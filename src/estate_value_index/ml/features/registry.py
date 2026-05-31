@@ -14,7 +14,6 @@ NUMERIC_FEATURE_NAMES: tuple[str, ...] = (
     "living_area",
     "rooms",
     "monthly_fee",
-    "days_on_market",
     "construction_year",
     "property_age",
     "price_per_sqm",
@@ -29,22 +28,10 @@ NUMERIC_FEATURE_NAMES: tuple[str, ...] = (
     "area_sales_volume_3m",
     "area_sales_volume_6m",
     "area_sales_volume_12m",
-    # Temporal features (listing-based only to avoid leakage)
+    # Temporal features (observation-time only). Listing-time and seasonality
+    # features require a true listing/publish date, which the source does not
+    # provide; they can be added if that date becomes available.
     "days_since_scraped",
-    "days_since_listed",
-    "listed_month",
-    "listed_quarter",
-    "listed_weekday",
-    "is_weekend_listing",
-    "listed_month_sin",
-    "listed_month_cos",
-    "listed_quarter_sin",
-    "listed_quarter_cos",
-    # Phase 2: Advanced temporal features
-    "is_tax_month",
-    "is_summer_peak",
-    "is_holiday_period",
-    "market_timing_score",
     # Property efficiency features
     "rooms_per_sqm",
     "fee_efficiency",
@@ -75,16 +62,11 @@ NUMERIC_FEATURE_NAMES: tuple[str, ...] = (
     "luxury_score",
     "value_score",
     "floor_per_sqm",
-    # Phase 3: Enhanced interactions
+    # Enhanced interactions (property/area/quality combinations).
     "area_location_score",
-    "timing_location_interaction",
     "efficiency_quality_score",
     "size_era_interaction",
     "rooms_efficiency_interaction",
-    "volatility_timing_interaction",
-    "liquidity_season_interaction",
-    "momentum_distance_interaction",
-    "property_desirability_score",
     "enhancement_potential",
     # New features inspired by top performers
     "price_acceleration_3m",
@@ -104,11 +86,7 @@ CATEGORICAL_FEATURE_NAMES: tuple[str, ...] = (
     "age_bucket",
     "space_efficiency",
     "area_price_tier",
-    # Phase 2: Advanced temporal features
-    "market_cycle",
-    "swedish_season",
-    "school_period",
-    "dom_momentum",
+    # Area price momentum (derived from past-only area price-change stats)
     "area_price_momentum",
     # Phase 3: Advanced architectural features
     "architectural_era",

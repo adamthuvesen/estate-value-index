@@ -7,13 +7,12 @@ PERFORMANCE_DEGRADATION_THRESHOLD = 0.10  # 10% MAE increase triggers alert
 
 # Critical features for drift monitoring (high importance from feature engineering)
 CRITICAL_NUMERIC_FEATURES = [
+    "listing_price",
     "living_area",
     "price_per_sqm",
+    "relative_area_price",
     "area_target_encoded",
     "area_price_median",
-    "days_on_market",
-    "construction_quality_score",
-    "energy_efficiency_est",
     "area_sold_price_median_3m",
 ]
 
