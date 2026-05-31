@@ -1,5 +1,5 @@
 import json
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 import scrapy
@@ -285,7 +285,7 @@ class BooliSpider(BooliExtractionMixins, scrapy.Spider):
             # Basic info
             item["listing_id"] = listing_id
             item["url"] = response.url
-            item["scraped_at"] = datetime.now().isoformat()
+            item["scraped_at"] = datetime.now(UTC).isoformat()
             if source_page is not None:
                 item["source_page"] = source_page
 

@@ -29,9 +29,9 @@ def prepare_bq_row(item: dict[str, Any]) -> dict[str, Any]:
         try:
             scraped_at = datetime.fromisoformat(scraped_at_str)
         except ValueError:
-            scraped_at = datetime.now()
+            scraped_at = datetime.now(UTC)
     else:
-        scraped_at = datetime.now()
+        scraped_at = datetime.now(UTC)
 
     def to_int(value: Any) -> int | None:
         if value is None:
