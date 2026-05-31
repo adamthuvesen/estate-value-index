@@ -10,8 +10,10 @@ from datetime import datetime
 def monitor_bigquery_costs(project_id: str, days: int = 7) -> dict:
     """Estimate BigQuery query costs from INFORMATION_SCHEMA.JOBS for the past N days."""
     try:
+        from estate_value_index.utils.bigquery_safety import _validate_bq_project_id
         from estate_value_index.utils.clients import get_bq_client
 
+        project_id = _validate_bq_project_id(project_id)
         client = get_bq_client(project_id)
 
         # Estimate from bytes processed; not actual billing
