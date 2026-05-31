@@ -97,8 +97,7 @@ if __name__ == "__main__":
         "--feature-set",
         type=str,
         default=None,
-        choices=["top_10", "top_20", "top_30", "full"],
-        help="Feature subset to use (from config/feature_subsets.yaml).",
+        help="Feature subset to use (any key from config/feature_subsets.yaml, or 'full').",
     )
     args = parser.parse_args()
 

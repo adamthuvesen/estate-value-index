@@ -14,17 +14,28 @@ from estate_value_index.utils.gcs import is_gcs_enabled, resolve_data_path
 
 
 def load_feature_subset(feature_set: str | None) -> tuple[list[str] | None, list[str] | None]:
-    """Load feature subset from config/feature_subsets.yaml."""
-    if feature_set is None or feature_set == "full":
+    """Load feature subset from config/feature_subsets.yaml.
+
+    ``feature_set=None`` resolves to the config's ``default`` key (falling back
+    to the full registry if that is ``full`` or unset). ``"full"`` always means
+    the full registry.
+    """
+    if feature_set == "full":
         return None, None
 
     config_path = Path("config/feature_subsets.yaml")
     if not config_path.exists():
-        print(f"Feature subset config not found: {config_path}")
+        if feature_set is not None:
+            print(f"Feature subset config not found: {config_path}")
         return None, None
 
     with open(config_path) as f:
         config = yaml.safe_load(f)
+
+    if feature_set is None:
+        feature_set = config.get("default", "full")
+        if feature_set == "full":
+            return None, None
 
     if feature_set not in config:
         print(f"Unknown feature set: {feature_set}")
