@@ -1,0 +1,38 @@
+station_name,type,lat,lon
+Stockholm Central,pendeltag,59.3293,18.0586
+Stockholm City,pendeltag,59.3312,18.0582
+Stockholms Södra,pendeltag,59.3136,18.0622
+Årstaberg,pendeltag,59.2985,18.0387
+Älvsjö,pendeltag,59.2786,18.0042
+Stuvsta,pendeltag,59.2646,17.9911
+Huddinge,pendeltag,59.2366,17.9882
+Flemingsberg,pendeltag,59.2189,17.9452
+Tullinge,pendeltag,59.2036,17.9068
+Tumba,pendeltag,59.1963,17.8336
+Rönninge,pendeltag,59.1951,17.7589
+Södertälje hamn,pendeltag,59.1855,17.6368
+Södertälje centrum,pendeltag,59.1984,17.6251
+Östertälje,pendeltag,59.2069,17.6522
+Södertälje Syd,pendeltag,59.1680,17.6292
+Järna,pendeltag,59.0914,17.5633
+Gnesta,pendeltag,59.0469,17.3064
+Karlberg,pendeltag,59.3379,18.0301
+Sundbyberg,pendeltag,59.3611,17.9710
+Solna,pendeltag,59.3649,18.0071
+Ulriksdal,pendeltag,59.3876,18.0239
+Helenelund,pendeltag,59.4031,18.0171
+Sollentuna,pendeltag,59.4281,17.9466
+Häggvik,pendeltag,59.4382,17.9345
+Norrviken,pendeltag,59.4544,17.9297
+Rotebro,pendeltag,59.4651,17.9305
+Upplands Väsby,pendeltag,59.5183,17.9219
+Rosersberg,pendeltag,59.5839,17.8814
+Märsta,pendeltag,59.6217,17.8557
+Arlanda,pendeltag,59.6497,17.9293
+Uppsala,pendeltag,59.8585,17.6469
+Spånga,pendeltag,59.3826,17.9021
+Barkarby,pendeltag,59.4059,17.8788
+Jakobsberg,pendeltag,59.4249,17.8355
+Kallhäll,pendeltag,59.4534,17.8159
+Kungsängen,pendeltag,59.4795,17.7610
+Bålsta,pendeltag,59.5667,17.5277
