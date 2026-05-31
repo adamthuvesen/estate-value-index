@@ -1,9 +1,8 @@
-"""Regression tests for ML temporal-feature-engineering leakage.
+"""Tests for temporal correctness of ML feature engineering.
 
-These tests pin the contract from the `fix-ml-temporal-leakage` change:
-no statistic computed from the holdout fold is observable to the training
-fold, and same-day same-area sales never leak labels into each other's
-features.
+These pin the contract that no statistic computed from the holdout fold is
+observable to the training fold, and that same-day same-area sales never
+contribute labels to each other's features.
 """
 
 from __future__ import annotations

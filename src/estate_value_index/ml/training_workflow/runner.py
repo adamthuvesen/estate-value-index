@@ -51,7 +51,7 @@ MIN_FEATURES_AFTER_PRUNING = 5
 
 @dataclass
 class SplitData:
-    """Leakage-free train/test frames plus the training-fold feature context."""
+    """Train/test frames plus the training-fold feature context."""
 
     train_engineered: pd.DataFrame
     test_engineered: pd.DataFrame
@@ -110,11 +110,10 @@ def _print_run_header(config: TrainingConfig) -> None:
 def _load_and_split(config: TrainingConfig) -> SplitData:
     """Load data, split temporally, then engineer features on the train fold only.
 
-    Per fix-ml-temporal-leakage: split FIRST, then engineer features. Training
-    statistics (medians, target-encoding global mean, area-market expanding
-    stats) are fit on the training fold only; the holdout is transformed via
-    FeatureEngineeringContext so no holdout-derived statistic is observable
-    to the trained model.
+    Split first, then engineer features. Training statistics (medians,
+    target-encoding global mean, area-market expanding stats) are fit on the
+    training fold only; the holdout is transformed via FeatureEngineeringContext
+    using those train-fold statistics.
     """
     df_or_engineered, skip_feature_engineering = load_training_dataframe(
         use_materialized_features=config.use_materialized_features,
@@ -208,9 +207,9 @@ def _prepare_train_test_matrices(
     categorical_features: list[str],
     all_features: list[str],
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series, dict, dict]:
-    """Slice, impute, and cast the leakage-free frames into LGBM-ready matrices."""
-    # Train/test slices come from the leakage-free engineered frames built
-    # above; no re-split or re-engineering inside the pruning loop.
+    """Slice, impute, and cast the engineered frames into LGBM-ready matrices."""
+    # Train/test slices come from the engineered frames built above; no
+    # re-split or re-engineering inside the pruning loop.
     X_train_raw = split.train_engineered[all_features].copy()
     X_test_raw = split.test_engineered[all_features].copy()
     y_train = split.train_engineered["sold_price"].copy()
@@ -271,7 +270,7 @@ def _fit_and_evaluate_iteration(
     )
 
     # feature_context was built outside the loop from the actual training
-    # fold (per fix-ml-temporal-leakage); no per-iteration rebuild needed.
+    # fold; no per-iteration rebuild needed.
     context_payload = _context_payload(split.feature_context)
 
     y_train_log = np.log1p(y_train)
@@ -542,7 +541,7 @@ def _log_temporal_validation(
     train_size: int,
     test_count: int,
 ) -> None:
-    """Print the train/test date ranges and confirm no temporal leakage."""
+    """Print the train/test date ranges and confirm chronological ordering."""
     print("\nTemporal Split Validation:")
     print(f"   Training set: {train_size:,} samples")
     print(
@@ -554,7 +553,7 @@ def _log_temporal_validation(
     )
     temporal_gap = (test_df["sold_date"].min() - train_df["sold_date"].max()).days
     print(f"   Temporal gap: {temporal_gap} day(s)")
-    print("   No temporal leakage (test data is strictly after training data)")
+    print("   Test data is strictly after training data")
 
 
 def _retrain_on_all_data(

@@ -23,7 +23,8 @@ def _create_area_market_features(
 ) -> pd.DataFrame:
     """Create area-level market microstructure features.
 
-    Uses leave-one-out calculation during training to avoid data leakage.
+    During training, each row's area statistics are computed from other
+    listings only (leave-one-out), using a time-based expanding window.
     """
     # Ensure days_on_market is available for downstream statistics
     if "days_on_market" not in df.columns:
@@ -33,10 +34,10 @@ def _create_area_market_features(
 
     if context is None:
         # Training mode: time-based rolling with closed='left' so same-day rows
-        # in the same area do not leak into each other's statistics. The window
-        # is unbounded ("100000D") to mimic an expanding window. closed='left'
-        # excludes the current row's date, so two listings at (area=A, date=D)
-        # see the same prior history (everything strictly before D).
+        # in the same area do not contribute to each other's statistics. The
+        # window is unbounded ("100000D") to mimic an expanding window.
+        # closed='left' excludes the current row's date, so two listings at
+        # (area=A, date=D) see the same prior history (everything before D).
         if "sold_date" in df.columns:
             df["sold_date"] = pd.to_datetime(df["sold_date"], errors="coerce")
             unbounded = "100000D"
@@ -147,7 +148,7 @@ def _create_area_market_features(
         df["area_price_volatility"], df["area_price_median"], df.index
     )
 
-    # Area price momentum (categorical based on area stats - NOT leakage)
+    # Area price momentum (categorical, based on area stats)
     df["area_price_momentum"] = df["area_price_change_mean"].apply(_classify_area_price_momentum)
 
     return df

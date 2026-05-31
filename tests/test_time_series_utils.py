@@ -74,8 +74,8 @@ def test_validate_temporal_leakage_valid(sample_temporal_df):
 
     assert validate_temporal_leakage(train_indices, test_indices, df_sorted, verbose=False) is True
 
-    # Same-day boundary sales must be rejected — leakage-free encoders cannot
-    # distinguish same-day rows across the split. See fix-ml-temporal-leakage.
+    # Same-day boundary sales must be rejected: encoders cannot distinguish
+    # same-day rows across the split, so they must not straddle it.
     dates = pd.date_range(start="2024-01-01", periods=100, freq="D")
     df_with_overlap = pd.DataFrame(
         {

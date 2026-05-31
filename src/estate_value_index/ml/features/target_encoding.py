@@ -5,18 +5,18 @@ import pandas as pd
 from estate_value_index.ml.constants import TARGET_ENCODING_SMOOTHING
 from estate_value_index.ml.features.context import FeatureEngineeringContext
 
-"""Target encoding with temporal leakage guards."""
+"""Target encoding using only prior sales (temporal awareness)."""
 
 
 def _create_target_encoding(
     df: pd.DataFrame, context: FeatureEngineeringContext | None
 ) -> pd.DataFrame:
-    """Create target-encoded features using temporal awareness to prevent data leakage."""
+    """Create target-encoded features using only sales strictly before each row's date."""
     if context is None:
         # Training mode: pre-aggregate same-day same-area rows so two listings
-        # with identical (area, sold_date) cannot leak each other's sold_price
-        # into the encoding. For each row at date D in area A, the encoding is
-        # the mean of all sold_price values in A whose sold_date < D.
+        # with identical (area, sold_date) do not contribute each other's
+        # sold_price to the encoding. For each row at date D in area A, the
+        # encoding is the mean of all sold_price values in A whose sold_date < D.
         if "sold_price" in df.columns and "sold_date" in df.columns:
             global_mean = float(df["sold_price"].mean())
             smoothing = TARGET_ENCODING_SMOOTHING

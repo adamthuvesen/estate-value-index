@@ -44,8 +44,9 @@ def _create_temporal_features(df: pd.DataFrame, reference_date: pd.Timestamp) ->
     df["listed_quarter_sin"] = np.sin(2 * np.pi * df["listed_quarter"] / 4)
     df["listed_quarter_cos"] = np.cos(2 * np.pi * df["listed_quarter"] / 4)
 
-    # Note: We do NOT use sold_* features to avoid leakage of the listing's own sold_date
-    # Historical sold_dates from other properties are used in area statistics (area_sold_price_median_*)
+    # Note: a listing's own sold_* fields are not used as features; only its
+    # listing-time attributes. Other properties' historical sold_dates feed the
+    # area statistics (area_sold_price_median_*).
 
     # Market cycle based on listing_date (uses year-based cycle)
     df["market_cycle"] = _classify_market_cycle(df["listing_date"])
