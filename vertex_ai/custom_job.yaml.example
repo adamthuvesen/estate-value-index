@@ -1,0 +1,36 @@
+
+# Sample Vertex AI job configuration.
+# Update the service account, imageUri, and output paths before use.
+
+displayName: lgbm-train-sample
+jobSpec:
+  serviceAccount: service-account@your-gcp-project-id.iam.gserviceaccount.com
+  baseOutputDirectory:
+    outputUriPrefix: gs://your-gcs-bucket/vertex-ai/jobs/sample
+  workerPoolSpecs:
+    - machineSpec:
+        machineType: n1-standard-4
+      replicaCount: 1
+      containerSpec:
+        imageUri: europe-north1-docker.pkg.dev/your-gcp-project-id/vertex-training/lgbm-trainer:latest
+        args:
+          - --data-source
+          - bigquery
+          - --use-features
+          - --model-dir
+          - gs://your-gcs-bucket/vertex-ai/models/sample
+          - --model-prefix
+          - vertex-lgbm-sample
+        env:
+          - name: GCP_PROJECT_ID
+            value: your-gcp-project-id
+          - name: BIGQUERY_DATASET_FEATURES
+            value: booli_features
+          - name: BIGQUERY_TABLE_FEATURES
+            value: engineered_features
+          - name: GCS_BUCKET
+            value: your-gcs-bucket
+          - name: GCS_ENABLED
+            value: "true"
+          - name: MODEL_ARTIFACTS_URI
+            value: gs://your-gcs-bucket/vertex-ai/models/sample

@@ -1,0 +1,125 @@
+name: Deploy Web App
+
+# Required GitHub Secrets:
+#   GCP_SA_KEY - GCP service account JSON key with permissions:
+#     - Cloud Run Admin
+#     - Storage Object Viewer (for container runtime GCS access)
+#     - Artifact Registry Reader (for container registry)
+#
+# Model Loading Architecture:
+#   Models are loaded at container runtime (not during build).
+#   The startup.sh script downloads models from gs://estate-value-index-data-production/models/
+#   when the container starts, before launching services.
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+      model_commit_sha:
+        description: 'Commit SHA of trained model (leave empty for current commit)'
+        required: false
+        type: string
+
+env:
+  GCP_PROJECT_ID: estate-value-index
+  GCP_REGION: europe-north1
+  SERVICE_NAME: estate-value-index-app
+  GCS_BUCKET: estate-value-index-data-production
+
+jobs:
+  deploy:
+    name: Build and Deploy to Cloud Run
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      # NOTE: Models are now loaded at container runtime from GCS (see scripts/startup.sh)
+      # No need to download models during build - they're fetched when the container starts
+
+      - name: Configure Docker for GCR
+        run: gcloud auth configure-docker
+
+      - name: Build Docker image
+        run: |
+          docker build -t gcr.io/${{ env.GCP_PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ github.sha }} \
+                      -t gcr.io/${{ env.GCP_PROJECT_ID }}/${{ env.SERVICE_NAME }}:latest .
+
+      - name: Push Docker image to GCR
+        run: |
+          docker push gcr.io/${{ env.GCP_PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
+          docker push gcr.io/${{ env.GCP_PROJECT_ID }}/${{ env.SERVICE_NAME }}:latest
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy ${{ env.SERVICE_NAME }} \
+            --image gcr.io/${{ env.GCP_PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ github.sha }} \
+            --platform managed \
+            --region ${{ env.GCP_REGION }} \
+            --allow-unauthenticated \
+            --min-instances 0 \
+            --max-instances 2 \
+            --memory 1Gi \
+            --cpu 1 \
+            --timeout 900s \
+            --port 8080 \
+            --set-env-vars "GCS_ENABLED=true,GCS_BUCKET=${{ env.GCS_BUCKET }},NODE_ENV=${{ inputs.environment }}" \
+            --quiet
+
+      - name: Get deployment URL
+        id: get-url
+        run: |
+          URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} \
+            --region ${{ env.GCP_REGION }} \
+            --format 'value(status.url)')
+          echo "url=$URL" >> $GITHUB_OUTPUT
+
+      - name: Health check
+        run: |
+          # The service has `ingress: internal`, so HTTP probes from GitHub
+          # runners get a Google-frontend 404. Verify revision readiness via
+          # the Cloud Run control plane instead — that's what we actually care
+          # about (the latest revision came up healthy).
+          REVISION=$(gcloud run services describe ${{ env.SERVICE_NAME }} \
+            --region ${{ env.GCP_REGION }} \
+            --format='value(status.latestReadyRevisionName)')
+
+          if [ -z "$REVISION" ]; then
+            echo "❌ No ready revision found for ${{ env.SERVICE_NAME }}"
+            exit 1
+          fi
+
+          echo "✅ Latest ready revision: $REVISION"
+
+          gcloud run revisions describe "$REVISION" \
+            --region ${{ env.GCP_REGION }} \
+            --format='value(status.conditions)' | head -20
+
+      - name: Summary
+        run: |
+          MODEL_SHA="${{ inputs.model_commit_sha || github.sha }}"
+          echo "## Deployment Summary"
+          echo "✅ Deployed to: ${{ steps.get-url.outputs.url }}"
+          echo "Environment: ${{ inputs.environment }}"
+          echo "Model Commit: ${MODEL_SHA}"
+          echo "Image: gcr.io/${{ env.GCP_PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ github.sha }}"

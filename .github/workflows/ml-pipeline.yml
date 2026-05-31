@@ -1,0 +1,279 @@
+name: ML Pipeline
+
+# Required GitHub Secrets:
+#   GCP_SA_KEY - GCP service account JSON key with permissions:
+#     - BigQuery Data Editor
+#     - Vertex AI User
+#     - Storage Admin (for GCS model upload)
+#   PREFECT_API_KEY - Prefect Cloud authentication (REQUIRED for Vertex AI mode)
+
+on:
+  # Manual trigger with parameters
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Pipeline mode'
+        required: true
+        default: 'retrain'
+        type: choice
+        options:
+          - retrain          # Retrain only (no scraping)
+          - full             # Full pipeline (scrape + train)
+          - vertex           # Vertex AI training only
+          - local            # Local training only
+      max_pages:
+        description: 'Maximum pages to scrape (full mode only)'
+        required: false
+        default: '5'
+        type: string
+      tune:
+        description: 'Enable hyperparameter tuning'
+        required: false
+        default: true
+        type: boolean
+      rebuild_container:
+        description: 'Rebuild Vertex AI training container'
+        required: false
+        default: false
+        type: boolean
+      deploy:
+        description: 'Deploy to Cloud Run after training'
+        required: false
+        default: false
+        type: boolean
+
+  # Weekly schedule: Sunday at 2 AM UTC (retrain mode)
+  schedule:
+    - cron: '0 2 * * 0'
+
+env:
+  GCP_PROJECT_ID: estate-value-index
+  BIGQUERY_PROJECT_ID: estate-value-index
+  GCP_REGION: europe-north1
+  GCS_BUCKET: estate-value-index-data-production
+  BIGQUERY_DATASET_RAW: booli_raw
+  BIGQUERY_TABLE_LISTINGS: listings
+  BIGQUERY_DATASET_FEATURES: booli_features
+  BIGQUERY_TABLE_FEATURES: engineered_features
+
+jobs:
+  ml-pipeline:
+    name: Run ML Pipeline
+    runs-on: ubuntu-latest
+    timeout-minutes: 120  # 2 hours for full pipeline
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8.1.0
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Validate BigQuery access
+        run: |
+          echo "Validating BigQuery datasets..."
+          bq ls ${{ env.GCP_PROJECT_ID }}:${{ env.BIGQUERY_DATASET_RAW }} > /dev/null || {
+            echo "❌ Error: Cannot access BigQuery dataset ${{ env.BIGQUERY_DATASET_RAW }}"
+            exit 1
+          }
+          bq ls ${{ env.GCP_PROJECT_ID }}:${{ env.BIGQUERY_DATASET_FEATURES }} > /dev/null || {
+            echo "❌ Error: Cannot access BigQuery dataset ${{ env.BIGQUERY_DATASET_FEATURES }}"
+            exit 1
+          }
+          echo "✅ BigQuery access validated"
+
+      - name: Set pipeline parameters
+        id: params
+        run: |
+          # Determine mode (manual trigger or scheduled)
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            MODE="retrain"
+            TUNE="true"
+            REBUILD="false"
+            DEPLOY="false"
+            MAX_PAGES="5"
+          else
+            MODE="${{ github.event.inputs.mode }}"
+            TUNE="${{ github.event.inputs.tune }}"
+            REBUILD="${{ github.event.inputs.rebuild_container }}"
+            DEPLOY="${{ github.event.inputs.deploy }}"
+            MAX_PAGES="${{ github.event.inputs.max_pages }}"
+          fi
+
+          echo "mode=$MODE" >> $GITHUB_OUTPUT
+          echo "tune=$TUNE" >> $GITHUB_OUTPUT
+          echo "rebuild=$REBUILD" >> $GITHUB_OUTPUT
+          echo "deploy=$DEPLOY" >> $GITHUB_OUTPUT
+          echo "max_pages=$MAX_PAGES" >> $GITHUB_OUTPUT
+
+          echo "Pipeline Configuration:"
+          echo "  Mode: $MODE"
+          echo "  Tune: $TUNE"
+          echo "  Rebuild container: $REBUILD"
+          echo "  Deploy: $DEPLOY"
+          echo "  Max pages: $MAX_PAGES"
+
+      - name: Run ML Pipeline
+        id: pipeline
+        env:
+          PREFECT_API_KEY: ${{ secrets.PREFECT_API_KEY }}
+          PREFECT_API_URL: ${{ secrets.PREFECT_API_URL }}
+        run: |
+          uv run python -c "
+          import sys
+          import json
+          from estate_value_index.pipelines.core.complete_pipeline import complete_pipeline_flow
+
+          # Parse parameters
+          mode = '${{ steps.params.outputs.mode }}'
+          tune = '${{ steps.params.outputs.tune }}'.lower() == 'true'
+          rebuild = '${{ steps.params.outputs.rebuild }}'.lower() == 'true'
+          deploy = '${{ steps.params.outputs.deploy }}'.lower() == 'true'
+          max_pages = int('${{ steps.params.outputs.max_pages }}')
+
+          # Configure based on mode
+          if mode == 'retrain':
+              skip_scraping = True
+              use_vertex = True
+          elif mode == 'full':
+              skip_scraping = False
+              use_vertex = True
+          elif mode == 'vertex':
+              skip_scraping = True
+              use_vertex = True
+          elif mode == 'local':
+              skip_scraping = True
+              use_vertex = False
+          else:
+              print(f'❌ Unknown mode: {mode}')
+              sys.exit(1)
+
+          # Run pipeline
+          print(f'🚀 Running pipeline: mode={mode}, tune={tune}, deploy={deploy}')
+
+          result = complete_pipeline_flow(
+              max_pages=max_pages,
+              skip_scraping=skip_scraping,
+              tune=tune,
+              use_vertex=use_vertex,
+              machine_type='n1-standard-4',
+              rebuild_container=rebuild,
+              deploy_to_prod=deploy,
+              validate_deployment=True,
+              dry_run=False
+          )
+
+          # Check results
+          success = result.get('success', False)
+          validation_passed = result.get('stages', {}).get('training', {}).get('validation_passed', False)
+          validation_mae = result.get('stages', {}).get('training', {}).get('validation_mae_passed', True)
+
+          print(f'Pipeline completed: {success}')
+          print(f'Validation passed: {validation_passed}')
+          print(f'  - MAE check: {validation_mae}')
+
+          # Write validation status for notifications
+          with open('validation_status.txt', 'w') as f:
+              if not validation_passed:
+                  f.write('VALIDATION_FAILED')
+              else:
+                  f.write('SUCCESS')
+
+          # Extract metrics
+          metrics = result.get('stages', {}).get('training', {}).get('metrics', {})
+          mae = metrics.get('mae', 0)
+
+          # Quality gate: MAE threshold
+          if mae > 275000:
+              print(f'❌ MAE quality gate failed: {mae:,.0f} SEK exceeds threshold of 275,000 SEK')
+              sys.exit(1)
+          else:
+              print(f'✅ MAE quality gate passed: {mae:,.0f} SEK')
+
+          # Fail if validation failed
+          if not validation_passed:
+              print('❌ Pipeline validation failed (MAE threshold not met)')
+              sys.exit(1)
+
+          print('✅ Pipeline validation passed')
+          "
+
+      - name: Upload pipeline logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pipeline-logs-${{ github.run_number }}
+          path: |
+            data/metrics/*.json
+            *.log
+          retention-days: 30
+          if-no-files-found: ignore
+
+      - name: Upload model artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: model-artifacts-${{ github.sha }}
+          path: |
+            web/models/*.joblib
+            web/models/*.json
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Log failure details
+        if: failure()
+        run: |
+          echo "❌ ML Pipeline Failed"
+          echo "Workflow: ${{ github.workflow }}"
+          echo "Run: ${{ github.run_number }}"
+          echo "Trigger: ${{ github.event_name }}"
+          echo "Mode: ${{ steps.params.outputs.mode }}"
+
+          # Check if it was a validation failure vs other failure
+          if [ -f validation_status.txt ] && grep -q "VALIDATION_FAILED" validation_status.txt; then
+            echo "Reason: Validation Failed (MAE threshold)"
+          else
+            echo "Reason: Pipeline Error"
+          fi
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## ML Pipeline Summary"
+          echo "Mode: ${{ steps.params.outputs.mode }}"
+          echo "Hyperparameter Tuning: ${{ steps.params.outputs.tune }}"
+          echo "Deploy: ${{ steps.params.outputs.deploy }}"
+          echo "Commit SHA: ${{ github.sha }}"
+
+          if [ -f "web/models/price_prediction_model_metrics_lgbm.json" ]; then
+            echo ""
+            echo "## Model Metrics"
+            cat web/models/price_prediction_model_metrics_lgbm.json | python -m json.tool
+          fi
+
+          echo ""
+          echo "## Model Location"
+          echo "Models uploaded to: gs://${{ env.GCS_BUCKET }}/models/"
+          echo "Loaded at runtime by: scripts/startup.sh"

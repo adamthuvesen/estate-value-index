@@ -1,0 +1,148 @@
+name: ML Monitoring - Weekly Drift Detection
+
+# Required GitHub Secrets:
+#   GCP_SA_KEY - GCP service account JSON key with permissions:
+#     - BigQuery Data Viewer
+#     - Storage Object Admin (for GCS monitoring data)
+
+on:
+  schedule:
+    - cron: '0 3 * * 1'  # Monday 3 AM UTC
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  drift-detection:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    permissions:
+      contents: read
+      id-token: write
+      issues: write  # For creating issues on drift detection
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+
+      - name: Install dependencies
+        run: |
+          uv sync --all-extras
+          source .venv/bin/activate
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Verify GCS access
+        run: |
+          source .venv/bin/activate
+          python -c "
+          from google.cloud import storage
+          client = storage.Client()
+          bucket = client.bucket('estate-value-index-data-production')
+          blob = bucket.blob('monitoring/baseline/baseline_data.parquet')
+          if not blob.exists():
+              print('WARNING: Baseline data not found - first run will create it')
+          else:
+              print('GCS access verified, baseline exists')
+          "
+
+      - name: Export recent predictions
+        id: export
+        run: |
+          source .venv/bin/activate
+          python -c "
+          import os
+          from estate_value_index.pipelines.tasks.monitoring import export_recent_predictions_task
+          from pathlib import Path
+
+          result = export_recent_predictions_task.fn(
+              days_lookback=30,  # 30 days to ensure sufficient data
+              output_path=Path('/tmp/current_data.parquet'),
+          )
+          print(f'Exported {result[\"row_count\"]} rows')
+
+          # Check if export was successful
+          if not result.get('success', False):
+              print(f'Export failed: {result.get(\"error\", \"Unknown error\")}')
+              print('Skipping drift detection due to insufficient data')
+              with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                  f.write('skip_drift=true\n')
+          else:
+              with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                  f.write('skip_drift=false\n')
+          "
+
+      - name: Run drift detection
+        id: drift_check
+        if: steps.export.outputs.skip_drift != 'true'
+        run: |
+          source .venv/bin/activate
+          python -c "
+          from estate_value_index.pipelines.tasks.monitoring import monitor_model_drift_task
+          from pathlib import Path
+          import os
+
+          result = monitor_model_drift_task.fn(
+              current_data_path='/tmp/current_data.parquet',
+              reference_data_path='gs://estate-value-index-data-production/monitoring/baseline/baseline_data.parquet',
+              model_version='${{ github.sha }}',
+              alert_on_drift=True,
+              upload_to_gcs=True,
+          )
+
+          print(f'Drift detected: {result[\"drift_detected\"]}')
+          print(f'Drifted features: {result[\"drifted_features\"]}')
+          print(f'Performance degraded: {result[\"performance_degraded\"]}')
+
+          # Set outputs for next steps
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f'drift_detected={result[\"drift_detected\"]}\n')
+              f.write(f'performance_degraded={result[\"performance_degraded\"]}\n')
+              f.write(f'num_drifted_features={result[\"num_drifted_features\"]}\n')
+
+          # Exit with error if critical drift detected
+          if result['performance_degraded'] or result['num_drifted_features'] >= 3:
+              print('⚠️  Critical drift detected - manual review required')
+              exit(1)
+          "
+
+      - name: Upload drift report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: drift-report-${{ github.run_number }}
+          path: /tmp/drift_report_*.html
+          retention-days: 30
+
+      - name: Summary - Skipped
+        if: steps.export.outputs.skip_drift == 'true'
+        run: |
+          echo "## ML Monitoring Summary" >> $GITHUB_STEP_SUMMARY
+          echo "⏭️ Drift detection skipped due to insufficient recent data." >> $GITHUB_STEP_SUMMARY
+          echo "This is expected if there have been fewer than 10 predictions in the last 7 days." >> $GITHUB_STEP_SUMMARY
+
+      - name: Comment on drift detection failure
+        if: failure() && steps.export.outputs.skip_drift != 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '⚠️ ML Monitoring Alert: Drift Detected',
+              body: `Automated drift detection run failed on ${new Date().toISOString()}.
+
+              **Action Required:** Review drift report in workflow artifacts.
+
+              Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}`
+            })
