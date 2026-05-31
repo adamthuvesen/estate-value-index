@@ -1,0 +1,90 @@
+# gcloudignore - controls what gets uploaded to Cloud Build
+# This can dramatically speed up deployments
+
+# Python virtual environments (LARGEST - 1GB+)
+.venv/
+venv/
+env/
+ENV/
+
+# Node modules (handled by Docker build)
+node_modules/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Next.js (we rebuild in Docker anyway)
+.next/cache/
+
+# Git
+.git/
+.gitignore
+
+# IDEs
+.vscode/
+.idea/
+.cursor/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+tests/
+*.test.js
+*.test.ts
+*.spec.js
+*.spec.ts
+
+# Notebooks (not needed for production)
+notebooks/
+*.ipynb
+
+# Reports (not needed for production)
+reports/
+
+# Documentation (keep only essential)
+docs/
+*.md
+!README.md
+
+# Data files (too large, except essential ones)
+data/raw/
+data/metrics/
+*.csv
+*.parquet
+
+# Enrichment data (loaded from GCS at runtime)
+data/enrichment/
+!data/enrichment/.gitkeep
+
+# Model artifacts (loaded from GCS at runtime)
+web/models/*
+!web/models/.gitkeep
+
+# Experiments (not needed for production)
+experiments/
+
+# CI/CD
+.github/
+
+# Logs
+*.log
+logs/
+
+# Keep these for build
+!.dockerignore
+!Dockerfile

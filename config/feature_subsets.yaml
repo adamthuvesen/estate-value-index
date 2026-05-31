@@ -1,0 +1,96 @@
+# Feature subset configurations for model training
+# Based on feature importance analysis.
+#
+# Key findings:
+# - Top 10 features achieved best MAE (239,990 SEK, -3.14% vs baseline)
+# - More features led to overfitting (Top 30 was WORST at 248,829 SEK)
+# - Less is more - focused feature sets generalize better
+
+# Default feature set to use
+default: top_10
+
+# Top 10 features (RECOMMENDED - best performance)
+# MAE: 239,990 SEK (-3.14% vs baseline)
+top_10:
+  numeric:
+    - listing_price          # 42.90% importance
+    - relative_area_price    # 34.08% importance
+    - price_per_sqm          # 7.52% importance
+    - area_price_median      # 3.89% importance
+    - area_sold_price_median_12m  # 2.05% importance
+    - luxury_score           # 1.94% importance
+    - cost_benefit_ratio     # 1.18% importance
+    - days_on_market         # 0.86% importance
+    - living_area            # 0.70% importance
+    - distance_to_city_center  # 0.49% importance (POI feature)
+  categorical: []
+
+# Top 20 features (alternative - good balance)
+# MAE: 244,052 SEK (-1.50% vs baseline)
+top_20:
+  numeric:
+    - listing_price
+    - relative_area_price
+    - price_per_sqm
+    - area_price_median
+    - area_sold_price_median_12m
+    - luxury_score
+    - cost_benefit_ratio
+    - days_on_market
+    - living_area
+    - distance_to_city_center
+    - area_target_encoded
+    - area_sold_price_median_6m
+    - area_age_interaction
+    - area_price_change_mean
+    - value_score
+    - total_cost_per_sqm
+    - monthly_fee_per_sqm
+    - volatility_timing_interaction
+    - area_sold_price_median_3m
+    - living_area_squared
+  categorical: []
+
+# Top 30 features (NOT recommended - overfits)
+# MAE: 248,829 SEK (+0.43% vs baseline - worse than baseline!)
+top_30:
+  numeric:
+    - listing_price
+    - relative_area_price
+    - price_per_sqm
+    - area_price_median
+    - area_sold_price_median_12m
+    - luxury_score
+    - cost_benefit_ratio
+    - days_on_market
+    - living_area
+    - distance_to_city_center
+    - area_target_encoded
+    - area_sold_price_median_6m
+    - area_age_interaction
+    - area_price_change_mean
+    - value_score
+    - total_cost_per_sqm
+    - monthly_fee_per_sqm
+    - volatility_timing_interaction
+    - area_sold_price_median_3m
+    - living_area_squared
+    - days_since_listed
+    - rooms_age_interaction
+    - fee_price_interaction
+    - construction_year
+    - area_volatility_score
+    - floor_per_sqm
+    - area_days_on_market_median
+    - floor_height_premium
+    - distance_to_nearest_train
+  categorical:
+    - area
+
+# Full feature set (all 89 features)
+# MAE: 245,834 SEK (-0.78% vs baseline)
+full:
+  # Uses all features from NUMERIC_FEATURE_NAMES and CATEGORICAL_FEATURE_NAMES
+  # Set to null to indicate "use all available features"
+  numeric: null
+  categorical: null

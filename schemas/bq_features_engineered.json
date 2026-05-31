@@ -1,0 +1,560 @@
+[
+  {
+    "name": "listing_id",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Unique listing identifier linking to raw listings table"
+  },
+  {
+    "name": "sold_price",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Target variable - final sale price in Swedish Kronor (SEK)"
+  },
+  {
+    "name": "sold_date",
+    "type": "DATE",
+    "mode": "NULLABLE",
+    "description": "Date when the property was sold, used for temporal validation and feature engineering"
+  },
+  {
+    "name": "feature_date",
+    "type": "DATE",
+    "mode": "REQUIRED",
+    "description": "Date when the engineered features were computed and materialized"
+  },
+  {
+    "name": "listing_price",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Original asking price when the property was first listed"
+  },
+  {
+    "name": "living_area",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Total living area of the property in square meters"
+  },
+  {
+    "name": "rooms",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Total number of rooms in the property"
+  },
+  {
+    "name": "monthly_fee",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Monthly housing association fee (avgift) in Swedish Kronor"
+  },
+  {
+    "name": "days_on_market",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Number of days the property was listed before being sold"
+  },
+  {
+    "name": "construction_year",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Year when the property was originally constructed"
+  },
+  {
+    "name": "property_age",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Age of the property in years (current year - construction_year)"
+  },
+  {
+    "name": "price_per_sqm",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Price per square meter calculated as listing_price / living_area"
+  },
+  {
+    "name": "monthly_fee_per_sqm",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Monthly fee per square meter calculated as monthly_fee / living_area"
+  },
+  {
+    "name": "living_area_squared",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Polynomial feature: living_area squared to capture non-linear size effects"
+  },
+  {
+    "name": "area_sold_price_median_1m",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Median sold price in the same area over the past 1 month"
+  },
+  {
+    "name": "area_sold_price_median_3m",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Median sold price in the same area over the past 3 months"
+  },
+  {
+    "name": "area_sold_price_median_6m",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Median sold price in the same area over the past 6 months"
+  },
+  {
+    "name": "area_sold_price_median_12m",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Median sold price in the same area over the past 12 months"
+  },
+  {
+    "name": "area_sales_volume_1m",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Number of properties sold in the same area over the past 1 month"
+  },
+  {
+    "name": "area_sales_volume_3m",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Number of properties sold in the same area over the past 3 months"
+  },
+  {
+    "name": "area_sales_volume_6m",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Number of properties sold in the same area over the past 6 months"
+  },
+  {
+    "name": "area_sales_volume_12m",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Number of properties sold in the same area over the past 12 months"
+  },
+  {
+    "name": "days_since_scraped",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Number of days since the listing was scraped from Booli.se"
+  },
+  {
+    "name": "days_since_listed",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Number of days since the property was first listed for sale"
+  },
+  {
+    "name": "listed_month",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Month when the property was listed (1-12)"
+  },
+  {
+    "name": "listed_quarter",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Quarter when the property was listed (1-4)"
+  },
+  {
+    "name": "listed_weekday",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Day of the week when the property was listed (0=Monday, 6=Sunday)"
+  },
+  {
+    "name": "is_weekend_listing",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Binary indicator: 1 if listed on weekend (Saturday/Sunday), 0 otherwise"
+  },
+  {
+    "name": "listed_month_sin",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Cyclical encoding of listing month using sine transformation"
+  },
+  {
+    "name": "listed_month_cos",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Cyclical encoding of listing month using cosine transformation"
+  },
+  {
+    "name": "listed_quarter_sin",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Cyclical encoding of listing quarter using sine transformation"
+  },
+  {
+    "name": "listed_quarter_cos",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Cyclical encoding of listing quarter using cosine transformation"
+  },
+  {
+    "name": "is_tax_month",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Binary indicator: 1 if listed during Swedish tax months (March/April), 0 otherwise"
+  },
+  {
+    "name": "is_summer_peak",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Binary indicator: 1 if listed during Swedish summer peak season (May-August), 0 otherwise"
+  },
+  {
+    "name": "is_holiday_period",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Binary indicator: 1 if listed during holiday periods (December/January/July), 0 otherwise"
+  },
+  {
+    "name": "market_timing_score",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Composite score combining multiple temporal factors affecting market timing"
+  },
+  {
+    "name": "rooms_per_sqm",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Room density calculated as rooms / living_area"
+  },
+  {
+    "name": "fee_efficiency",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Fee efficiency calculated as monthly_fee / living_area"
+  },
+  {
+    "name": "total_cost_per_sqm",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Total ownership cost per square meter including listing price and annual fees"
+  },
+  {
+    "name": "distance_to_center",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Estimated distance from property to Stockholm city center (0-5 scale)"
+  },
+  {
+    "name": "distance_to_city_center",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "True distance to Stockholm city center in meters (Sergels Torg, via Haversine formula)"
+  },
+  {
+    "name": "area_inventory",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Number of properties available for sale in the same area"
+  },
+  {
+    "name": "area_price_volatility",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Standard deviation of listing prices in the same area"
+  },
+  {
+    "name": "area_price_median",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Median listing price in the same area"
+  },
+  {
+    "name": "area_days_on_market_median",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Median days on market for properties in the same area"
+  },
+  {
+    "name": "area_price_change_mean",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Average price change (sold_price - listing_price) in the same area"
+  },
+  {
+    "name": "area_price_change_count",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Number of properties with price changes in the same area"
+  },
+  {
+    "name": "area_liquidity",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Market liquidity calculated as area_inventory / area_days_on_market_median"
+  },
+  {
+    "name": "relative_area_price",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Relative price compared to area median (listing_price / area_price_median)"
+  },
+  {
+    "name": "area_volatility_score",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Price volatility normalized by area median (area_price_volatility / area_price_median)"
+  },
+  {
+    "name": "construction_quality_score",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Estimated construction quality score based on architectural era (1-10 scale)"
+  },
+  {
+    "name": "energy_efficiency_est",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Estimated energy efficiency score based on construction year and size (1-10 scale)"
+  },
+  {
+    "name": "floor",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Floor number where the apartment is located"
+  },
+  {
+    "name": "floor_height_premium",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Non-linear floor premium using log transformation to capture diminishing returns"
+  },
+  {
+    "name": "amenity_score",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Composite score combining elevator, balcony, and floor amenities"
+  },
+  {
+    "name": "area_age_interaction",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Interaction feature: living_area * property_age"
+  },
+  {
+    "name": "rooms_age_interaction",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Interaction feature: rooms * property_age"
+  },
+  {
+    "name": "fee_price_interaction",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Normalized interaction: monthly_fee / (listing_price + 1)"
+  },
+  {
+    "name": "luxury_score",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Multi-factor luxury score combining price, size, and construction quality"
+  },
+  {
+    "name": "value_score",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Value score calculated as living_area / total_ownership_cost"
+  },
+  {
+    "name": "floor_per_sqm",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Floor density calculated as floor / living_area"
+  },
+  {
+    "name": "area_location_score",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Location premium score: distance_to_center * construction_quality_score"
+  },
+  {
+    "name": "timing_location_interaction",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Market timing and location interaction: market_timing_score * area_liquidity"
+  },
+  {
+    "name": "efficiency_quality_score",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Combined efficiency and quality score: energy_efficiency_est * construction_quality_score"
+  },
+  {
+    "name": "size_era_interaction",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Size and era interaction: living_area * construction_quality_score"
+  },
+  {
+    "name": "rooms_efficiency_interaction",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Room density and efficiency interaction: rooms_per_sqm * energy_efficiency_est"
+  },
+  {
+    "name": "volatility_timing_interaction",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Market volatility and timing interaction: area_volatility_score * market_timing_score"
+  },
+  {
+    "name": "liquidity_season_interaction",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Market liquidity and season interaction: area_liquidity * is_summer_peak"
+  },
+  {
+    "name": "momentum_distance_interaction",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Market momentum and distance interaction for hot markets"
+  },
+  {
+    "name": "property_desirability_score",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Comprehensive desirability score combining quality, location, efficiency, liquidity, and timing"
+  },
+  {
+    "name": "enhancement_potential",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Potential for property enhancement based on renovation likelihood, era, and location"
+  },
+  {
+    "name": "price_acceleration_3m",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Price acceleration over 3 months: (area_sold_price_median_1m - area_sold_price_median_3m) / area_sold_price_median_3m"
+  },
+  {
+    "name": "cost_benefit_ratio",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Cost-benefit ratio: (living_area * energy_efficiency_est) / total_ownership_cost"
+  },
+  {
+    "name": "temporal_price_trend",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Temporal price trend across different time windows"
+  },
+  {
+    "name": "efficiency_premium",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Price premium based on energy efficiency and construction quality"
+  },
+  {
+    "name": "demand_supply_ratio",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Demand-supply ratio: area_sales_volume_3m / area_inventory"
+  },
+  {
+    "name": "area_avg_price",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Average listing price in the same area"
+  },
+  {
+    "name": "area_listing_count",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Total number of listings in the same area"
+  },
+  {
+    "name": "area_target_encoded",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Leave-one-out target encoding of area using sold prices"
+  },
+  {
+    "name": "area",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Standardized neighborhood/area name"
+  },
+  {
+    "name": "age_bucket",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Property age category: new (≤10 years), modern (11-30 years), old (>30 years)"
+  },
+  {
+    "name": "space_efficiency",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Space efficiency category based on rooms_per_sqm: luxury_spacious, spacious, efficient, cramped"
+  },
+  {
+    "name": "area_price_tier",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Area price tier classification: budget, mid, premium, luxury"
+  },
+  {
+    "name": "market_cycle",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Market cycle phase based on listing year: boom, stable, downturn, recovery"
+  },
+  {
+    "name": "swedish_season",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Swedish real estate season: winter_low, spring_start, summer_peak, autumn_active"
+  },
+  {
+    "name": "school_period",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "School calendar period: school_start, school_active, school_end, holiday"
+  },
+  {
+    "name": "dom_momentum",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Days on market momentum: hot_market (≤7 days), normal (8-30 days), slow (>30 days)"
+  },
+  {
+    "name": "area_price_momentum",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Area price momentum: stable, rising, falling, bidding_war"
+  },
+  {
+    "name": "architectural_era",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Architectural era classification: pre_war, functionalism, modern, contemporary"
+  },
+  {
+    "name": "renovation_likelihood",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Renovation likelihood based on property age: high, medium, low"
+  },
+  {
+    "name": "has_elevator",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Elevator availability: yes, no"
+  },
+  {
+    "name": "has_balcony",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Balcony availability: yes, no"
+  },
+  {
+    "name": "floor_tier",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Floor tier classification: ground, low (1-2), mid (3-5), high (6+), unknown"
+  }
+]

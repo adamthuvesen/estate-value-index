@@ -1,0 +1,92 @@
+[
+  {
+    "name": "prediction_id",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Unique identifier for prediction"
+  },
+  {
+    "name": "prediction_timestamp",
+    "type": "TIMESTAMP",
+    "mode": "REQUIRED",
+    "description": "Timestamp when prediction was made"
+  },
+  {
+    "name": "model_version",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Model version used for prediction"
+  },
+  {
+    "name": "predicted_price",
+    "type": "FLOAT",
+    "mode": "REQUIRED",
+    "description": "Predicted property price in SEK"
+  },
+  {
+    "name": "listing_price",
+    "type": "FLOAT",
+    "mode": "NULLABLE",
+    "description": "Original listing price in SEK"
+  },
+  {
+    "name": "living_area",
+    "type": "FLOAT",
+    "mode": "REQUIRED",
+    "description": "Living area in square meters"
+  },
+  {
+    "name": "rooms",
+    "type": "INTEGER",
+    "mode": "REQUIRED",
+    "description": "Number of rooms"
+  },
+  {
+    "name": "area",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Geographic area"
+  },
+  {
+    "name": "price_per_sqm",
+    "type": "FLOAT",
+    "mode": "NULLABLE",
+    "description": "Price per square meter"
+  },
+  {
+    "name": "area_target_encoded",
+    "type": "FLOAT",
+    "mode": "NULLABLE",
+    "description": "Target-encoded area feature"
+  },
+  {
+    "name": "days_on_market",
+    "type": "INTEGER",
+    "mode": "NULLABLE",
+    "description": "Days property was on market"
+  },
+  {
+    "name": "construction_year",
+    "type": "INTEGER",
+    "mode": "NULLABLE",
+    "description": "Year property was constructed"
+  },
+  {
+    "name": "monthly_fee",
+    "type": "FLOAT",
+    "mode": "NULLABLE",
+    "description": "Monthly HOA fee in SEK"
+  },
+  {
+    "name": "sold_price",
+    "type": "FLOAT",
+    "mode": "NULLABLE",
+    "description": "Actual sold price (if available)"
+  },
+  {
+    "name": "sold_date",
+    "type": "DATE",
+    "mode": "NULLABLE",
+    "description": "Actual sold date (if available)"
+  }
+]
