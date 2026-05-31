@@ -7,6 +7,7 @@ from typing import Any
 
 from prefect import task
 
+from estate_value_index.exceptions import DataError
 from estate_value_index.pipelines.types import SyncResult
 from estate_value_index.pipelines.utils import get_bq_config, get_task_logger
 
@@ -85,7 +86,10 @@ def sync_bigquery_to_local_task(
         verify_count = sum(1 for line in f if line.strip())
 
     if verify_count != len(listings):
-        logger.warning(f"Verification mismatch: wrote {len(listings)} but verified {verify_count}")
+        raise DataError(
+            f"Verification mismatch: wrote {len(listings)} but verified {verify_count}",
+            context={"expected": len(listings), "verified": verify_count, "file": str(output_file)},
+        )
 
     logger.info(f"Sync complete: {len(listings)} listings")
 

@@ -8,6 +8,7 @@ from typing import TypedDict
 
 from prefect import task
 
+from estate_value_index.exceptions import InfrastructureError
 from estate_value_index.pipelines.types import ProcessingResult, UploadResult
 from estate_value_index.pipelines.utils import get_bq_config, get_task_logger
 from estate_value_index.utils.clients import get_bq_client
@@ -334,16 +335,10 @@ def geocode_new_addresses_task(
         from geopy.geocoders import Nominatim
 
         geolocator = Nominatim(user_agent="estate-value-index-pipeline")
-    except ImportError:
-        logger.error("geopy not installed - run: pip install geopy")
-        return GeocodeResult(
-            success=False,
-            timestamp=datetime.now().isoformat(),
-            new_addresses=new_addresses,
-            geocoded=0,
-            failed=0,
-            skipped=new_addresses,
-        )
+    except ImportError as exc:
+        raise InfrastructureError(
+            "geopy is required for geocoding but is not installed - run: pip install geopy"
+        ) from exc
 
     # Geocode each address
     new_geocodes = []
