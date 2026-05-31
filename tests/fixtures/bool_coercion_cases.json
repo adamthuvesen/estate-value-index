@@ -1,0 +1,16 @@
+[
+  { "input": "ja", "expected": true },
+  { "input": "nej", "expected": false },
+  { "input": "yes", "expected": true },
+  { "input": "no", "expected": false },
+  { "input": "true", "expected": true },
+  { "input": "false", "expected": false },
+  { "input": "1", "expected": true },
+  { "input": "0", "expected": false },
+  { "input": true, "expected": true },
+  { "input": false, "expected": false },
+  { "input": 1, "expected": true },
+  { "input": 0, "expected": false },
+  { "input": "maybe", "expected": null },
+  { "input": null, "expected": null }
+]
