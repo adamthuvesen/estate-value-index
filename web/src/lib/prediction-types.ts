@@ -1,0 +1,63 @@
+export interface PredictionInput {
+  listing_id: string;
+  listing_price: string;
+  living_area: string;
+  rooms: string;
+  monthly_fee: string;
+  days_on_market: string;
+  construction_year: string;
+  property_type: string;
+  area: string;
+  model: string;
+  floor: string;
+  elevator: string;
+  balcony: string;
+}
+
+export interface PredictionPayload {
+  listing_price: number;
+  living_area: number;
+  rooms: number;
+  monthly_fee: number;
+  days_on_market: number;
+  construction_year: number;
+  municipality: string;
+  property_type: string;
+  area: string;
+  model: string;
+  floor: number | null;
+  elevator: boolean | null;
+  balcony: boolean | null;
+}
+
+export interface PredictionResult {
+  listing_id: string;
+  predicted_price: number;
+  input_data: PredictionPayload;
+  confidence: string;
+  timestamp: string;
+  model_used?: string;
+  status?: string;
+}
+
+export interface ListingPrefillResponse {
+  listing_id?: string;
+  listing_price?: number | null;
+  living_area?: number | null;
+  rooms?: number | null;
+  monthly_fee?: number | null;
+  days_on_market?: number | null;
+  construction_year?: number | null;
+  property_type?: string | null;
+  area?: string | null;
+  floor?: number | null;
+  elevator?: boolean | null;
+  balcony?: boolean | null;
+  source_url?: string;
+  error?: string;
+}
+
+export interface SampleListing {
+  name: string;
+  data: PredictionInput;
+}
