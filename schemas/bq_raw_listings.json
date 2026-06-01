@@ -1,0 +1,152 @@
+[
+  {
+    "name": "listing_id",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Unique listing identifier from Booli.se scraping system"
+  },
+  {
+    "name": "url",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Direct URL to the property listing on Booli.se"
+  },
+  {
+    "name": "scraped_at",
+    "type": "TIMESTAMP",
+    "mode": "REQUIRED",
+    "description": "Exact timestamp when the listing was scraped from Booli.se"
+  },
+  {
+    "name": "scraped_at_date",
+    "type": "DATE",
+    "mode": "REQUIRED",
+    "description": "Date partition key extracted from scraped_at timestamp for BigQuery optimization"
+  },
+  {
+    "name": "listing_price",
+    "type": "INT64",
+    "mode": "NULLABLE",
+    "description": "Original asking price when the property was first listed, in Swedish Kronor (SEK)"
+  },
+  {
+    "name": "sold_price",
+    "type": "INT64",
+    "mode": "NULLABLE",
+    "description": "Final sale price achieved when the property was sold, in Swedish Kronor (SEK)"
+  },
+  {
+    "name": "address",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Full street address of the property including street name and number"
+  },
+  {
+    "name": "area",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Standardized neighborhood/area name (cleaned and normalized from area_original)"
+  },
+  {
+    "name": "area_original",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Original area name as scraped from Booli.se before standardization"
+  },
+  {
+    "name": "municipality",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Swedish municipality name where the property is located (e.g., Stockholm, Solna)"
+  },
+  {
+    "name": "living_area",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Total living area of the property in square meters (excluding balcony, storage, etc.)"
+  },
+  {
+    "name": "rooms",
+    "type": "INT64",
+    "mode": "NULLABLE",
+    "description": "Total number of rooms in the property (including bedrooms, living room, kitchen, etc.)"
+  },
+  {
+    "name": "property_type",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Type of property (e.g., 'Lägenhet' for apartment, 'Villa' for house, 'Radhus' for townhouse)"
+  },
+  {
+    "name": "construction_year",
+    "type": "INT64",
+    "mode": "NULLABLE",
+    "description": "Year when the property was originally constructed or built"
+  },
+  {
+    "name": "monthly_fee",
+    "type": "INT64",
+    "mode": "NULLABLE",
+    "description": "Monthly housing association fee (avgift) in Swedish Kronor (SEK)"
+  },
+  {
+    "name": "price_per_sqm",
+    "type": "INT64",
+    "mode": "NULLABLE",
+    "description": "Calculated price per square meter based on listing price divided by living area"
+  },
+  {
+    "name": "floor",
+    "type": "INT64",
+    "mode": "NULLABLE",
+    "description": "Floor number where the apartment is located (ground floor = 0, first floor = 1, etc.)"
+  },
+  {
+    "name": "elevator",
+    "type": "BOOL",
+    "mode": "NULLABLE",
+    "description": "Boolean indicating whether the building has an elevator"
+  },
+  {
+    "name": "balcony",
+    "type": "BOOL",
+    "mode": "NULLABLE",
+    "description": "Boolean indicating whether the apartment has a balcony"
+  },
+  {
+    "name": "sold_date",
+    "type": "DATE",
+    "mode": "NULLABLE",
+    "description": "Date when the property was sold (completion date)"
+  },
+  {
+    "name": "days_on_market",
+    "type": "INT64",
+    "mode": "NULLABLE",
+    "description": "Number of days the property was listed before being sold"
+  },
+  {
+    "name": "price_change",
+    "type": "INT64",
+    "mode": "NULLABLE",
+    "description": "Price difference between sold price and listing price in Swedish Kronor (SEK)"
+  },
+  {
+    "name": "description",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Full text description of the property from the listing"
+  },
+  {
+    "name": "images",
+    "type": "STRING",
+    "mode": "REPEATED",
+    "description": "Array of image URLs from the property listing"
+  },
+  {
+    "name": "source_page",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "URL of the Booli.se search page where this listing was found"
+  }
+]

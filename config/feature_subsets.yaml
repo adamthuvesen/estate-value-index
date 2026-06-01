@@ -1,0 +1,78 @@
+# Feature subset configurations for model training.
+#
+# `--feature-set <key>` selects a subset; omitting it uses `default` below.
+# Sets were chosen by recursive feature elimination on the LightGBM pipeline
+# (temporal holdout, 5235 train / 1331 test), then decorrelated. Held-out MAE
+# is flat from ~6 features up to the full registry — most registry features are
+# redundant derivatives — so the compact sets match the full model:
+#   - full   (~66 feat): ~271k MAE / 4.5% MAPE
+#   - lean_15 (15 feat): ~272k MAE / 4.6% MAPE
+#   - lean_10 (10 feat): ~275k MAE / 4.6% MAPE   <- default
+#   - lean_8   (8 feat): ~274k MAE / 4.6% MAPE
+#   - lean_6   (6 feat): ~274k MAE / 4.6% MAPE
+#   - listing_price only: ~305k MAE / 5.1% MAPE
+# Accuracy only degrades below ~5 features. Numbers are single-split; confirm
+# a final choice with repeated/rolling temporal folds before production.
+
+default: lean_10
+
+# Recommended: smallest set with full accuracy plus an interpretability margin.
+lean_10:
+  numeric:
+    - listing_price            # asking price (anchor)
+    - relative_area_price      # asking price vs area median
+    - monthly_fee_per_sqm
+    - floor_per_sqm
+    - area_price_change_mean   # area momentum (past-only)
+    - area_sold_price_median_3m
+    - area_sales_volume_3m
+    - area_age_interaction     # living_area x property_age
+    - cost_benefit_ratio
+    - efficiency_premium
+  categorical: []
+
+lean_8:
+  numeric:
+    - listing_price
+    - monthly_fee_per_sqm
+    - floor_per_sqm
+    - area_price_change_mean
+    - area_sales_volume_3m
+    - area_age_interaction
+    - cost_benefit_ratio
+    - efficiency_premium
+  categorical: []
+
+lean_6:
+  numeric:
+    - listing_price
+    - monthly_fee_per_sqm
+    - area_price_change_mean
+    - area_age_interaction
+    - cost_benefit_ratio
+    - efficiency_premium
+  categorical: []
+
+lean_15:
+  numeric:
+    - listing_price
+    - relative_area_price
+    - monthly_fee_per_sqm
+    - floor_per_sqm
+    - area_price_change_mean
+    - area_sold_price_median_3m
+    - area_sales_volume_3m
+    - area_age_interaction
+    - rooms_age_interaction
+    - fee_price_interaction
+    - cost_benefit_ratio
+    - efficiency_premium
+    - temporal_price_trend
+    - demand_supply_ratio
+  categorical:
+    - area
+
+# All features from the registry (no subset).
+full:
+  numeric: null
+  categorical: null

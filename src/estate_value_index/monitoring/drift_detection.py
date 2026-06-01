@@ -1,0 +1,193 @@
+"""Model monitoring with Evidently AI for drift detection."""
+
+from __future__ import annotations
+
+import logging
+from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
+
+import pandas as pd
+from evidently import ColumnMapping
+from evidently.metric_preset import DataDriftPreset, RegressionPreset
+from evidently.report import Report
+
+from estate_value_index.monitoring.constants import (
+    CRITICAL_CATEGORICAL_FEATURES,
+    CRITICAL_NUMERIC_FEATURES,
+    PERFORMANCE_DEGRADATION_THRESHOLD,
+)
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class DriftResult:
+    """Results from drift detection analysis."""
+
+    drift_detected: bool
+    drifted_features: list[str]
+    drift_score: float
+    performance_degraded: bool
+    current_mae: float | None
+    reference_mae: float | None
+    degradation_pct: float | None
+    report_html: str
+    timestamp: str
+    num_drifted_features: int
+
+
+@dataclass
+class _ExtractedMetrics:
+    dataset_drift: bool
+    drifted_features: list[str]
+    drift_scores: list[float]
+    current_mae: float | None
+    reference_mae: float | None
+
+
+class ModelMonitor:
+    """Production model monitoring with Evidently AI.
+
+    Detects data drift and performance degradation by comparing current
+    production data against baseline training data.
+
+    Args:
+        reference_data_path: Path to baseline training data (parquet)
+        model_version: Model version identifier (e.g., "2025-12-23-lgbm")
+    """
+
+    def __init__(
+        self,
+        reference_data_path: str | Path,
+        model_version: str,
+    ) -> None:
+        self.reference_data = pd.read_parquet(reference_data_path)
+        self.model_version = model_version
+
+        if "sold_price" not in self.reference_data.columns:
+            logger.warning("Reference data missing 'sold_price' - performance monitoring disabled")
+
+    def detect_drift(
+        self,
+        current_data: pd.DataFrame,
+        target_column: str = "sold_price",
+        prediction_column: str = "predicted_price",
+    ) -> DriftResult:
+        """Detect data drift and performance degradation.
+
+        Args:
+            current_data: Recent production data with features and predictions
+            target_column: Name of target column (actual values)
+            prediction_column: Name of prediction column
+
+        Returns:
+            DriftResult with drift metrics and HTML report
+        """
+        logger.info(
+            f"Running drift detection: {len(self.reference_data)} reference vs "
+            f"{len(current_data)} current samples"
+        )
+
+        # Restrict to features present in both datasets.
+        ref_cols = self.reference_data.columns
+        cur_cols = current_data.columns
+        categorical_cols = [
+            f for f in CRITICAL_CATEGORICAL_FEATURES if f in ref_cols and f in cur_cols
+        ]
+        numeric_cols = [f for f in CRITICAL_NUMERIC_FEATURES if f in ref_cols and f in cur_cols]
+
+        column_mapping = ColumnMapping()
+        column_mapping.numerical_features = numeric_cols
+        column_mapping.categorical_features = categorical_cols
+
+        has_predictions = prediction_column in cur_cols and target_column in cur_cols
+        if has_predictions:
+            column_mapping.target = target_column
+            column_mapping.prediction = prediction_column
+
+        metrics: list = [DataDriftPreset()]
+        if has_predictions:
+            metrics.append(RegressionPreset())
+        drift_report = Report(metrics=metrics)
+
+        drift_report.run(
+            reference_data=self.reference_data,
+            current_data=current_data,
+            column_mapping=column_mapping,
+        )
+
+        extracted = self._extract_all_metrics(drift_report.as_dict())
+
+        drift_score = (
+            sum(extracted.drift_scores) / len(extracted.drift_scores)
+            if extracted.drift_scores
+            else 0.0
+        )
+
+        performance_degraded = False
+        degradation_pct: float | None = None
+        if (
+            has_predictions
+            and extracted.current_mae is not None
+            and extracted.reference_mae is not None
+        ):
+            degradation_pct = (
+                (extracted.current_mae - extracted.reference_mae) / extracted.reference_mae * 100
+            )
+            performance_degraded = degradation_pct > (PERFORMANCE_DEGRADATION_THRESHOLD * 100)
+
+        logger.info(
+            f"Drift detection complete: drift={extracted.dataset_drift}, "
+            f"drifted_features={len(extracted.drifted_features)}, "
+            f"performance_degraded={performance_degraded}"
+        )
+
+        return DriftResult(
+            drift_detected=extracted.dataset_drift,
+            drifted_features=extracted.drifted_features,
+            drift_score=drift_score,
+            performance_degraded=performance_degraded,
+            current_mae=extracted.current_mae,
+            reference_mae=extracted.reference_mae,
+            degradation_pct=degradation_pct,
+            report_html=drift_report.get_html(),
+            timestamp=datetime.now().isoformat(),
+            num_drifted_features=len(extracted.drifted_features),
+        )
+
+    def _extract_all_metrics(self, report_dict: dict) -> _ExtractedMetrics:
+        """Extract drift + regression metrics from an Evidently report dict."""
+        dataset_drift = False
+        drifted_features: list[str] = []
+        drift_scores: list[float] = []
+        current_mae: float | None = None
+        reference_mae: float | None = None
+
+        for metric in report_dict.get("metrics", []):
+            metric_type = metric.get("metric")
+            result = metric.get("result", {})
+
+            if metric_type == "DatasetDriftMetric":
+                dataset_drift = result.get("dataset_drift", False)
+
+            elif metric_type == "ColumnDriftMetric":
+                drifted = result.get("drift_detected", False)
+                if drifted:
+                    drifted_features.append(result.get("column_name", "unknown"))
+                score = result.get("drift_score", 0.0)
+                if score == 0.0 and drifted:
+                    score = 1.0
+                drift_scores.append(score)
+
+            elif metric_type == "RegressionQualityMetric":
+                current_mae = result.get("current", {}).get("mean_absolute_error")
+                reference_mae = result.get("reference", {}).get("mean_absolute_error")
+
+        return _ExtractedMetrics(
+            dataset_drift=dataset_drift,
+            drifted_features=drifted_features,
+            drift_scores=drift_scores,
+            current_mae=current_mae,
+            reference_mae=reference_mae,
+        )

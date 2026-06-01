@@ -1,0 +1,8 @@
+{
+  "mae": 250000,
+  "rmse": 310000,
+  "mape": 4.5,
+  "model_type": "lightgbm",
+  "dataset_size": 12,
+  "generated_at": "2026-01-31T00:00:00"
+}

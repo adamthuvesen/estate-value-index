@@ -1,0 +1,88 @@
+# Python
+.venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE / Editors
+.claude/
+.cursor/
+GEMINI.md
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+logs/
+*.log
+*.err
+
+# Scrapy
+.scrapy/
+
+# Data files (exclude from git)
+data/raw/booli/*
+!data/raw/booli/.gitkeep
+
+# Temporary data
+data/temp/
+data/cache/
+cache/
+
+# Processed data
+data/processed/*.json
+!data/processed/.gitkeep
+
+# Model artifacts (generated during training)
+web/models/*
+!web/models/.gitkeep
+
+# Enrichment artifacts (generated)
+data/enrichment/*
+!data/enrichment/.gitkeep
+
+# Pipeline artifacts
+data/metrics/*
+!data/metrics/.gitkeep
+data/evaluation/
+data/geo/address_geocodes.csv
+reports/*
+!reports/.gitkeep
+
+# Checkpoints
+/tmp/pipeline_checkpoint.json
+.pipeline_state.json
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+notebooks/*.csv
+notebooks/*.ipynb
+
+# Test artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Images (scraped property images)
+data/images/
+
+# OpenSpec
+openspec/

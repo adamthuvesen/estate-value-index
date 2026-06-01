@@ -1,0 +1,96 @@
+station_name,line,lat,lon
+T-Centralen,blue/green/red,59.3308,18.0594
+Kungsträdgården,blue,59.3311,18.0719
+Östermalmstorg,red,59.3353,18.0742
+Karlaplan,red,59.3380,18.0909
+Gärdet,red,59.3451,18.0965
+Ropsten,red,59.3573,18.1018
+Stadion,red,59.3427,18.0830
+Tekniska högskolan,red,59.3459,18.0715
+Universitetet,red,59.3651,18.0543
+Bergshamra,red,59.3821,18.0348
+Danderyds sjukhus,red,59.3943,18.0406
+Mörby centrum,red,59.3981,18.0371
+Slussen,green/red,59.3196,18.0717
+Gamla stan,green/red,59.3229,18.0675
+Medborgarplatsen,green,59.3141,18.0737
+Skanstull,green,59.3072,18.0747
+Gullmarsplan,green,59.2987,18.0798
+Skärmarbrink,green,59.2918,18.0973
+Blåsut,green,59.2944,18.1129
+Sandsborg,green,59.2855,18.0921
+Skogskyrkogården,green,59.2795,18.0957
+Tallkrogen,green,59.2746,18.0837
+Gubbängen,green,59.2631,18.0831
+Hökarängen,green,59.2570,18.0820
+Farsta,green,59.2433,18.0932
+Farsta strand,green,59.2330,18.1047
+Hammarbyhöjden,green,59.2933,18.1220
+Björkhagen,green,59.2867,18.1323
+Kärrtorp,green,59.2815,18.1464
+Bagarmossen,green,59.2769,18.1355
+Skarpnäck,green,59.2672,18.1332
+Globen,green,59.2935,18.0767
+Enskede gård,green,59.2823,18.0662
+Sockenplan,green,59.2743,18.0586
+Svedmyra,green,59.2662,18.0578
+Stureby,green,59.2590,18.0516
+Bandhagen,green,59.2700,18.0488
+Högdalen,green,59.2640,18.0404
+Rågsved,green,59.2556,18.0308
+Hagsätra,green,59.2628,18.0143
+Hötorget,green,59.3347,18.0624
+Rådmansgatan,green,59.3412,18.0525
+Odenplan,green,59.3428,18.0498
+Sankt Eriksplan,green,59.3415,18.0349
+Fridhemsplan,green/blue,59.3323,18.0294
+Thorildsplan,green,59.3317,18.0127
+Kristineberg,green,59.3326,17.9992
+Alvik,green,59.3319,17.9786
+Stora mossen,green,59.3362,17.9620
+Abrahamsberg,green,59.3369,17.9533
+Brommaplan,green,59.3386,17.9387
+Åkeshov,green,59.3373,17.9188
+Ängbyplan,green,59.3374,17.9035
+Islandstorget,green,59.3377,17.8906
+Blackeberg,green,59.3375,17.8757
+Råcksta,green,59.3353,17.8574
+Vällingby,green,59.3637,17.8719
+Johannelund,green,59.3673,17.8556
+Hässelby gård,green,59.3665,17.8398
+Hässelby strand,green,59.3628,17.8338
+Telefonplan,red,59.2983,18.0088
+Midsommarkransen,red,59.3017,18.0142
+Liljeholmen,red,59.3108,18.0236
+Hornstull,red,59.3169,18.0345
+Zinkensdamm,red,59.3176,18.0499
+Mariatorget,red,59.3186,18.0626
+Norsborg,red,59.2430,17.8140
+Hallunda,red,59.2438,17.8267
+Alby,red,59.2396,17.8449
+Fittja,red,59.2482,17.8595
+Masmo,red,59.2573,17.8689
+Vårby gård,red,59.2651,17.8852
+Vårberg,red,59.2745,17.8996
+Skärholmen,red,59.2775,17.9077
+Sätra,red,59.2845,17.9262
+Bredäng,red,59.2942,17.9334
+Västertorp,red,59.2930,17.9701
+Fruängen,red,59.2855,18.0049
+Aspudden,red,59.3037,18.0112
+Akalla,blue,59.4139,17.9112
+Husby,blue,59.4091,17.9281
+Kista,blue,59.4032,17.9445
+Hallonbergen,blue,59.3762,17.9458
+Näckrosen,blue,59.3666,17.9497
+Solna centrum,blue,59.3600,17.9989
+Västra skogen,blue,59.3504,18.0020
+Stadshagen,blue,59.3417,18.0233
+Rådhuset,blue,59.3301,18.0451
+Huvudsta,blue,59.3496,18.0153
+Solna strand,blue,59.3555,18.0020
+Sundbybergs centrum,blue,59.3611,17.9710
+Duvbo,blue,59.3683,17.9636
+Rinkeby,blue,59.3885,17.9293
+Tensta,blue,59.3941,17.9028
+Hjulsta,blue,59.3964,17.8863

@@ -1,0 +1,291 @@
+"""Tests for feature engineering functionality."""
+
+import numpy as np
+import pandas as pd
+import pytest
+
+from src.estate_value_index.ml.features import (
+    CATEGORICAL_FEATURE_NAMES,
+    NUMERIC_FEATURE_NAMES,
+    FeatureEngineeringContext,
+    SimplePredictionPipeline,
+    _coerce_nullable_bool,
+    _safe_divide,
+    build_feature_context,
+    create_optimized_features,
+    get_feature_lists,
+    handle_missing_values,
+)
+from src.estate_value_index.ml.features.heuristics import (
+    _estimate_energy_efficiency,
+    _estimate_energy_efficiency_series,
+)
+from tests.conftest import assert_valid_dataframe
+
+
+class TestFeatureEngineering:
+    @pytest.mark.unit
+    def test_create_optimized_features_basic(self, sample_swedish_properties):
+        result = create_optimized_features(sample_swedish_properties)
+
+        assert_valid_dataframe(result)
+        assert len(result) == len(sample_swedish_properties)
+
+        expected_features = [
+            "price_per_sqm",
+            "monthly_fee_per_sqm",
+            "property_age",
+            "living_area_squared",
+            "age_bucket",
+            "rooms_per_sqm",
+            "area_age_interaction",
+            "luxury_score",
+        ]
+        for feature in expected_features:
+            assert feature in result.columns, f"Missing feature: {feature}"
+
+    @pytest.mark.unit
+    def test_create_optimized_features_with_context(
+        self, sample_swedish_properties, mock_feature_context
+    ):
+        result = create_optimized_features(sample_swedish_properties, context=mock_feature_context)
+
+        assert_valid_dataframe(result)
+        assert "area_avg_price" in result.columns
+        assert "area_target_encoded" in result.columns
+        assert result["area_avg_price"].notna().any()
+
+    @pytest.mark.unit
+    def test_create_optimized_features_temporal(self, sample_swedish_properties):
+        result = create_optimized_features(sample_swedish_properties)
+
+        # Listing-based temporal features (sold_date features avoided to prevent leakage)
+        temporal_features = [
+            "days_since_scraped",
+            "days_since_listed",
+            "listed_month",
+            "listed_quarter",
+            "listed_weekday",
+            "is_weekend_listing",
+            "listed_month_sin",
+            "listed_month_cos",
+        ]
+        for feature in temporal_features:
+            assert feature in result.columns, f"Missing temporal feature: {feature}"
+
+        assert result["listed_month"].min() >= 1
+        assert result["listed_month"].max() <= 12
+        assert result["listed_quarter"].min() >= 1
+        assert result["listed_quarter"].max() <= 4
+
+    @pytest.mark.unit
+    def test_create_optimized_features_edge_cases(self, edge_case_properties):
+        result = create_optimized_features(edge_case_properties)
+
+        assert_valid_dataframe(result)
+        assert len(result) == len(edge_case_properties)
+        assert "price_per_sqm" in result.columns
+        assert "property_age" in result.columns
+
+    @pytest.mark.unit
+    def test_safe_divide_function(self):
+        index = pd.RangeIndex(3)
+
+        result = _safe_divide([10, 20, 30], [2, 4, 5], index)
+        expected = pd.Series([5.0, 5.0, 6.0], index=index)
+        pd.testing.assert_series_equal(result, expected)
+
+        result = _safe_divide([10, 20], [0, 4], index[:2])
+        assert np.isnan(result.iloc[0])
+        assert result.iloc[1] == 5.0
+
+        result = _safe_divide(None, [1, 2], index[:2])
+        assert result.isna().all()
+
+    @pytest.mark.unit
+    def test_coerce_nullable_bool(self):
+        test_series = pd.Series(["true", "false", "1", "0", "yes", "no", "invalid", None])
+        result = _coerce_nullable_bool(test_series)
+
+        expected = [True, False, True, False, True, False, pd.NA, pd.NA]
+        for i, exp in enumerate(expected):
+            if pd.isna(exp):
+                assert pd.isna(result.iloc[i])
+            else:
+                assert result.iloc[i] == exp
+
+
+class TestFeatureConfiguration:
+    @pytest.mark.unit
+    def test_get_feature_lists(self):
+        numeric, categorical, all_features = get_feature_lists()
+
+        assert isinstance(numeric, list)
+        assert isinstance(categorical, list)
+        assert isinstance(all_features, list)
+        assert len(numeric) > 0
+        assert len(categorical) > 0
+        assert len(all_features) == len(numeric) + len(categorical)
+
+        assert "listing_price" in numeric
+        assert "living_area" in numeric
+        assert "area" in categorical
+        # property_type is filtered out from current feature list
+        assert "property_type" not in categorical
+
+    @pytest.mark.unit
+    def test_feature_constants(self):
+        assert len(NUMERIC_FEATURE_NAMES) > 15
+        assert len(CATEGORICAL_FEATURE_NAMES) > 0
+        assert "price_per_sqm" in NUMERIC_FEATURE_NAMES
+        assert "area" in CATEGORICAL_FEATURE_NAMES
+
+
+class TestMissingValueHandling:
+    @pytest.mark.unit
+    def test_handle_missing_values_basic(self, sample_swedish_properties):
+        df = sample_swedish_properties.copy()
+        df.loc[0, "living_area"] = np.nan
+        df.loc[1, "area"] = np.nan
+
+        numeric_features = ["living_area", "rooms", "monthly_fee"]
+        categorical_features = ["area", "property_type"]
+
+        X_train = df[numeric_features + categorical_features]
+        X_test = X_train.copy()
+
+        X_train_filled, _, numeric_fill, categorical_fill = handle_missing_values(
+            X_train, X_test, numeric_features, categorical_features
+        )
+
+        assert not X_train_filled[numeric_features].isna().any().any()
+        assert not X_train_filled[categorical_features].isna().any().any()
+        assert "living_area" in numeric_fill
+        assert "area" in categorical_fill
+        assert isinstance(numeric_fill["living_area"], float)
+        assert isinstance(categorical_fill["area"], str)
+
+    @pytest.mark.unit
+    def test_handle_missing_values_all_missing(self):
+        df = pd.DataFrame(
+            {"numeric_col": [np.nan, np.nan, np.nan], "categorical_col": [None, None, None]}
+        )
+
+        X_train_filled, _, _, _ = handle_missing_values(
+            df, df, ["numeric_col"], ["categorical_col"]
+        )
+
+        assert not X_train_filled["numeric_col"].isna().any()
+        assert not X_train_filled["categorical_col"].isna().any()
+        assert X_train_filled["numeric_col"].iloc[0] == 0
+        assert X_train_filled["categorical_col"].iloc[0] == "unknown"
+
+
+class TestFeatureContext:
+    @pytest.mark.unit
+    def test_build_feature_context(self, sample_swedish_properties):
+        df = create_optimized_features(sample_swedish_properties)
+        context = build_feature_context(df)
+
+        assert isinstance(context, FeatureEngineeringContext)
+        assert isinstance(context.reference_date, pd.Timestamp)
+        assert isinstance(context.area_avg_price, dict)
+        assert isinstance(context.global_target_mean, float)
+        assert "Södermalm" in context.area_avg_price
+        assert context.area_avg_price["Södermalm"] > 0
+
+    @pytest.mark.unit
+    def test_build_feature_context_empty_data(self):
+        df = pd.DataFrame(
+            {"listing_price": [1000000], "sold_price": [1100000], "area": ["Stockholm"]}
+        )
+        context = build_feature_context(df)
+
+        assert isinstance(context, FeatureEngineeringContext)
+        assert context.global_target_mean > 0
+        assert context.global_listing_price_mean > 0
+
+    @pytest.mark.unit
+    def test_energy_efficiency_vectorised_matches_scalar(self):
+        # Permutation of every (year-bin, area-bin) bucket the function reasons about,
+        # plus NaNs on each axis. The vectorised version must match the scalar
+        # version row-by-row — this is the safety net for the `df.apply(axis=1)`
+        # → `np.select` rewrite.
+        years = [2020, 2005, 1995, 1985, 1975, 1960, np.nan, 2020]
+        areas = [30.0, 50.0, 70.0, 90.0, 30.0, 70.0, 50.0, np.nan]
+        s_year = pd.Series(years)
+        s_area = pd.Series(areas)
+
+        scalar = pd.Series(
+            [_estimate_energy_efficiency(y, a) for y, a in zip(years, areas, strict=True)]
+        )
+        vector = _estimate_energy_efficiency_series(s_year, s_area)
+
+        pd.testing.assert_series_equal(scalar, vector, check_names=False, check_dtype=False)
+
+    @pytest.mark.unit
+    def test_energy_efficiency_handles_nullable_extension_dtypes(self):
+        # BigQuery's to_dataframe() returns integer columns as pandas nullable
+        # Int64. Comparisons on nullable dtypes return a `boolean` extension
+        # Series which numpy 2.x's np.select rejects with
+        # "invalid entry 0 in condlist: should be boolean ndarray". Guard against
+        # regressing back to a non-nullable assumption.
+        s_year = pd.Series([2020, 2005, pd.NA, 1985, 1960], dtype="Int64")
+        s_area = pd.Series([30.0, 50.0, 70.0, pd.NA, 90.0], dtype="Float64")
+
+        result = _estimate_energy_efficiency_series(s_year, s_area)
+
+        expected = pd.Series(
+            [
+                _estimate_energy_efficiency(2020, 30.0),
+                _estimate_energy_efficiency(2005, 50.0),
+                5.0,  # NaN year → default
+                5.0,  # NaN area → default
+                _estimate_energy_efficiency(1960, 90.0),
+            ]
+        )
+        pd.testing.assert_series_equal(result, expected, check_names=False, check_dtype=False)
+
+
+class TestPredictionPipelines:
+    @pytest.mark.unit
+    def test_simple_prediction_pipeline_init(self, mock_feature_context):
+        mock_model = object()
+
+        pipeline = SimplePredictionPipeline(
+            model=mock_model,
+            numeric_features=["living_area", "rooms"],
+            categorical_features=["area"],
+            context=mock_feature_context,
+        )
+
+        assert pipeline.model is mock_model
+        assert pipeline.context is mock_feature_context
+        assert "living_area" in pipeline.numeric_features
+
+
+class TestFeatureValidation:
+    @pytest.mark.unit
+    def test_feature_engineering_preserves_index(self, sample_swedish_properties):
+        original_ids = sample_swedish_properties["listing_id"].tolist()
+        result = create_optimized_features(sample_swedish_properties)
+
+        assert result["listing_id"].tolist() == original_ids
+
+    @pytest.mark.unit
+    def test_feature_engineering_numeric_dtypes(self, sample_swedish_properties):
+        result = create_optimized_features(sample_swedish_properties)
+
+        for col in ["price_per_sqm", "property_age", "living_area_squared"]:
+            if col in result.columns:
+                assert pd.api.types.is_numeric_dtype(result[col]), f"{col} should be numeric"
+
+    @pytest.mark.unit
+    @pytest.mark.parametrize("missing_col", ["listing_price", "living_area", "construction_year"])
+    def test_feature_engineering_missing_key_columns(self, sample_swedish_properties, missing_col):
+        df = sample_swedish_properties.copy()
+        if missing_col in df.columns:
+            df = df.drop(columns=[missing_col])
+
+        with pytest.raises((TypeError, KeyError)):
+            create_optimized_features(df)

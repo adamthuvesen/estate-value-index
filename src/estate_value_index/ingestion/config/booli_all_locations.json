@@ -1,0 +1,50 @@
+{
+  "site": "booli",
+  "search_parameters": {
+    "maxSoldPrice": "9000000",
+    "minSoldPrice": "4000000",
+    "maxLivingArea": "80",
+    "minLivingArea": "40",
+    "maxRooms": "4",
+    "minRooms": "2",
+    "areaIds": "115353,115341,115350,115347,869737,115349,115348,115351,115354,874649,2476,874646,874654,401672,3376,554,874659,874660,2477",
+    "minSoldDate": "2022-01-01"
+  },
+  "location_mappings": {
+    "1": "Stockholms kommun",
+    "115353": "Kungsholmen",
+    "115341": "Vasastan",
+    "115350": "Östermalm",
+    "115347": "Södermalm",
+    "869737": "Norrmalm",
+    "115349": "Gamla Stan",
+    "115348": "Djurgården",
+    "115351": "Södermalm",
+    "115354": "Hammarby",
+    "874649": "Årsta",
+    "2476": "Hammarby Sjöstad",
+    "874646": "Gröndal",
+    "874654": "Liljeholmen",
+    "401672": "Henriksdal",
+    "3376": "Finnboda",
+    "554": "Saltsjöqvarn",
+    "874659": "Alvik",
+    "874660": "Traneberg",
+    "2477": "Gullmarsplan"
+  },
+  "crawler_settings": {
+    "max_pages": 10,
+    "base_url": "https://www.booli.se/sok/slutpriser",
+    "listing_url_pattern": "/annons/",
+    "concurrent_requests": 4,
+    "download_delay": 2,
+    "randomize_delay": true,
+    "enable_images": false,
+    "enable_screenshots": false
+  },
+  "output_settings": {
+    "output_dir": "data",
+    "images_dir": "data/images",
+    "logs_dir": "logs"
+  }
+}
