@@ -4,7 +4,6 @@ Swedish real estate price prediction from listing data to a served web app.
 
 The repo contains the full path: Scrapy ingestion, BigQuery loading/materialization, model training, runtime model artifact loading, a FastAPI prediction service, a Next.js frontend, and deploy/runtime scripts for Cloud Run.
 
-This public repository intentionally does not include any real listing data, geocodes, trained models, model metrics, or property-level prediction artifacts. Use the synthetic fixtures under `tests/fixtures/` for tests and provide your own data/model artifacts through BigQuery, local paths, or GCS.
 
 ## Start Here
 
