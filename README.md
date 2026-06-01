@@ -186,30 +186,12 @@ uv run python -m estate_value_index.utils.settings
 | `scripts/` | Operational scripts, deploy, startup, materialization helpers |
 | `tests/` | Python test suite |
 
-## Sharp Edges
-
-- Do not use random row splits for production model evaluation; respect chronological semantics and `sold_date`.
-- Keep inference feature context aligned with training, especially area normalization and categoricals.
-- Do not hand-edit `web/models/`; generate or sync artifacts instead.
-- Do not put ad hoc user strings into BigQuery SQL. Use validated/parameterized patterns in `src/estate_value_index/utils/bigquery_safety.py`.
-- Next.js API routes that need Node APIs should export `runtime = 'nodejs'`.
-- Do not use `localStorage` or `sessionStorage` in web artifacts.
-- In CI, `GCS_ENABLED=false` is often the right move to avoid credential-bound tests.
-
 ## Documentation
 
 - [agents/docs/architecture.md](agents/docs/architecture.md) - system boundaries and runtime shape.
 - [agents/docs/data-pipeline.md](agents/docs/data-pipeline.md) - ingestion, BigQuery, pipeline, and data-quality rules.
 - [agents/docs/ml-and-models.md](agents/docs/ml-and-models.md) - training contract, artifacts, and ML checks.
 - [agents/docs/api-web-deploy.md](agents/docs/api-web-deploy.md) - FastAPI, Next.js, container, and deploy notes.
-
-## Contributing
-
-Contributions are welcome. Fork the repo and work on a feature branch; do not commit directly to `main`.
-
-- Run the Python tests before opening a PR: `uv run pytest`.
-- For web changes, also run `cd web && npm test` and `cd web && npm run lint`.
-- Use conventional commit messages (e.g. `feat:`, `fix:`, `docs:`).
 
 ## License
 
