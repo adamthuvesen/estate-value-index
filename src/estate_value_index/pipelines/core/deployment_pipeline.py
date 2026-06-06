@@ -28,7 +28,7 @@ def deployment_pipeline_flow(config: DeploymentFlowConfig | None = None) -> dict
 
     gcs_bucket = get_gcs_bucket()
     model_artifacts_gcs_uri = config.model_artifacts_gcs_uri or f"gs://{gcs_bucket}/models/"
-    enrichment_gcs_uri = config.enrichment_gcs_uri or f"gs://{gcs_bucket}/enrichment/"
+    enrichment_gcs_uri = config.enrichment_gcs_uri or f"gs://{gcs_bucket}/derived/"
 
     logger.info(
         f"Starting deployment: validate={config.validate}, auto_rollback={config.auto_rollback_on_failure}, dry_run={config.dry_run}"

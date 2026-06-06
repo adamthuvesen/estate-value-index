@@ -303,7 +303,7 @@ def run_analysis(
         Dict with metadata, statistics, and properties
     """
     if output_file is None:
-        output_file = Path("data/enrichment/value_analysis.json")
+        output_file = Path("data/derived/value_analysis.json")
     if models_dir is None:
         models_dir = Path("web/models")
 

@@ -99,7 +99,7 @@ COPY web/tailwind.config.ts /app/web/
 COPY web/postcss.config.mjs /app/web/
 
 # Create directories for models and data (data loaded from GCS at runtime)
-RUN mkdir -p /app/web/models /app/data/enrichment
+RUN mkdir -p /app/web/models /app/data/derived
 
 # Create supervisor configuration
 RUN mkdir -p /var/log/supervisor && \

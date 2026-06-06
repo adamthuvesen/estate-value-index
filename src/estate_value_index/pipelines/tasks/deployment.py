@@ -395,7 +395,7 @@ def log_metrics_task(
             destination = "local"
 
     # Local logging
-    local_dir = Path("data/metrics")
+    local_dir = Path("data/derived/metrics")
     local_dir.mkdir(parents=True, exist_ok=True)
     local_path = local_dir / filename
 

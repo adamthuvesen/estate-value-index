@@ -233,7 +233,7 @@ jobs:
         with:
           name: pipeline-logs-${{ github.run_number }}
           path: |
-            data/metrics/*.json
+            data/derived/metrics/*.json
             *.log
           retention-days: 30
           if-no-files-found: ignore

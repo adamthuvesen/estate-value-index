@@ -26,7 +26,7 @@ afterEach(() => {
 describe("value-finder API errors", () => {
   it("does not expose internal loader details from the listing route on 500", async () => {
     const internalMessage =
-      "Failed to load data from /app/data/enrichment/value_analysis.json or GCS (secret-bucket/value_analysis.json): credentials missing";
+      "Failed to load data from /app/data/derived/value_analysis.json or GCS (secret-bucket/value_analysis.json): credentials missing";
     mockedGetValueAnalysisData.mockRejectedValue(new Error(internalMessage));
 
     const response = await getValueFinder(makeRequest());
@@ -44,7 +44,7 @@ describe("value-finder API errors", () => {
 
   it("does not expose internal loader details from the metadata route on 500", async () => {
     const internalMessage =
-      "Failed to parse /Users/adam/dev/data/enrichment/value_analysis.json from private-bucket";
+      "Failed to parse /Users/adam/dev/data/derived/value_analysis.json from private-bucket";
     mockedGetValueAnalysisData.mockRejectedValue(new Error(internalMessage));
 
     const response = await getMetadata();
@@ -61,7 +61,7 @@ describe("value-finder API errors", () => {
 
   it("returns a safe missing-data response without local paths", async () => {
     const internalMessage =
-      "File not found: /app/data/enrichment/value_analysis.json. GCS fallback is disabled.";
+      "File not found: /app/data/derived/value_analysis.json. GCS fallback is disabled.";
     mockedGetValueAnalysisData.mockRejectedValue(new Error(internalMessage));
 
     const response = await getValueFinder(makeRequest());

@@ -191,7 +191,7 @@ def complete_pipeline_flow(
 
                 deploy_result = deploy_to_cloud_run_task(
                     model_artifacts_gcs_uri=model_gcs_uri or f"gs://{gcs_bucket}/models/",
-                    enrichment_gcs_uri=f"gs://{gcs_bucket}/enrichment/",
+                    enrichment_gcs_uri=f"gs://{gcs_bucket}/derived/",
                     validate=validate_deployment,
                 )
                 results["stages"]["deployment"] = deploy_result

@@ -2,7 +2,7 @@ import { join } from "path";
 import { loadDataFile } from "@/lib/gcs-loader";
 
 export interface JsonFileCacheOptions {
-  /** Filename under `data/` (e.g. `enrichment/value_analysis.json`). */
+  /** Filename under `data/` (e.g. `derived/value_analysis.json`). */
   relativePath: string;
   /** TTL in milliseconds before the in-memory copy is refetched. */
   ttlMs: number;

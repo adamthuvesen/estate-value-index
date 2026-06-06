@@ -4,7 +4,7 @@ This module provides geocoding functionality using OpenStreetMap/Nominatim,
 with caching to avoid repeated API calls and rate limiting.
 
 Dual cache strategy:
-- Local dev: CSV at data/geo/address_geocodes.csv
+- Local dev: CSV at data/cache/geocodes.csv
 - Production: BigQuery table booli_raw.geocodes
 """
 
@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_CACHE_PATH = Path("data/geo/address_geocodes.csv")
+DEFAULT_CACHE_PATH = Path("data/cache/geocodes.csv")
 BQ_GEOCODE_TABLE = "booli_raw.geocodes"
 
 

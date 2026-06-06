@@ -40,7 +40,7 @@ def generate_area_statistics_task(
     logger = get_task_logger(__name__)
 
     if output_file is None:
-        output_file = Path("data/enrichment/area_statistics.json")
+        output_file = Path("data/derived/area_statistics.json")
     output_file.parent.mkdir(parents=True, exist_ok=True)
 
     logger.info(f"Generating area statistics from {data_source}")
@@ -99,7 +99,7 @@ def generate_value_analysis_task(
     logger = get_task_logger(__name__)
 
     if output_file is None:
-        output_file = Path("data/enrichment/value_analysis.json")
+        output_file = Path("data/derived/value_analysis.json")
     if data_file is None:
         data_file = Path("data/raw/booli/booli_listings_prod.json")
 
@@ -145,7 +145,7 @@ def generate_value_analysis_task(
 def upload_enrichment_to_gcs_task(
     local_dir: Path,
     gcs_bucket: str,
-    gcs_prefix: str = "enrichment/",
+    gcs_prefix: str = "derived/",
 ) -> dict:
     """Upload enrichment data to GCS.
 

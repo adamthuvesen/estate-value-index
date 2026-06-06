@@ -4,7 +4,7 @@ import { createJsonFileCache } from "@/lib/json-file-cache";
 export const VALUE_ANALYSIS_CACHE_TTL_MS = 5 * 60 * 1000;
 
 const cache = createJsonFileCache<ValueAnalysisData>({
-  relativePath: "enrichment/value_analysis.json",
+  relativePath: "derived/value_analysis.json",
   ttlMs: VALUE_ANALYSIS_CACHE_TTL_MS,
 });
 

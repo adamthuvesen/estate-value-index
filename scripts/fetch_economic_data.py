@@ -19,7 +19,7 @@ from pathlib import Path
 import pandas as pd
 import requests
 
-DATA_DIR = Path(__file__).parent.parent / "data" / "economy"
+DATA_DIR = Path(__file__).parent.parent / "data" / "reference" / "economy"
 
 # Indicators we track from KI
 KI_INDICATORS = ["KIFI", "BTOT", "BBYG", "bhus", "bhusmakro", "bhusmikro"]
@@ -271,7 +271,7 @@ if __name__ == "__main__":
     print("\n" + "=" * 60)
     print("SUMMARY")
     print("=" * 60)
-    print("Updated files created in data/economy/:")
+    print("Updated files created in data/reference/economy/:")
     print("  - swedish_interest_rates_monthly_updated.csv")
     print("  - swedish_ki_indicators_monthly_updated.csv")
     print("  - swedish_economic_indicators_quarterly_updated.csv")

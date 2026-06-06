@@ -4,7 +4,7 @@ import { createJsonFileCache } from "@/lib/json-file-cache";
 export const AREA_STATS_CACHE_TTL_MS = 5 * 60 * 1000;
 
 const cache = createJsonFileCache<AreaStatisticsData>({
-  relativePath: "enrichment/area_statistics.json",
+  relativePath: "derived/area_statistics.json",
   ttlMs: AREA_STATS_CACHE_TTL_MS,
 });
 
