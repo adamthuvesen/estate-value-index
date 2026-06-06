@@ -427,11 +427,11 @@ def _generate_enrichment_stage(config: TrainingFlowConfig, results: dict, logger
 
         # Generate area statistics
         area_stats_result = generate_area_statistics_task(
-            output_file=Path("data/enrichment/area_statistics.json"),
+            output_file=Path("data/derived/area_statistics.json"),
             data_source="bigquery",
             feature_context_path=Path(config.local_model_dir)
             / f"{config.model_prefix}_feature_context.json",
-            value_analysis_path=Path("data/enrichment/value_analysis.json"),
+            value_analysis_path=Path("data/derived/value_analysis.json"),
             raw_listings_path=Path("data/raw/booli/booli_listings_prod.json"),
         )
         results["steps"]["area_statistics"] = area_stats_result
@@ -441,7 +441,7 @@ def _generate_enrichment_stage(config: TrainingFlowConfig, results: dict, logger
 
         # Generate value analysis (property predictions)
         value_analysis_result = generate_value_analysis_task(
-            output_file=Path("data/enrichment/value_analysis.json"),
+            output_file=Path("data/derived/value_analysis.json"),
             data_file=Path("data/raw/booli/booli_listings_prod.json"),
             model_type="lgbm",
             apply_training_filters=False,
@@ -453,9 +453,9 @@ def _generate_enrichment_stage(config: TrainingFlowConfig, results: dict, logger
 
         # Upload enrichment data to GCS (for Cloud Run to access)
         enrichment_upload_result = upload_enrichment_to_gcs_task(
-            local_dir=Path("data/enrichment"),
+            local_dir=Path("data/derived"),
             gcs_bucket=get_gcs_bucket(),
-            gcs_prefix="enrichment/",
+            gcs_prefix="derived/",
         )
         results["steps"]["enrichment_upload"] = enrichment_upload_result
         logger.info(

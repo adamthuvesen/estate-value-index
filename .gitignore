@@ -31,32 +31,32 @@ logs/
 # Scrapy
 .scrapy/
 
-# Data files (exclude from git)
+# Data files — organized by lifecycle role:
+#   raw/       ingested source data (never committed)
+#   reference/ curated inputs (COMMITTED — intentionally not ignored)
+#   cache/     regenerable, safe to delete
+#   derived/   pipeline outputs (value analysis, area stats, metrics)
+
+# raw: ingested Booli dumps
 data/raw/booli/*
 !data/raw/booli/.gitkeep
 
-# Temporary data
-data/temp/
-data/cache/
+# cache: regenerable, throwaway
+data/cache/*
+!data/cache/.gitkeep
 cache/
 
-# Processed data
-data/processed/*.json
-!data/processed/.gitkeep
+# derived: pipeline outputs
+data/derived/*
+!data/derived/.gitkeep
+!data/derived/metrics/
+data/derived/metrics/*
+!data/derived/metrics/.gitkeep
 
 # Model artifacts (generated during training)
 web/models/*
 !web/models/.gitkeep
 
-# Enrichment artifacts (generated)
-data/enrichment/*
-!data/enrichment/.gitkeep
-
-# Pipeline artifacts
-data/metrics/*
-!data/metrics/.gitkeep
-data/evaluation/
-data/geo/address_geocodes.csv
 reports/*
 !reports/.gitkeep
 

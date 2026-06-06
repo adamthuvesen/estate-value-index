@@ -44,7 +44,7 @@ bigquery:
 gcs:
   # Bucket structure
   models_prefix: models/  # Model artifacts prefix
-  enrichment_prefix: enrichment/  # Enrichment data prefix
+  enrichment_prefix: derived/  # Enrichment/derived data prefix
   data_prefix: data/  # Raw data prefix
 
   # Upload settings

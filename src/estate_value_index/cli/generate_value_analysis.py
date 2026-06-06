@@ -60,7 +60,7 @@ def main(argv: list[str] | None = None, *, args=None) -> int:
         parser.add_argument(
             "--output",
             type=Path,
-            default=Path("data/enrichment/value_analysis.json"),
+            default=Path("data/derived/value_analysis.json"),
             help="Output path for value analysis JSON",
         )
         parser.add_argument(

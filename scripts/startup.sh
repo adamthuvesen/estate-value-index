@@ -6,7 +6,7 @@ echo "[STARTUP] Starting Estate Value Index services..."
 # Configuration
 : "${GCS_BUCKET:?GCS_BUCKET is required when syncing runtime artifacts from GCS}"
 MODEL_DIR="/app/web/models"
-ENRICHMENT_DIR="/app/data/enrichment"
+ENRICHMENT_DIR="/app/data/derived"
 
 # Function to download from GCS.
 #
@@ -50,7 +50,7 @@ mkdir -p "${ENRICHMENT_DIR}"
 download_from_gcs "models/" "${MODEL_DIR}" "model artifacts" "required"
 
 # Download enrichment data from GCS — optional (degrade gracefully).
-download_from_gcs "enrichment/" "${ENRICHMENT_DIR}" "enrichment data" "optional" || true
+download_from_gcs "derived/" "${ENRICHMENT_DIR}" "enrichment data" "optional" || true
 
 # List downloaded files for verification.
 echo "[STARTUP] Model files:"

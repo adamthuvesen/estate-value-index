@@ -22,7 +22,7 @@ STOCKHOLM_CENTER_LON = 18.0649
 STOCKHOLM_CENTER = (STOCKHOLM_CENTER_LAT, STOCKHOLM_CENTER_LON)
 
 # Default POI data paths
-GEO_DATA_DIR = Path("data/geo")
+GEO_DATA_DIR = Path("data/reference/geo")
 METRO_STATIONS_PATH = GEO_DATA_DIR / "stockholm_metro_stations.csv"
 TRAIN_STATIONS_PATH = GEO_DATA_DIR / "stockholm_train_stations.csv"
 
@@ -68,7 +68,7 @@ def load_metro_stations(path: Path | str | None = None) -> np.ndarray:
     """Load metro station coordinates.
 
     Args:
-        path: Path to metro stations CSV (default: data/geo/stockholm_metro_stations.csv)
+        path: Path to metro stations CSV (default: data/reference/geo/stockholm_metro_stations.csv)
 
     Returns:
         NumPy array of shape (N, 2) with [lat, lon] for each station
@@ -88,7 +88,7 @@ def load_train_stations(path: Path | str | None = None) -> np.ndarray:
     """Load train station coordinates.
 
     Args:
-        path: Path to train stations CSV (default: data/geo/stockholm_train_stations.csv)
+        path: Path to train stations CSV (default: data/reference/geo/stockholm_train_stations.csv)
 
     Returns:
         NumPy array of shape (N, 2) with [lat, lon] for each station

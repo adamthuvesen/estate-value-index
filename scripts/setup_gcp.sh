@@ -91,7 +91,7 @@ echo ""
 echo "Creating bucket directory structure..."
 echo "" | gsutil cp - "gs://${BUCKET_NAME}/raw/.keep"
 echo "" | gsutil cp - "gs://${BUCKET_NAME}/models/.keep"
-echo "" | gsutil cp - "gs://${BUCKET_NAME}/enrichment/.keep"
+echo "" | gsutil cp - "gs://${BUCKET_NAME}/derived/.keep"
 echo "Directory structure created"
 
 # Create service account for automation

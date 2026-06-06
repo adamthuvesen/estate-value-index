@@ -223,8 +223,8 @@ class TestLogMetricsTask:
         mocker.patch(
             "estate_value_index.pipelines.tasks.deployment.Path",
             side_effect=lambda p: (
-                tmp_path / str(p).removeprefix("data/metrics/")
-                if "data/metrics" in str(p)
+                tmp_path / str(p).removeprefix("data/derived/metrics/")
+                if "data/derived/metrics" in str(p)
                 else Path(p)
             ),
         )
@@ -260,7 +260,7 @@ class TestLogMetricsTask:
         original_path = Path
 
         def patched_path(p: str) -> Path:
-            if "data/metrics" in str(p):
+            if "data/derived/metrics" in str(p):
                 return tmp_path / "metrics"
             return original_path(p)
 
