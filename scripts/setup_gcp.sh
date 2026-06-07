@@ -123,6 +123,37 @@ gcloud projects add-iam-policy-binding "$PROJECT_ID" \
 
 echo "Permissions granted"
 
+# Dedicated, least-privilege runtime identity for the public Cloud Run service.
+# The API/web container only reads model artifacts from GCS — it never touches
+# BigQuery — so this account gets object-read on the bucket and nothing else: no
+# project Editor, no BigQuery. Running the public service under it means even a
+# compromise of the request path cannot reach BigQuery, because the attached
+# credentials cannot. deploy_cloud_run.sh attaches it via --service-account.
+RUNTIME_SA_NAME="evi-cloud-run-runtime"
+RUNTIME_SA_EMAIL="${RUNTIME_SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
+
+echo ""
+echo "Creating Cloud Run runtime service account (least privilege)..."
+if gcloud iam service-accounts describe "$RUNTIME_SA_EMAIL" &> /dev/null; then
+    echo "Runtime service account already exists, skipping creation"
+else
+    gcloud iam service-accounts create "$RUNTIME_SA_NAME" \
+        --display-name="EVI Cloud Run runtime" \
+        --description="Runtime identity for the public Cloud Run service; GCS read only, no BigQuery"
+    echo "Created runtime service account: $RUNTIME_SA_EMAIL"
+fi
+
+echo "Granting bucket-scoped object read to the runtime SA (no project-wide roles)..."
+gsutil iam ch "serviceAccount:${RUNTIME_SA_EMAIL}:roles/storage.objectViewer" "gs://${BUCKET_NAME}"
+
+echo "Allowing the automation SA to deploy Cloud Run as the runtime SA..."
+gcloud iam service-accounts add-iam-policy-binding "$RUNTIME_SA_EMAIL" \
+    --member="serviceAccount:${SERVICE_ACCOUNT_EMAIL}" \
+    --role="roles/iam.serviceAccountUser" \
+    --quiet
+
+echo "Runtime service account ready (GCS read only; no BigQuery, no Editor)"
+
 # Create service account key for local development
 echo ""
 echo "Creating service account key for local development..."

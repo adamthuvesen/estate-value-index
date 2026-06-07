@@ -11,6 +11,9 @@ REGION="${GCP_REGION:-europe-north1}"
 SERVICE_NAME="estate-value-index-app"
 IMAGE_NAME="gcr.io/${PROJECT_ID}/${SERVICE_NAME}"
 GCS_BUCKET="${GCS_BUCKET:-}"
+# Dedicated least-privilege runtime identity (GCS read only, no BigQuery). Created
+# by scripts/setup_gcp.sh. Override only to point at another GCS-read-only account.
+RUNTIME_SERVICE_ACCOUNT="${RUNTIME_SERVICE_ACCOUNT:-evi-cloud-run-runtime@${PROJECT_ID}.iam.gserviceaccount.com}"
 
 : "${PROJECT_ID:?PROJECT_ID is required}"
 : "${REGION:?REGION is required}"
@@ -24,6 +27,8 @@ echo "Project: $PROJECT_ID"
 echo "Region:  $REGION"
 echo "Service: $SERVICE_NAME"
 echo "Image:   $IMAGE_NAME"
+echo ""
+echo "Runtime SA: $RUNTIME_SERVICE_ACCOUNT"
 echo ""
 echo "Configuration:"
 echo "  - Health check: /api/health (verifies Next.js + FastAPI)"
@@ -41,6 +46,20 @@ fi
 
 # Set project
 gcloud config set project "$PROJECT_ID"
+
+# Refuse to deploy without the dedicated least-privilege runtime SA. Without
+# --service-account, Cloud Run runs as the default compute SA (project Editor),
+# which would give this public, unauthenticated service full BigQuery access it
+# does not need. The runtime SA reads model artifacts from GCS and nothing else.
+echo ""
+echo "Verifying runtime service account exists..."
+if ! gcloud iam service-accounts describe "$RUNTIME_SERVICE_ACCOUNT" &> /dev/null; then
+    echo "ERROR: runtime service account '$RUNTIME_SERVICE_ACCOUNT' not found." >&2
+    echo "Create it first (least privilege, GCS read only) by running" >&2
+    echo "scripts/setup_gcp.sh, or set RUNTIME_SERVICE_ACCOUNT to an existing" >&2
+    echo "account that has only GCS object-read on gs://${GCS_BUCKET}." >&2
+    exit 1
+fi
 
 # Enable required APIs
 echo "Ensuring required APIs are enabled..."
@@ -60,6 +79,7 @@ gcloud run deploy "$SERVICE_NAME" \
   --image "$IMAGE_NAME" \
   --platform managed \
   --region "$REGION" \
+  --service-account "$RUNTIME_SERVICE_ACCOUNT" \
   --allow-unauthenticated \
   --min-instances 0 \
   --max-instances 2 \
