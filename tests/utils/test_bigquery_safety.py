@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import datetime
+
 import pytest
 
 from estate_value_index.utils.bigquery_safety import (
+    Filter,
     _validate_bq_dataset_id,
     _validate_bq_project_id,
     _validate_bq_table_id,
+    build_filter_clause,
     quote_identifier,
     safe_table_ref,
 )
@@ -136,3 +140,89 @@ def test_quote_identifier_accepts(name: str) -> None:
 def test_quote_identifier_rejects(name: str) -> None:
     with pytest.raises(ValueError, match="invalid BigQuery identifier"):
         quote_identifier(name)
+
+
+def test_build_filter_clause_empty() -> None:
+    assert build_filter_clause([]) == ("", [])
+
+
+def test_build_filter_clause_binary_scalar() -> None:
+    sql, params = build_filter_clause([Filter("sold_price", ">=", 3_000_000)])
+    assert sql == "WHERE `sold_price` >= @filter_0"
+    assert len(params) == 1
+    assert (params[0].name, params[0].type_, params[0].value) == ("filter_0", "INT64", 3_000_000)
+
+
+def test_build_filter_clause_ands_multiple_predicates() -> None:
+    sql, params = build_filter_clause(
+        [
+            Filter("sold_date", ">=", datetime.date(2024, 1, 1)),
+            Filter("area", "=", "Södermalm"),
+        ]
+    )
+    assert sql == "WHERE `sold_date` >= @filter_0 AND `area` = @filter_1"
+    assert [p.type_ for p in params] == ["DATE", "STRING"]
+
+
+def test_build_filter_clause_in_uses_array_param_and_unnest() -> None:
+    sql, params = build_filter_clause([Filter("area", "IN", ["Södermalm", "Vasastan"])])
+    assert sql == "WHERE `area` IN UNNEST(@filter_0)"
+    assert params[0].array_type == "STRING"
+    assert params[0].values == ["Södermalm", "Vasastan"]
+
+
+def test_build_filter_clause_unary_takes_no_param() -> None:
+    sql, params = build_filter_clause([Filter("sold_price", "IS NOT NULL")])
+    assert sql == "WHERE `sold_price` IS NOT NULL"
+    assert params == []
+
+
+def test_build_filter_clause_operator_is_case_insensitive() -> None:
+    sql, _ = build_filter_clause([Filter("area", "in", ["A", "B"])])
+    assert sql == "WHERE `area` IN UNNEST(@filter_0)"
+
+
+@pytest.mark.parametrize(
+    ("value", "bq_type"),
+    [
+        (True, "BOOL"),
+        (5, "INT64"),
+        (1.5, "FLOAT64"),
+        ("x", "STRING"),
+        (datetime.date(2024, 1, 1), "DATE"),
+        (datetime.datetime(2024, 1, 1, 12, 0), "TIMESTAMP"),
+    ],
+)
+def test_build_filter_clause_infers_scalar_type(value: object, bq_type: str) -> None:
+    _, params = build_filter_clause([Filter("c", "=", value)])
+    assert params[0].type_ == bq_type
+
+
+def test_build_filter_clause_rejects_bad_column() -> None:
+    with pytest.raises(ValueError, match="invalid BigQuery identifier"):
+        build_filter_clause([Filter("area; DROP TABLE x", "=", "A")])
+
+
+def test_build_filter_clause_rejects_unknown_operator() -> None:
+    with pytest.raises(ValueError, match="unsupported filter operator"):
+        build_filter_clause([Filter("area", "LIKE", "A%")])
+
+
+def test_build_filter_clause_rejects_unary_with_value() -> None:
+    with pytest.raises(ValueError, match="takes no value"):
+        build_filter_clause([Filter("area", "IS NULL", "x")])
+
+
+def test_build_filter_clause_rejects_empty_in() -> None:
+    with pytest.raises(ValueError, match="non-empty sequence"):
+        build_filter_clause([Filter("area", "IN", [])])
+
+
+def test_build_filter_clause_rejects_binary_without_value() -> None:
+    with pytest.raises(ValueError, match="requires a value"):
+        build_filter_clause([Filter("area", "=", None)])
+
+
+def test_build_filter_clause_rejects_unsupported_value_type() -> None:
+    with pytest.raises(ValueError, match="unsupported filter value type"):
+        build_filter_clause([Filter("area", "=", {"nope": 1})])

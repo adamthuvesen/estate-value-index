@@ -86,12 +86,16 @@ jobs:
           docker push gcr.io/${{ env.GCP_PROJECT_ID }}/${{ env.SERVICE_NAME }}:latest
 
       - name: Deploy to Cloud Run
+        # Runs under the dedicated least-privilege runtime SA (GCS read only, no
+        # BigQuery), not the default compute SA. The WIF deployer SA must hold
+        # iam.serviceAccountUser on it (granted by scripts/setup_gcp.sh).
         run: |
           gcloud run deploy ${{ env.SERVICE_NAME }} \
             --image gcr.io/${{ env.GCP_PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ github.sha }} \
             --platform managed \
             --project ${{ env.GCP_PROJECT_ID }} \
             --region ${{ env.GCP_REGION }} \
+            --service-account "evi-cloud-run-runtime@${{ env.GCP_PROJECT_ID }}.iam.gserviceaccount.com" \
             --allow-unauthenticated \
             --min-instances 0 \
             --max-instances 2 \
