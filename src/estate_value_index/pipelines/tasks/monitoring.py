@@ -10,6 +10,7 @@ from prefect import task
 
 from estate_value_index.monitoring.drift_detection import DriftResult, ModelMonitor
 from estate_value_index.pipelines.utils import get_task_logger
+from estate_value_index.utils.bigquery_safety import safe_table_ref
 from estate_value_index.utils.clients import get_bq_client, get_storage_client
 from estate_value_index.utils.gcs import get_gcs_bucket, upload_blob, upload_html_to_gcs
 
@@ -50,7 +51,7 @@ def export_recent_predictions_task(
     # Query to get recent predictions with features (parameterized for security)
     query = f"""
         SELECT *
-        FROM `{project_id}.booli_raw.predictions`
+        FROM {safe_table_ref(project_id, "booli_raw", "predictions", quote=True)}
         WHERE prediction_timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL @days_lookback DAY)
         ORDER BY prediction_timestamp DESC
     """
@@ -74,7 +75,7 @@ def export_recent_predictions_task(
         logger.info("Using features table fallback with feature_date filter")
         fallback_query = f"""
             SELECT *
-            FROM `{project_id}.booli_features.engineered_features`
+            FROM {safe_table_ref(project_id, "booli_features", "engineered_features", quote=True)}
             WHERE feature_date >= DATE_SUB(CURRENT_DATE(), INTERVAL @days_lookback DAY)
             ORDER BY feature_date DESC
             LIMIT 500
@@ -92,7 +93,7 @@ def export_recent_predictions_task(
         logger.info("No recent data found, sampling from most recent available data")
         sample_query = f"""
             SELECT *
-            FROM `{project_id}.booli_features.engineered_features`
+            FROM {safe_table_ref(project_id, "booli_features", "engineered_features", quote=True)}
             ORDER BY feature_date DESC
             LIMIT 500
         """

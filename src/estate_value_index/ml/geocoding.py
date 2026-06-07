@@ -18,6 +18,7 @@ import numpy as np
 import pandas as pd
 
 from estate_value_index.exceptions import BigQueryError, DataLoadError, exception_context
+from estate_value_index.utils.bigquery_safety import safe_table_ref
 
 if TYPE_CHECKING:
     from geopy.geocoders import Nominatim
@@ -313,9 +314,9 @@ def sync_cache_to_bigquery(
     client = get_bq_client(project_id)
     project = project_id or client.project
     dataset, prod_table = BQ_GEOCODE_TABLE.split(".", 1)
-    prod_ref = f"{project}.{dataset}.{prod_table}"
     staging_table = f"{prod_table}_staging_{uuid4().hex[:8]}"
-    staging_ref = f"{project}.{dataset}.{staging_table}"
+    prod_ref = safe_table_ref(project, dataset, prod_table)
+    staging_ref = safe_table_ref(project, dataset, staging_table)
 
     schema = [
         bigquery.SchemaField("address", "STRING"),
@@ -332,8 +333,8 @@ def sync_cache_to_bigquery(
         client.load_table_from_dataframe(df, staging_ref, job_config=job_config).result()
 
         merge_sql = f"""
-            MERGE `{prod_ref}` T
-            USING `{staging_ref}` S
+            MERGE {safe_table_ref(project, dataset, prod_table, quote=True)} T
+            USING {safe_table_ref(project, dataset, staging_table, quote=True)} S
             ON T.address = S.address
             WHEN MATCHED AND S.geocoded_at > T.geocoded_at THEN
               UPDATE SET lat = S.lat, lon = S.lon, geocoded_at = S.geocoded_at
@@ -362,9 +363,11 @@ def load_geocode_cache_from_bigquery(
     from estate_value_index.utils.clients import get_bq_client
 
     client = get_bq_client(project_id)
-    table_ref = f"{project_id or client.project}.{BQ_GEOCODE_TABLE}"
+    project = project_id or client.project
+    dataset, table = BQ_GEOCODE_TABLE.split(".", 1)
+    table_ref = safe_table_ref(project, dataset, table)
 
-    query = f"SELECT address, lat, lon FROM `{table_ref}`"
+    query = f"SELECT address, lat, lon FROM {safe_table_ref(project, dataset, table, quote=True)}"
 
     try:
         df = client.query(query).to_dataframe()

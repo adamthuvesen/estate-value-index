@@ -17,6 +17,7 @@ from google.cloud import bigquery
 from google.cloud.exceptions import GoogleCloudError
 
 from estate_value_index.ingestion.processing import load_jsonl_file
+from estate_value_index.utils.bigquery_safety import safe_table_ref
 from estate_value_index.utils.clients import get_bq_client
 from estate_value_index.utils.settings import bq_table, get_batch_size, load_env_config
 
@@ -331,8 +332,8 @@ def upload_to_bigquery(
     print("\nUploading data to BigQuery (MERGE deduplication)...")
     print("   Note: Using temp table + MERGE to prevent duplicates")
 
-    temp_table_id = (
-        f"{project_id}.{dataset_id}.listings_temp_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    temp_table_id = safe_table_ref(
+        project_id, dataset_id, f"listings_temp_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     )
 
     result = _upload_via_merge(client, full_table_id, temp_table_id, bq_rows, batch_size)

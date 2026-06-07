@@ -11,7 +11,7 @@ from typing import Any
 import pandas as pd
 
 from estate_value_index.exceptions import BigQueryError, exception_context
-from estate_value_index.utils.bigquery_safety import _validate_bq_project_id
+from estate_value_index.utils.bigquery_safety import _validate_bq_project_id, safe_table_ref
 from estate_value_index.utils.clients import get_bq_client
 from estate_value_index.utils.settings import load_env_config
 
@@ -186,11 +186,13 @@ def load_from_bigquery(
     # Build query
     query = f"""
         SELECT *
-        FROM `{project_id}.{dataset_id}.{table_id}`
+        FROM {safe_table_ref(project_id, dataset_id, table_id, quote=True)}
     """
 
     # trusted-input: optional predicate only; call sites are operator-controlled
     # (train_model.py, feature_materialization.py, scripts/*.py) — never user/request input.
+    # There is no parameterisation for an arbitrary SQL fragment; this is the one
+    # reviewed escape hatch (see tests/utils/test_no_unsafe_sql.py).
     if where_clause:
         query += f"\n        WHERE {where_clause}"
 
@@ -273,7 +275,7 @@ def load_features_from_bigquery(
     # Build query
     query = f"""
         SELECT *
-        FROM `{project_id}.{dataset_id}.{table_id}`
+        FROM {safe_table_ref(project_id, dataset_id, table_id, quote=True)}
     """
 
     # trusted-input: same boundary as load_from_bigquery (operator-authored only).
