@@ -28,7 +28,7 @@ def geocode_new_addresses(
     from google.cloud import bigquery
 
     from estate_value_index.ml.geocoding import geocode_address
-    from estate_value_index.utils.bigquery_safety import _validate_bq_project_id
+    from estate_value_index.utils.bigquery_safety import _validate_bq_project_id, safe_table_ref
     from estate_value_index.utils.clients import get_bq_client
     from estate_value_index.utils.settings import load_env_config
 
@@ -43,12 +43,12 @@ def geocode_new_addresses(
             address,
             area,
             CONCAT(address, ', ', LOWER(REPLACE(REPLACE(REPLACE(REPLACE(area, 'ö', 'o'), 'ä', 'a'), 'å', 'a'), ' ', '_'))) as geocode_key
-        FROM `{project_id}.booli_raw.listings`
+        FROM {safe_table_ref(project_id, "booli_raw", "listings", quote=True)}
         WHERE address IS NOT NULL AND area IS NOT NULL
     ),
     existing_geocodes AS (
         SELECT address as geocode_key
-        FROM `{project_id}.booli_raw.geocodes`
+        FROM {safe_table_ref(project_id, "booli_raw", "geocodes", quote=True)}
     )
     SELECT la.address, la.area, la.geocode_key
     FROM listing_addresses la
@@ -143,7 +143,7 @@ def geocode_new_addresses(
 
     if new_geocodes:
         print(f"\nUploading {len(new_geocodes)} geocodes to BigQuery...")
-        geocodes_table = f"{project_id}.booli_raw.geocodes"
+        geocodes_table = safe_table_ref(project_id, "booli_raw", "geocodes")
         errors = client.insert_rows_json(geocodes_table, new_geocodes)
         if errors:
             print(f"BigQuery insert errors: {errors[:3]}")

@@ -20,6 +20,7 @@ from estate_value_index.ml import create_optimized_features, filter_valid_listin
 from estate_value_index.ml.data_loader import load_from_bigquery
 from estate_value_index.ml.features import CATEGORICAL_FEATURE_NAMES, NUMERIC_FEATURE_NAMES
 from estate_value_index.ml.preprocessing import normalize_area_for_model
+from estate_value_index.utils.bigquery_safety import safe_table_ref
 from estate_value_index.utils.clients import get_bq_client
 from estate_value_index.utils.settings import bq_table, get_batch_size, load_env_config
 
@@ -49,11 +50,12 @@ def join_geocodes(
 
     # Load geocodes from BigQuery
     client = get_bq_client(project_id)
-    geocodes_table_id = f"{project_id}.{geocodes_dataset}.{geocodes_table}"
+    geocodes_table_id = safe_table_ref(project_id, geocodes_dataset, geocodes_table)
 
     try:
         geocodes_df = client.query(
-            f"SELECT address, lat, lon FROM `{geocodes_table_id}`"
+            f"SELECT address, lat, lon "
+            f"FROM {safe_table_ref(project_id, geocodes_dataset, geocodes_table, quote=True)}"
         ).to_dataframe()
         logger.info("Loaded %d geocodes from BigQuery", len(geocodes_df))
     except Exception as e:
@@ -220,10 +222,12 @@ def materialize_features(
     if truncate:
         from uuid import uuid4
 
-        staging_id = f"{full_table_id}_staging_{uuid4().hex[:8]}"
+        staging_table_id = f"{table_id}_staging_{uuid4().hex[:8]}"
+        staging_id = bq_table(project_id, dataset_id, staging_table_id)
         upload_target = staging_id
         logger.info("Uploading to staging table %s (production swap on success)", staging_id)
     else:
+        staging_table_id = None
         staging_id = None
         upload_target = full_table_id
         logger.info("Uploading %d rows to %s", len(rows), full_table_id)
@@ -256,7 +260,10 @@ def materialize_features(
 
         if staging_id is not None:
             logger.info("Verifying staging row count")
-            count_query = f"SELECT COUNT(*) as count FROM `{staging_id}`"
+            count_query = (
+                "SELECT COUNT(*) as count "
+                f"FROM {safe_table_ref(project_id, dataset_id, staging_table_id, quote=True)}"
+            )
             staging_count = list(client.query(count_query).result())[0]["count"]
             if staging_count != len(rows):
                 raise RuntimeError(
@@ -266,12 +273,18 @@ def materialize_features(
             logger.info(
                 "Swapping staging → production via CREATE OR REPLACE TABLE %s", full_table_id
             )
-            swap_sql = f"CREATE OR REPLACE TABLE `{full_table_id}` AS SELECT * FROM `{staging_id}`"
+            swap_sql = (
+                f"CREATE OR REPLACE TABLE {safe_table_ref(project_id, dataset_id, table_id, quote=True)} "
+                f"AS SELECT * FROM {safe_table_ref(project_id, dataset_id, staging_table_id, quote=True)}"
+            )
             client.query(swap_sql).result()
             row_count = staging_count
         else:
             logger.info("Verifying data")
-            count_query = f"SELECT COUNT(*) as count FROM `{full_table_id}`"
+            count_query = (
+                "SELECT COUNT(*) as count "
+                f"FROM {safe_table_ref(project_id, dataset_id, table_id, quote=True)}"
+            )
             row_count = list(client.query(count_query).result())[0]["count"]
 
         logger.info("BigQuery table has %d rows", row_count)

@@ -14,6 +14,8 @@ from typing import Any
 
 import yaml
 
+from estate_value_index.utils.bigquery_safety import safe_table_ref
+
 try:
     from dotenv import load_dotenv
 
@@ -64,7 +66,12 @@ def load_yaml_config(path: str | None = None) -> dict[str, Any]:
 
 
 def bq_table(project: str, dataset: str, table: str) -> str:
-    return f"{project}.{dataset}.{table}"
+    """Return a validated, fully-qualified ``project.dataset.table`` reference.
+
+    Delegates to :func:`~estate_value_index.utils.bigquery_safety.safe_table_ref`
+    so every interpolated table reference is allow-list validated at the source.
+    """
+    return safe_table_ref(project, dataset, table)
 
 
 def get_training_config() -> dict[str, Any]:

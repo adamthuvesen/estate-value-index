@@ -11,6 +11,7 @@ from prefect import task
 from estate_value_index.exceptions import InfrastructureError
 from estate_value_index.pipelines.types import ProcessingResult, UploadResult
 from estate_value_index.pipelines.utils import get_bq_config, get_task_logger
+from estate_value_index.utils.bigquery_safety import quote_identifier, safe_table_ref
 from estate_value_index.utils.clients import get_bq_client
 
 
@@ -178,7 +179,7 @@ def upload_to_bigquery_task(
 
     # Use temp table + MERGE for upsert
     temp_table_id = f"{bq_config.table_id}_temp_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-    temp_table_ref = f"{bq_config.project_id}.{bq_config.dataset_id}.{temp_table_id}"
+    temp_table_ref = safe_table_ref(bq_config.project_id, bq_config.dataset_id, temp_table_id)
 
     try:
         target_table = client.get_table(table_ref)
@@ -194,11 +195,17 @@ def upload_to_bigquery_task(
         )
         load_job.result()
 
-        # Build MERGE query
-        insert_fields = ", ".join([field.name for field in target_table.schema])
-        insert_values = ", ".join([f"source.{field.name}" for field in target_table.schema])
+        # Build MERGE query. Column names come from the table's own schema, but
+        # quote_identifier validates + backtick-quotes each one so the dynamic
+        # column lists can never carry a SQL fragment (see bigquery_safety).
+        insert_fields = ", ".join(quote_identifier(field.name) for field in target_table.schema)
+        insert_values = ", ".join(
+            f"source.{quote_identifier(field.name)}" for field in target_table.schema
+        )
         field_names = [field.name for field in target_table.schema if field.name != "listing_id"]
-        update_clause = ", ".join([f"target.{f} = source.{f}" for f in field_names])
+        update_clause = ", ".join(
+            f"target.{quote_identifier(f)} = source.{quote_identifier(f)}" for f in field_names
+        )
 
         merge_query = f"""
         MERGE `{table_ref}` AS target
@@ -294,12 +301,12 @@ def geocode_new_addresses_task(
             address,
             area,
             CONCAT(address, ', ', LOWER(REPLACE(REPLACE(REPLACE(REPLACE(area, 'ö', 'o'), 'ä', 'a'), 'å', 'a'), ' ', '_'))) as geocode_key
-        FROM `{project_id}.booli_raw.listings`
+        FROM {safe_table_ref(project_id, "booli_raw", "listings", quote=True)}
         WHERE address IS NOT NULL AND area IS NOT NULL
     ),
     existing_geocodes AS (
         SELECT address as geocode_key
-        FROM `{project_id}.booli_raw.geocodes`
+        FROM {safe_table_ref(project_id, "booli_raw", "geocodes", quote=True)}
     )
     SELECT la.address, la.area, la.geocode_key
     FROM listing_addresses la
@@ -393,7 +400,7 @@ def geocode_new_addresses_task(
     if new_geocodes:
         logger.info(f"Uploading {len(new_geocodes)} geocodes to BigQuery...")
 
-        geocodes_table = f"{project_id}.booli_raw.geocodes"
+        geocodes_table = safe_table_ref(project_id, "booli_raw", "geocodes")
 
         errors = client.insert_rows_json(geocodes_table, new_geocodes)
         if errors:

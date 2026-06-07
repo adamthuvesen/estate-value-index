@@ -13,6 +13,7 @@ from estate_value_index.pipelines.constants import (
     DEFAULT_MODEL_DIR,
     DEFAULT_MODEL_PREFIX,
 )
+from estate_value_index.utils.bigquery_safety import safe_table_ref
 from estate_value_index.utils.clients import get_bq_client
 from estate_value_index.utils.settings import load_env_config
 
@@ -28,8 +29,8 @@ class BigQueryConfig:
 
     @property
     def full_table_id(self) -> str:
-        """Return fully qualified table ID."""
-        return f"{self.project_id}.{self.dataset_id}.{self.table_id}"
+        """Return validated, fully qualified ``project.dataset.table`` ID."""
+        return safe_table_ref(self.project_id, self.dataset_id, self.table_id)
 
 
 def get_bq_config(
