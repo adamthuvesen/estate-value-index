@@ -10,13 +10,17 @@ from datetime import datetime
 def monitor_bigquery_costs(project_id: str, days: int = 7) -> dict:
     """Estimate BigQuery query costs from INFORMATION_SCHEMA.JOBS for the past N days."""
     try:
+        from google.cloud import bigquery
+
         from estate_value_index.utils.bigquery_safety import _validate_bq_project_id
         from estate_value_index.utils.clients import get_bq_client
 
         project_id = _validate_bq_project_id(project_id)
         client = get_bq_client(project_id)
 
-        # Estimate from bytes processed; not actual billing
+        # Estimate from bytes processed; not actual billing. ``project_id`` is
+        # validated above; ``days`` is bound as a query parameter (never an
+        # f-string) per the codebase's value-vs-identifier SQL rule.
         query = f"""
         SELECT
             TIMESTAMP_TRUNC(creation_time, DAY) as date,
@@ -25,7 +29,7 @@ def monitor_bigquery_costs(project_id: str, days: int = 7) -> dict:
         FROM
             `{project_id}.region-europe-north1.INFORMATION_SCHEMA.JOBS`
         WHERE
-            creation_time >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL {days} DAY)
+            creation_time >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL @days DAY)
             AND job_type = 'QUERY'
             AND state = 'DONE'
         GROUP BY
@@ -34,7 +38,10 @@ def monitor_bigquery_costs(project_id: str, days: int = 7) -> dict:
             date DESC
         """
 
-        results = list(client.query(query).result())
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[bigquery.ScalarQueryParameter("days", "INT64", days)]
+        )
+        results = list(client.query(query, job_config=job_config).result())
 
         total_tb = sum(row.total_tb_processed or 0 for row in results)
         total_cost = sum(row.estimated_cost_usd or 0 for row in results)
