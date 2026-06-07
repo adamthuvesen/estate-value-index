@@ -28,14 +28,6 @@ from pathlib import Path
 # qualname -> reason. Each entry is dynamic SQL that interpolates something other
 # than a safe_table_ref()/quote_identifier() call, and has been reviewed.
 REVIEWED_DYNAMIC_SQL: dict[str, str] = {
-    "estate_value_index.ml.data_loader:load_from_bigquery": (
-        "Optional `where_clause` is the one operator-only escape hatch (no "
-        "parameterisation for arbitrary SQL fragments); never request/user input. "
-        "Table ref uses safe_table_ref()."
-    ),
-    "estate_value_index.ml.data_loader:load_features_from_bigquery": (
-        "Same operator-only `where_clause` boundary as load_from_bigquery."
-    ),
     "estate_value_index.pipelines.tasks.sync:sync_bigquery_to_local_task": (
         "`table_ref` is BigQueryConfig.full_table_id, which is validated via "
         "safe_table_ref() in the property."
@@ -70,8 +62,9 @@ _SAFE_CALLS = {"safe_table_ref", "quote_identifier"}
 # An f-string is treated as SQL only when its literal parts show SQL *structure*
 # (not a lone keyword), so prose like "Continuing with MERGE for N rows" is not
 # flagged. Case-sensitive uppercase, matching the codebase's SQL convention.
-# The trailing ``^\s*WHERE`` arm catches predicate fragments appended to a query
-# (e.g. data_loader's operator-only ``where_clause``).
+# The trailing ``^\s*WHERE`` arm catches a raw predicate fragment appended to a
+# query — the pattern the retired ``where_clause`` hatch used; structured filters
+# go through build_filter_clause() instead and never produce one here.
 _SQL_STATEMENT = re.compile(
     r"""(?xms)
       \bSELECT\b .*? \bFROM\b        # SELECT ... FROM

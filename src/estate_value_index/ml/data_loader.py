@@ -11,7 +11,12 @@ from typing import Any
 import pandas as pd
 
 from estate_value_index.exceptions import BigQueryError, exception_context
-from estate_value_index.utils.bigquery_safety import _validate_bq_project_id, safe_table_ref
+from estate_value_index.utils.bigquery_safety import (
+    Filter,
+    _validate_bq_project_id,
+    build_filter_clause,
+    safe_table_ref,
+)
 from estate_value_index.utils.clients import get_bq_client
 from estate_value_index.utils.settings import load_env_config
 
@@ -148,7 +153,7 @@ def load_from_bigquery(
     table_id: str | None = None,
     *,
     drop_duplicate_listing_ids: bool = True,
-    where_clause: str | None = None,
+    filters: Sequence[Filter] | None = None,
 ) -> pd.DataFrame:
     """Load Booli listings from BigQuery.
 
@@ -157,10 +162,11 @@ def load_from_bigquery(
         dataset_id: BigQuery dataset name. If None, uses environment config.
         table_id: BigQuery table name. If None, uses environment config.
         drop_duplicate_listing_ids: Whether to deduplicate by listing_id.
-        where_clause: Optional SQL predicate (without the ``WHERE`` keyword).
-            **Trusted input only** — must be authored by operators (notebooks,
-            training scripts). Never pass request-derived or user-controlled
-            strings; there is no parameterisation for arbitrary SQL fragments.
+        filters: Optional structured predicates ANDed into a parameterised
+            ``WHERE`` clause (see :class:`~estate_value_index.utils.bigquery_safety.Filter`).
+            Columns/operators are validated and values are bound as query
+            parameters, so this is safe even for operator-authored filters — it
+            replaces the former raw ``where_clause`` string.
 
     Returns:
         DataFrame with listings from BigQuery.
@@ -174,6 +180,8 @@ def load_from_bigquery(
             "google-cloud-bigquery is required for BigQuery support. "
             "Install it with: pip install google-cloud-bigquery"
         )
+
+    from google.cloud import bigquery
 
     # Load environment configuration
     env_config = load_env_config()
@@ -189,16 +197,16 @@ def load_from_bigquery(
         FROM {safe_table_ref(project_id, dataset_id, table_id, quote=True)}
     """
 
-    # trusted-input: optional predicate only; call sites are operator-controlled
-    # (train_model.py, feature_materialization.py, scripts/*.py) — never user/request input.
-    # There is no parameterisation for an arbitrary SQL fragment; this is the one
-    # reviewed escape hatch (see tests/utils/test_no_unsafe_sql.py).
-    if where_clause:
-        query += f"\n        WHERE {where_clause}"
+    where_sql, query_params = build_filter_clause(filters or [])
+    if where_sql:
+        query += f"\n        {where_sql}"
 
     try:
         client = get_bq_client(project_id)
-        df = client.query(query).to_dataframe()
+        job_config = (
+            bigquery.QueryJobConfig(query_parameters=query_params) if query_params else None
+        )
+        df = client.query(query, job_config=job_config).to_dataframe()
     except Exception as e:
         raise BigQueryError(
             f"Failed to query BigQuery: {e}",
@@ -236,7 +244,7 @@ def load_features_from_bigquery(
     dataset_id: str | None = None,
     table_id: str | None = None,
     *,
-    where_clause: str | None = None,
+    filters: Sequence[Filter] | None = None,
 ) -> pd.DataFrame:
     """Load pre-computed engineered features from BigQuery.
 
@@ -248,8 +256,9 @@ def load_features_from_bigquery(
         project_id: GCP project ID. If None, uses environment config.
         dataset_id: BigQuery dataset name. If None, uses environment config.
         table_id: BigQuery table name. If None, uses environment config.
-        where_clause: Optional SQL predicate (without the ``WHERE`` keyword).
-            **Trusted input only** — same contract as ``load_from_bigquery``.
+        filters: Optional structured predicates ANDed into a parameterised
+            ``WHERE`` clause — same contract as ``load_from_bigquery`` (see
+            :class:`~estate_value_index.utils.bigquery_safety.Filter`).
 
     Returns:
         DataFrame with pre-computed engineered features ready for training.
@@ -263,6 +272,8 @@ def load_features_from_bigquery(
             "google-cloud-bigquery is required for BigQuery support. "
             "Install it with: pip install google-cloud-bigquery"
         )
+
+    from google.cloud import bigquery
 
     # Load environment configuration
     env_config = load_env_config()
@@ -278,13 +289,16 @@ def load_features_from_bigquery(
         FROM {safe_table_ref(project_id, dataset_id, table_id, quote=True)}
     """
 
-    # trusted-input: same boundary as load_from_bigquery (operator-authored only).
-    if where_clause:
-        query += f"\n        WHERE {where_clause}"
+    where_sql, query_params = build_filter_clause(filters or [])
+    if where_sql:
+        query += f"\n        {where_sql}"
 
     try:
         client = get_bq_client(project_id)
-        df = client.query(query).to_dataframe()
+        job_config = (
+            bigquery.QueryJobConfig(query_parameters=query_params) if query_params else None
+        )
+        df = client.query(query, job_config=job_config).to_dataframe()
     except Exception as e:
         raise BigQueryError(
             f"Failed to query BigQuery features: {e}",
