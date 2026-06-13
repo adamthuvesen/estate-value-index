@@ -21,7 +21,7 @@ This directory contains CI/CD workflows for the Estate Value Index project.
 ### What it does:
 
 1. **Python Tests & Linting**
-   - Runs 126 tests across 9 test files
+   - Runs the Python test suite (~160 tests across ~48 files)
    - Tests: `src/estate_value_index/{ml,ingestion,pipelines}`
    - Checks code formatting (Black) and import sorting (isort)
    - Generates coverage report
