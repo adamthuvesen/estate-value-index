@@ -115,7 +115,7 @@ evi = "estate_value_index.cli.__main__:main"
 
 [project.urls]
 Homepage = "https://github.com/adamthuvesen/estate-value-index"
-Documentation = "https://github.com/adamthuvesen/estate-value-index/tree/main/agents/docs"
+Documentation = "https://github.com/adamthuvesen/estate-value-index/tree/main/docs"
 Repository = "https://github.com/adamthuvesen/estate-value-index"
 Issues = "https://github.com/adamthuvesen/estate-value-index/issues"
 

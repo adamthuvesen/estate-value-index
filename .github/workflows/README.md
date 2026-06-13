@@ -278,10 +278,10 @@ gh secret list --env production
 
 ## Related documentation
 
-- [Architecture](../../agents/docs/architecture.md)
-- [Data pipeline](../../agents/docs/data-pipeline.md)
-- [ML and models](../../agents/docs/ml-and-models.md)
-- [API, web, and deploy](../../agents/docs/api-web-deploy.md)
+- [Architecture](../../docs/architecture.md)
+- [Data pipeline](../../docs/data-pipeline.md)
+- [ML and models](../../docs/ml-and-models.md)
+- [API, web, and deploy](../../docs/api-web-deploy.md)
 - [AGENTS.md (rules + env)](../../AGENTS.md)
 - [GitHub Actions documentation](https://docs.github.com/en/actions)
 

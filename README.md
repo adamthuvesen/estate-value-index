@@ -70,7 +70,7 @@ Scrapy → BigQuery raw listings → engineered features → LightGBM artifacts
 The composed path is `pipelines/core/complete_pipeline.py`, which chains ingestion, feature
 materialization, training, and deploy. Each stage also runs on its own (`data_pipeline.py`,
 `training_pipeline.py`, `deployment_pipeline.py`). Start with
-[agents/docs/architecture.md](agents/docs/architecture.md) for the full map;
+[docs/architecture.md](docs/architecture.md) for the full map;
 [AGENTS.md](AGENTS.md) holds the coding-agent rules.
 
 ## Setup
@@ -154,9 +154,9 @@ uv run python -m estate_value_index.cli.crawl_booli --max-pages 10
 | `scripts/` | Deploy, startup, materialization, ops helpers |
 | `tests/` | Python test suite |
 
-Deeper docs: [data-pipeline.md](agents/docs/data-pipeline.md),
-[ml-and-models.md](agents/docs/ml-and-models.md),
-[api-web-deploy.md](agents/docs/api-web-deploy.md).
+Deeper docs: [data-pipeline.md](docs/data-pipeline.md),
+[ml-and-models.md](docs/ml-and-models.md),
+[api-web-deploy.md](docs/api-web-deploy.md).
 
 ## License
 

@@ -1,6 +1,6 @@
 # Scripts
 
-Most automation goes through `uv run python -m estate_value_index.cli ...` (see `agents/docs/architecture.md`).
+Most automation goes through `uv run python -m estate_value_index.cli ...` (see `docs/architecture.md`).
 
 Cloud-mutating scripts require an explicit project via `--project` or environment
 variables. They must not fall back to a real project name when config is missing.
