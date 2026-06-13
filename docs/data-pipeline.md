@@ -38,6 +38,6 @@ Booli -> spider -> JSONL + upload path -> process_listings -> booli_raw.listings
 ## Checks to run
 
 - General pipeline/data changes: `uv run pytest`
-- BigQuery safety: `uv run pytest tests/utils/test_bigquery_safety.py tests/ml/test_where_clause_call_sites.py`
+- BigQuery safety: `uv run pytest tests/utils/test_bigquery_safety.py tests/utils/test_no_unsafe_sql.py tests/ml/test_filter_api_contract.py`
 - Temporal behavior: `uv run pytest tests/ml/test_temporal_leakage.py tests/test_time_series_utils.py`
 - Ingestion behavior: `uv run pytest tests/ingestion tests/test_ingestion_parsers.py tests/test_ingestion_utils.py`

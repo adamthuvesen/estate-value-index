@@ -21,7 +21,7 @@ This directory contains CI/CD workflows for the Estate Value Index project.
 ### What it does:
 
 1. **Python Tests & Linting**
-   - Runs 126 tests across 9 test files
+   - Runs the Python test suite (~160 tests across ~48 files)
    - Tests: `src/estate_value_index/{ml,ingestion,pipelines}`
    - Checks code formatting (Black) and import sorting (isort)
    - Generates coverage report
@@ -278,10 +278,10 @@ gh secret list --env production
 
 ## Related documentation
 
-- [Architecture](../../agents/docs/architecture.md)
-- [Data pipeline](../../agents/docs/data-pipeline.md)
-- [ML and models](../../agents/docs/ml-and-models.md)
-- [API, web, and deploy](../../agents/docs/api-web-deploy.md)
+- [Architecture](../../docs/architecture.md)
+- [Data pipeline](../../docs/data-pipeline.md)
+- [ML and models](../../docs/ml-and-models.md)
+- [API, web, and deploy](../../docs/api-web-deploy.md)
 - [AGENTS.md (rules + env)](../../AGENTS.md)
 - [GitHub Actions documentation](https://docs.github.com/en/actions)
 

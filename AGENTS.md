@@ -4,10 +4,10 @@
 
 **Read next**
 
-- [agents/docs/architecture.md](agents/docs/architecture.md) — architecture, runtime shape, and system boundaries
-- [agents/docs/data-pipeline.md](agents/docs/data-pipeline.md) — ingestion, BigQuery, feature materialization, and pipeline rules
-- [agents/docs/ml-and-models.md](agents/docs/ml-and-models.md) — training, feature context, model artifacts, and ML checks
-- [agents/docs/api-web-deploy.md](agents/docs/api-web-deploy.md) — FastAPI, Next.js, container startup, and deploy notes
+- [docs/architecture.md](docs/architecture.md) — architecture, runtime shape, and system boundaries
+- [docs/data-pipeline.md](docs/data-pipeline.md) — ingestion, BigQuery, feature materialization, and pipeline rules
+- [docs/ml-and-models.md](docs/ml-and-models.md) — training, feature context, model artifacts, and ML checks
+- [docs/api-web-deploy.md](docs/api-web-deploy.md) — FastAPI, Next.js, container startup, and deploy notes
 
 ---
 
@@ -17,7 +17,7 @@
 
 - `uv sync --all-extras`, then run Python via `uv run …` (no manual `activate` needed; `uv run` always uses the project venv)
 - Run **`uv run pytest`** before commit; for web changes also `cd web && npm test` (and lint/typecheck as needed)
-- Read the matching guide under [agents/docs/](agents/docs/) when you touch pipeline, ML, API, or deploy
+- Read the matching guide under [docs/](docs/) when you touch pipeline, ML, API, or deploy
 - Use `--dry-run` on CLIs that support it when outcomes are uncertain
 
 **NEVER**
@@ -26,7 +26,7 @@
 - Hand-edit **web/models/** (training outputs)
 - Use deprecated scripts: `clean_areas.py`, `merge_listings.py`, `impute_days_on_market.py`
 - Use **localStorage** / **sessionStorage** in **web** artifacts
-- **Trust** ad hoc strings in BigQuery SQL; use operator-only / parameterized patterns (see `utils/bigquery_safety.py`, [agents/docs/data-pipeline.md](agents/docs/data-pipeline.md))
+- **Trust** ad hoc strings in BigQuery SQL; use operator-only / parameterized patterns (see `utils/bigquery_safety.py`, [docs/data-pipeline.md](docs/data-pipeline.md))
 
 ---
 
@@ -39,8 +39,8 @@ cd web && npm run dev          # app on localhost:3000
 ```
 
 **Train (typical):** `uv run python train_model.py --use-features`  
-**Pipeline (orchestrated):** e.g. `uv run python -m estate_value_index.pipelines.core.complete_pipeline --quick` (see [agents/docs/data-pipeline.md](agents/docs/data-pipeline.md) and `complete_pipeline --help`)
-**Deploy:** `./scripts/deploy_cloud_run.sh` (see [agents/docs/api-web-deploy.md](agents/docs/api-web-deploy.md))
+**Pipeline (orchestrated):** e.g. `uv run python -m estate_value_index.pipelines.core.complete_pipeline --quick` (see [docs/data-pipeline.md](docs/data-pipeline.md) and `complete_pipeline --help`)
+**Deploy:** `./scripts/deploy_cloud_run.sh` (see [docs/api-web-deploy.md](docs/api-web-deploy.md))
 
 ---
 

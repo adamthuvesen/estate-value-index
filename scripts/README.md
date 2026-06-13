@@ -1,6 +1,6 @@
 # Scripts
 
-Most automation goes through `uv run python -m estate_value_index.cli ...` (see `agents/docs/architecture.md`).
+Most automation goes through `uv run python -m estate_value_index.cli ...` (see `docs/architecture.md`).
 
 Cloud-mutating scripts require an explicit project via `--project` or environment
 variables. They must not fall back to a real project name when config is missing.
@@ -20,7 +20,9 @@ These are not imported by the pipeline; run from the repo root with `uv run` or 
 | ------ | ------- |
 | `analyze_feature_correlation.py` | Ad-hoc feature correlation analysis |
 | `fetch_economic_data.py` | Pull external economic series (if configured) |
-| `monitor_costs.py` | Thin wrapper → `estate_value_index.ops.cost_monitoring` |
+
+GCP cost monitoring is a CLI command, not a script here:
+`uv run python -m estate_value_index.cli costs` (thin wrapper → `estate_value_index.ops.cost_monitoring`).
 
 ## Deprecated names (removed)
 
