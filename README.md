@@ -9,9 +9,10 @@ than a model in a notebook. The interesting parts are the seams where real syste
 temporal leakage in training, train/serve skew at inference, and untrusted input reaching
 SQL and the file system.
 
-The public repo ships the code, not the data. Real listings, geocodes, trained models, and
-metrics are intentionally excluded; `tests/fixtures/` carries synthetic shapes, and you bring
-your own BigQuery, GCS, and `.env` for production-like runs.
+The public repo ships the code, not the private data. Real listings, geocodes, trained
+models, private datasets, and production metrics are intentionally excluded. The files
+under `tests/fixtures/` are synthetic examples. Bring your own BigQuery, GCS, and `.env`
+for production-like runs.
 
 ## Engineering decisions
 
@@ -105,6 +106,35 @@ GCS_BUCKET=your-gcs-bucket
 Config precedence is environment variables → [config/pipeline_config.yaml](config/pipeline_config.yaml)
 → code defaults. Inspect resolved settings with
 `uv run python -m estate_value_index.utils.settings`.
+
+## Public demo
+
+You can inspect the no-secret fixture output without cloud access:
+
+```bash
+uv run python -m json.tool tests/fixtures/synthetic_value_analysis.json
+```
+
+Representative output:
+
+```json
+{
+  "statistics": {
+    "total_properties": 2,
+    "undervalued_count": 1,
+    "overvalued_count": 1,
+    "model_performance": {
+      "mae": 250000,
+      "rmse": 310000,
+      "mape": 4.5
+    }
+  }
+}
+```
+
+This is a toy fixture, not a public benchmark. It proves the output shape and UI/API
+contract. It does not reproduce private listings, geocodes, trained models, cloud state,
+or production performance.
 
 ## Run locally
 
