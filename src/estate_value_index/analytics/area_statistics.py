@@ -9,6 +9,7 @@ Output: area_statistics.json with analytics for each of the 36 Stockholm areas
 """
 
 import json
+import logging
 import statistics
 from collections import defaultdict
 from datetime import UTC, datetime
@@ -18,6 +19,8 @@ from typing import Any
 from estate_value_index.ingestion.processing import load_jsonl_file as load_jsonl
 from estate_value_index.ml.area_names import get_display_name
 from estate_value_index.ml.preprocessing import normalize_area_for_model
+
+logger = logging.getLogger(__name__)
 
 
 def load_json(filepath: Path) -> dict:
@@ -74,7 +77,7 @@ def load_raw_listings(data_source: str, raw_listings_path: Path) -> tuple[list[d
         except ImportError:
             # BigQuery client libraries not installed (local dev) — fall back.
             # A real query/auth failure raises BigQueryError, which propagates.
-            print("BigQuery support not installed, falling back to local JSON")
+            logger.warning("BigQuery support not installed, falling back to local JSON")
         else:
             records = json.loads(df.to_json(orient="records", date_format="iso"))
             for record in records:
@@ -82,12 +85,12 @@ def load_raw_listings(data_source: str, raw_listings_path: Path) -> tuple[list[d
                 if sold_date:
                     record["sold_date"] = _normalize_sold_date(sold_date)
             if records:
-                print("Loaded raw listings from BigQuery")
+                logger.info("Loaded raw listings from BigQuery")
                 return records, "bigquery"
-            print("BigQuery returned no rows, falling back to local JSON")
+            logger.warning("BigQuery returned no rows, falling back to local JSON")
 
     records = load_jsonl(raw_listings_path)
-    print(f"Loaded raw listings from local JSON: {raw_listings_path}")
+    logger.info("Loaded raw listings from local JSON: %s", raw_listings_path)
     return records, raw_listings_path.name
 
 
@@ -445,14 +448,16 @@ def generate_area_statistics(
     )
     output_path = output_path or (project_root / "data" / "enrichment" / "area_statistics.json")
 
-    print("Loading data sources...")
+    logger.info("Loading data sources...")
 
     feature_context = load_json(feature_context_path)
     value_analysis = load_json(value_analysis_path)
     raw_listings, raw_listings_source = load_raw_listings(data_source, raw_listings_path)
 
-    print(f"Loaded {len(raw_listings)} raw listings")
-    print(f"Loaded {len(value_analysis.get('properties', []))} value analysis properties")
+    logger.info("Loaded %d raw listings", len(raw_listings))
+    logger.info(
+        "Loaded %d value analysis properties", len(value_analysis.get("properties", []))
+    )
 
     listings_by_area = defaultdict(list)
     for listing in raw_listings:
@@ -467,16 +472,16 @@ def generate_area_statistics(
     area_stats = {}
     areas = feature_context.get("area_avg_price", {}).keys()
 
-    print(f"\nGenerating statistics for {len(areas)} areas...")
+    logger.info("Generating statistics for %d areas...", len(areas))
 
     for area_key in sorted(areas):
-        print(f"  Processing {area_key}...")
+        logger.debug("Processing %s...", area_key)
 
         raw_props = listings_by_area.get(area_key, [])
         value_props = value_props_by_area.get(area_key, [])
 
         if len(raw_props) < 2:
-            print(f"    Skipping {area_key} - only {len(raw_props)} properties")
+            logger.debug("Skipping %s - only %d properties", area_key, len(raw_props))
             continue
 
         # Calculate market dynamics directly from raw data (more accurate than feature_context)
@@ -573,19 +578,23 @@ def generate_area_statistics(
         "areas": area_stats,
     }
 
-    print(f"\nWriting output to {output_path}...")
+    logger.info("Writing output to %s...", output_path)
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(output_data, f, indent=2, ensure_ascii=False)
 
-    print(f"Generated statistics for {len(area_stats)} areas -> {output_path}")
+    logger.info("Generated statistics for %d areas -> %s", len(area_stats), output_path)
 
-    print("\nArea Summary:")
+    logger.info("Area Summary:")
     for _, stats in sorted(area_stats.items(), key=lambda x: x[1]["sample_size"], reverse=True)[
         :10
     ]:
         flag = " LIMITED DATA" if stats["has_limited_data"] else ""
-        print(
-            f"  {stats['display_name']:30s} - {stats['sample_size']:4d} properties - {stats['price_tier']:8s}{flag}"
+        logger.info(
+            "  %-30s - %4d properties - %-8s%s",
+            stats["display_name"],
+            stats["sample_size"],
+            stats["price_tier"],
+            flag,
         )
 
     return output_data

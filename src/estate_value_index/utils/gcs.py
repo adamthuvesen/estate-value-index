@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import logging
 import os
 import posixpath
 import tempfile
@@ -10,6 +11,8 @@ from urllib.parse import urlparse
 
 from estate_value_index.exceptions import ConfigurationError
 from estate_value_index.utils.settings import is_gcs_enabled
+
+logger = logging.getLogger(__name__)
 
 
 def compute_sha256(path: str | Path, chunk_size: int = 1024 * 1024) -> str:
@@ -74,7 +77,7 @@ class GCSClient:
         blob = self._bucket.blob(gcs_path)
         blob.upload_from_filename(str(local_path))
         gcs_uri = f"gs://{self.bucket_name}/{gcs_path}"
-        print(f"Uploaded {local_path} to {gcs_uri}")
+        logger.info("Uploaded %s to %s", local_path, gcs_uri)
         return gcs_uri
 
     def download_file(self, gcs_path: str, local_path: str | Path) -> Path:
@@ -88,7 +91,7 @@ class GCSClient:
         local_path.parent.mkdir(parents=True, exist_ok=True)
         blob = self._bucket.blob(gcs_path)
         blob.download_to_filename(str(local_path))
-        print(f"Downloaded gs://{self.bucket_name}/{gcs_path} to {local_path}")
+        logger.info("Downloaded gs://%s/%s to %s", self.bucket_name, gcs_path, local_path)
         return local_path
 
     def upload_json(self, data: dict, gcs_path: str) -> str:
@@ -104,7 +107,7 @@ class GCSClient:
             json.dumps(data, indent=2, ensure_ascii=False), content_type="application/json"
         )
         gcs_uri = f"gs://{self.bucket_name}/{gcs_path}"
-        print(f"Uploaded JSON to {gcs_uri}")
+        logger.info("Uploaded JSON to %s", gcs_uri)
         return gcs_uri
 
     def download_json(self, gcs_path: str) -> dict:
@@ -159,14 +162,13 @@ def resolve_data_path(
         try:
             return client.download_file(gcs_path, default_local)
         except Exception as e:
-            print(f"GCS download failed: {e}")
-            print(f"   Falling back to local file: {default_local}")
+            logger.warning("GCS download failed: %s. Falling back to local file: %s", e, default_local)
             if default_local.exists():
                 return default_local
             raise
 
     if default_local.exists():
-        print(f"File not in GCS, using local: {default_local}")
+        logger.info("File not in GCS, using local: %s", default_local)
         return default_local
     raise FileNotFoundError(f"File not found in GCS ({gcs_path}) or locally ({default_local})")
 
@@ -202,7 +204,7 @@ def upload_model_artifacts(
     model_dir = Path(model_dir)
 
     if not is_gcs_enabled():
-        print("GCS disabled, skipping upload")
+        logger.info("GCS disabled, skipping upload")
         return {}
 
     env_artifacts_uri = os.getenv("MODEL_ARTIFACTS_URI", "").strip()
@@ -245,7 +247,11 @@ def upload_model_artifacts(
                     try:
                         client._bucket.blob(artefact_dest).delete()
                     except Exception as cleanup_exc:  # pragma: no cover - best-effort
-                        print(f"Failed to roll back partial upload {artefact_dest}: {cleanup_exc}")
+                        logger.warning(
+                            "Failed to roll back partial upload %s: %s",
+                            artefact_dest,
+                            cleanup_exc,
+                        )
                 raise
 
             artifacts[key] = uploaded_artefact_uri
@@ -267,6 +273,5 @@ def upload_model_artifacts(
         return artifacts
 
     except Exception as e:
-        print(f"GCS upload failed: {e}")
-        print("   Models saved locally but not uploaded to cloud")
+        logger.error("GCS upload failed: %s. Models saved locally but not uploaded to cloud", e)
         return {}
