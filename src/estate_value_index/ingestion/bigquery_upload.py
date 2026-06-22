@@ -9,6 +9,7 @@ This module provides functions for:
 from __future__ import annotations
 
 import json
+import logging
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -20,6 +21,8 @@ from estate_value_index.ingestion.processing import load_jsonl_file
 from estate_value_index.utils.bigquery_safety import safe_table_ref
 from estate_value_index.utils.clients import get_bq_client
 from estate_value_index.utils.settings import bq_table, get_batch_size, load_env_config
+
+logger = logging.getLogger(__name__)
 
 
 def prepare_bq_row(item: dict[str, Any]) -> dict[str, Any]:
@@ -75,15 +78,15 @@ def prepare_bq_row(item: dict[str, Any]) -> dict[str, Any]:
 
 def _load_listings(data_file: Path) -> list[dict[str, Any]]:
     """Load listings from a JSONL file with progress logging."""
-    print(f"Loading data from: {data_file}")
+    logger.info("Loading data from: %s", data_file)
     listings = load_jsonl_file(Path(data_file))
-    print(f"Loaded {len(listings)} listings")
+    logger.info("Loaded %d listings", len(listings))
     return listings
 
 
 def _prepare_rows(listings: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Convert listings to BigQuery rows, dropping duplicates by listing_id."""
-    print(f"Preparing {len(listings)} rows for BigQuery...")
+    logger.info("Preparing %d rows for BigQuery...", len(listings))
     bq_rows = []
     seen_ids: set[str] = set()
     duplicates_skipped = 0
@@ -102,12 +105,12 @@ def _prepare_rows(listings: list[dict[str, Any]]) -> list[dict[str, Any]]:
             bq_row = prepare_bq_row(item)
             bq_rows.append(bq_row)
         except Exception as e:
-            print(f"Warning: Failed to prepare row for {item.get('listing_id')}: {e}")
+            logger.warning("Failed to prepare row for %s: %s", item.get("listing_id"), e)
             continue
 
-    print(f"Prepared {len(bq_rows)} unique rows")
+    logger.info("Prepared %d unique rows", len(bq_rows))
     if duplicates_skipped > 0:
-        print(f"Skipped {duplicates_skipped} duplicate listing_ids")
+        logger.info("Skipped %d duplicate listing_ids", duplicates_skipped)
 
     return bq_rows
 
@@ -123,7 +126,7 @@ def _load_temp_table(
     Returns:
         Tuple of (total_inserted, total_errors).
     """
-    print(f"\n1. Loading {len(bq_rows)} rows into temp table...")
+    logger.info("Loading %d rows into temp table...", len(bq_rows))
 
     total_inserted = 0
     total_errors = 0
@@ -137,33 +140,37 @@ def _load_temp_table(
             errors = client.insert_rows_json(temp_table_id, batch)
 
             if errors:
-                print(f"Batch {batch_num}/{total_batches}: {len(errors)} errors")
+                logger.warning("Batch %d/%d: %d errors", batch_num, total_batches, len(errors))
                 for error in errors[:3]:
-                    print(f"   Error: {error}")
+                    logger.warning("   Error: %s", error)
                 total_errors += len(errors)
             else:
                 total_inserted += len(batch)
-                print(
-                    f"Batch {batch_num}/{total_batches}: {len(batch)} rows loaded (total: {total_inserted})"
+                logger.info(
+                    "Batch %d/%d: %d rows loaded (total: %d)",
+                    batch_num,
+                    total_batches,
+                    len(batch),
+                    total_inserted,
                 )
 
         except GoogleCloudError as e:
-            print(f"Batch {batch_num}/{total_batches} failed: {e}")
+            logger.error("Batch %d/%d failed: %s", batch_num, total_batches, e)
             total_errors += len(batch)
         except Exception as e:
-            print(f"Unexpected error in batch {batch_num}/{total_batches}: {e}")
+            logger.error("Unexpected error in batch %d/%d: %s", batch_num, total_batches, e)
             total_errors += len(batch)
 
     if total_errors > 0:
-        print(f"\n{total_errors} rows failed to load into temp table")
-        print(f"   Continuing with MERGE for {total_inserted} successfully loaded rows...")
+        logger.warning("%d rows failed to load into temp table", total_errors)
+        logger.info("Continuing with MERGE for %d successfully loaded rows...", total_inserted)
 
     return total_inserted, total_errors
 
 
 def _merge_temp_table(client: bigquery.Client, full_table_id: str, temp_table_id: str) -> None:
     """Merge the temp table into the main table, deduplicating by listing_id."""
-    print("\n2. Merging temp table into main table (deduplicating by listing_id)...")
+    logger.info("Merging temp table into main table (deduplicating by listing_id)...")
 
     merge_query = f"""
     MERGE `{full_table_id}` T
@@ -215,9 +222,9 @@ def _merge_temp_table(client: bigquery.Client, full_table_id: str, temp_table_id
 
     if hasattr(merge_job, "num_dml_affected_rows"):
         rows_affected = merge_job.num_dml_affected_rows
-        print(f"MERGE complete: {rows_affected} rows affected (inserted or updated)")
+        logger.info("MERGE complete: %s rows affected (inserted or updated)", rows_affected)
     else:
-        print("MERGE complete")
+        logger.info("MERGE complete")
 
 
 def _upload_via_merge(
@@ -242,18 +249,18 @@ def _upload_via_merge(
 
         _merge_temp_table(client, full_table_id, temp_table_id)
 
-        print("\n3. Cleaning up temp table...")
+        logger.info("Cleaning up temp table...")
         client.delete_table(temp_table_id, not_found_ok=True)
-        print("Temp table deleted")
+        logger.info("Temp table deleted")
 
     except Exception as e:
-        print(f"\nMERGE operation failed: {e}")
-        print("   Attempting to clean up temp table...")
+        logger.error("MERGE operation failed: %s", e)
+        logger.info("Attempting to clean up temp table...")
         try:
             client.delete_table(temp_table_id, not_found_ok=True)
-            print("Temp table cleaned up")
+            logger.info("Temp table cleaned up")
         except Exception:
-            print(f"Could not delete temp table: {temp_table_id}")
+            logger.error("Could not delete temp table: %s", temp_table_id)
         return None
 
     return total_inserted, total_errors
@@ -261,14 +268,14 @@ def _upload_via_merge(
 
 def _verify_row_count(client: bigquery.Client, full_table_id: str) -> None:
     """Log the current row count of the target table; best-effort."""
-    print("\nVerifying data...")
+    logger.info("Verifying data...")
     try:
         query = f"SELECT COUNT(*) as count FROM `{full_table_id}`"
         result = client.query(query).result()
         row_count = list(result)[0]["count"]
-        print(f"BigQuery table has {row_count} rows")
+        logger.info("BigQuery table has %s rows", row_count)
     except Exception as e:
-        print(f"Could not verify row count: {e}")
+        logger.warning("Could not verify row count: %s", e)
 
 
 def upload_to_bigquery(
@@ -301,36 +308,35 @@ def upload_to_bigquery(
 
     full_table_id = bq_table(project_id, dataset_id, table_id)
 
-    print("\nStarting BigQuery Migration")
-    print(f"   Source: {data_file}")
-    print(f"   Target: {full_table_id}")
-    print(f"   Batch size: {batch_size}")
-    print(f"   Dry run: {dry_run}")
-    print()
+    logger.info("Starting BigQuery migration")
+    logger.info("   Source: %s", data_file)
+    logger.info("   Target: %s", full_table_id)
+    logger.info("   Batch size: %d", batch_size)
+    logger.info("   Dry run: %s", dry_run)
 
     listings = _load_listings(data_file)
 
     if not listings:
-        print("No data to migrate")
+        logger.warning("No data to migrate")
         return False
 
     bq_rows = _prepare_rows(listings)
 
     if dry_run:
-        print("\nDry run complete - no data written to BigQuery")
-        print(f"   Sample row: {json.dumps(bq_rows[0], indent=2, default=str)}")
+        logger.info("Dry run complete - no data written to BigQuery")
+        logger.info("   Sample row: %s", json.dumps(bq_rows[0], indent=2, default=str))
         return True
 
-    print("\nConnecting to BigQuery...")
+    logger.info("Connecting to BigQuery...")
     try:
         client = get_bq_client(project_id)
-        print(f"Connected to project: {project_id}")
+        logger.info("Connected to project: %s", project_id)
     except Exception as e:
-        print(f"Failed to connect to BigQuery: {e}")
+        logger.error("Failed to connect to BigQuery: %s", e)
         return False
 
-    print("\nUploading data to BigQuery (MERGE deduplication)...")
-    print("   Note: Using temp table + MERGE to prevent duplicates")
+    logger.info("Uploading data to BigQuery (MERGE deduplication)...")
+    logger.info("   Using temp table + MERGE to prevent duplicates")
 
     temp_table_id = safe_table_ref(
         project_id, dataset_id, f"listings_temp_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
@@ -343,14 +349,13 @@ def upload_to_bigquery(
 
     _verify_row_count(client, full_table_id)
 
-    print("\nMigration Summary:")
-    print(f"   Rows inserted: {total_inserted}")
-    print(f"   Errors: {total_errors}")
-    print(f"   Success rate: {100 * total_inserted / len(bq_rows):.1f}%")
+    logger.info("Migration summary:")
+    logger.info("   Rows inserted: %d", total_inserted)
+    logger.info("   Errors: %d", total_errors)
+    logger.info("   Success rate: %.1f%%", 100 * total_inserted / len(bq_rows))
 
     if total_errors > 0:
-        print(f"\nMigration completed with {total_errors} errors")
+        logger.warning("Migration completed with %d errors", total_errors)
         return False
-    else:
-        print("\nMigration completed successfully!")
-        return True
+    logger.info("Migration completed successfully")
+    return True

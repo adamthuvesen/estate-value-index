@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import math
 import os
 from dataclasses import asdict, dataclass
@@ -46,6 +47,8 @@ from estate_value_index.utils.gcs import (
 )
 from estate_value_index.utils.settings import get_mae_threshold, get_random_state, get_test_size
 
+logger = logging.getLogger(__name__)
+
 MIN_FEATURES_AFTER_PRUNING = 5
 
 
@@ -78,33 +81,32 @@ def _context_payload(feature_context) -> dict[str, object]:
 
 
 def _print_run_header(config: TrainingConfig) -> None:
-    """Echo run configuration before any heavy work starts."""
-    print("Training Optimized Property Price Prediction Model")
-    print("=" * 60)
-    print("Model: LightGBM (LGBM)")
+    """Log run configuration before any heavy work starts."""
+    logger.info("Training Optimized Property Price Prediction Model")
+    logger.info("Model: LightGBM (LGBM)")
 
     if config.config_file:
         os.environ["EVI_CONFIG_FILE"] = config.config_file
-        print(f"Using config file: {config.config_file}")
+        logger.info("Using config file: %s", config.config_file)
 
     if config.use_materialized_features:
-        print(
+        logger.info(
             "Data Source: BigQuery (pre-computed features from booli_features.engineered_features)"
         )
     elif config.data_source.lower() == "bigquery":
-        print("Data Source: BigQuery (estate-value-index.booli_raw.listings)")
+        logger.info("Data Source: BigQuery (estate-value-index.booli_raw.listings)")
     else:
-        print(
-            f"Data: {Path(config.data_file or os.getenv('BOOLI_TRAIN_DATA') or 'data/raw/booli/booli_listings_prod.json').name}"
-        )
-    print()
+        data_name = Path(
+            config.data_file
+            or os.getenv("BOOLI_TRAIN_DATA")
+            or "data/raw/booli/booli_listings_prod.json"
+        ).name
+        logger.info("Data: %s", data_name)
 
     if config.hyperparameter_tuning:
-        print("Hyperparameter tuning ENABLED")
-        print("This may take several minutes...")
+        logger.info("Hyperparameter tuning ENABLED; this may take several minutes...")
     else:
-        print("Using optimized default parameters (fast)")
-    print()
+        logger.info("Using optimized default parameters (fast)")
 
 
 def _load_and_split(config: TrainingConfig) -> SplitData:
@@ -125,31 +127,31 @@ def _load_and_split(config: TrainingConfig) -> SplitData:
     if not skip_feature_engineering:
         df = df_or_engineered
         df_filtered = filter_valid_listings(df, min_price=3000000, drop_na_features=False)
-        print(f"After filtering: {len(df_filtered)} listings")
+        logger.info("After filtering: %d listings", len(df_filtered))
         # The temporal split needs sold_date as datetime; previously this was
         # done by feature engineering, which now runs after the split.
         df_filtered = df_filtered.copy()
         df_filtered["sold_date"] = pd.to_datetime(df_filtered["sold_date"], errors="coerce")
         if df_filtered["sold_date"].isna().any():
             n_bad = int(df_filtered["sold_date"].isna().sum())
-            print(f"Dropping {n_bad} rows with unparseable sold_date before split")
+            logger.info("Dropping %d rows with unparseable sold_date before split", n_bad)
             df_filtered = df_filtered.loc[df_filtered["sold_date"].notna()].reset_index(drop=True)
-        print("\nCreating temporal train/test split BEFORE feature engineering...")
+        logger.info("Creating temporal train/test split BEFORE feature engineering...")
         train_df_raw, test_df_raw = create_temporal_holdout_split(
             df_filtered, test_size=test_size, date_column="sold_date"
         )
-        print("Engineering features on training fold (statistics fit here)...")
+        logger.info("Engineering features on training fold (statistics fit here)...")
         train_engineered = create_optimized_features(train_df_raw)
-        print("Building feature context from training fold...")
+        logger.info("Building feature context from training fold...")
         feature_context = build_feature_context(train_engineered)
-        print("Transforming holdout fold via training-only context...")
+        logger.info("Transforming holdout fold via training-only context...")
         test_engineered = create_optimized_features(test_df_raw, context=feature_context)
     else:
         # BigQuery features path: features are pre-materialised. We still
         # split temporally and rebuild the context against the train fold
         # so handle_missing_values uses train-only fill values.
         df_engineered = df_or_engineered
-        print("\nCreating temporal train/test split on materialised features...")
+        logger.info("Creating temporal train/test split on materialised features...")
         train_engineered, test_engineered = create_temporal_holdout_split(
             df_engineered, test_size=test_size, date_column="sold_date"
         )
@@ -183,7 +185,7 @@ def _resolve_base_features(
         # Check for missing features
         missing_numeric = set(subset_numeric) - set(df_engineered.columns)
         if missing_numeric:
-            print(f"Missing numeric features (not in data): {missing_numeric}")
+            logger.warning("Missing numeric features (not in data): %s", missing_numeric)
 
     return base_numeric_features, base_categorical_features
 
@@ -215,7 +217,7 @@ def _prepare_train_test_matrices(
     y_train = split.train_engineered["sold_price"].copy()
     y_test = split.test_engineered["sold_price"].copy()
 
-    print(f"Training: {len(X_train_raw)}, Test: {len(X_test_raw)}")
+    logger.info("Training: %d, Test: %d", len(X_train_raw), len(X_test_raw))
 
     X_train, X_test, numeric_fill_values, categorical_fill_values = handle_missing_values(
         X_train_raw,
@@ -281,7 +283,7 @@ def _fit_and_evaluate_iteration(
     categorical_indices = get_categorical_indices(X_train, categorical_features)
 
     if hyperparameter_tuning:
-        print("=== HYPERPARAMETER TUNING ===")
+        logger.info("=== HYPERPARAMETER TUNING ===")
 
     lgbm_result = train_and_evaluate(
         "lgbm",
@@ -360,13 +362,23 @@ def _select_iteration_features(
         raise ValueError("No features available for training after pruning.")
 
     if iteration == 1:
-        print(f"Features: {len(numeric_features)} numeric, {len(categorical_features)} categorical")
-        print(f"Total samples: {len(split.train_engineered) + len(split.test_engineered)}")
-    else:
-        print(
-            f"\nRe-training with {len(all_features)} features after pruning low-importance signals…"
+        logger.info(
+            "Features: %d numeric, %d categorical",
+            len(numeric_features),
+            len(categorical_features),
         )
-        print(f"Features: {len(numeric_features)} numeric, {len(categorical_features)} categorical")
+        logger.info(
+            "Total samples: %d", len(split.train_engineered) + len(split.test_engineered)
+        )
+    else:
+        logger.info(
+            "Re-training with %d features after pruning low-importance signals", len(all_features)
+        )
+        logger.info(
+            "Features: %d numeric, %d categorical",
+            len(numeric_features),
+            len(categorical_features),
+        )
 
     return numeric_features, categorical_features, all_features
 
@@ -429,8 +441,10 @@ def _train_with_pruning(
                         "removed": low_importance_features,
                     }
                 )
-                print(
-                    f"Pruning {len(low_importance_features)} features with normalized importance ≤ {threshold:.4f}."
+                logger.info(
+                    "Pruning %d features with normalized importance <= %.4f.",
+                    len(low_importance_features),
+                    threshold,
                 )
                 continue
 
@@ -445,20 +459,19 @@ def _train_with_pruning(
 
 
 def _log_performance(lgbm_metrics: dict[str, object], hyperparameter_tuning: bool) -> None:
-    """Print the headline tuning summary and evaluation metrics."""
+    """Log the headline tuning summary and evaluation metrics."""
     if hyperparameter_tuning:
-        print("\nHyperparameter Tuning Summary:")
-        print(f"LGBM tuning: {lgbm_metrics['tuning_time']:.1f}s")
-
-        print("\nBest Parameters Found:")
-        print(f"LGBM:  {lgbm_metrics['best_params']}")
+        logger.info("Hyperparameter tuning summary:")
+        logger.info("LGBM tuning: %.1fs", lgbm_metrics["tuning_time"])
+        logger.info("Best parameters found:")
+        logger.info("LGBM:  %s", lgbm_metrics["best_params"])
     else:
-        print("\nUsed optimized default parameters (no hyperparameter tuning)")
+        logger.info("Used optimized default parameters (no hyperparameter tuning)")
 
-    print("\nLGBM Performance:")
-    print(f"MAE:  {lgbm_metrics['mae']:,.0f} SEK")
-    print(f"RMSE: {lgbm_metrics['rmse']:,.0f} SEK")
-    print(f"MAPE: {lgbm_metrics['mape']:.4f}")
+    logger.info("LGBM performance:")
+    logger.info("MAE:  %s SEK", f"{lgbm_metrics['mae']:,.0f}")
+    logger.info("RMSE: %s SEK", f"{lgbm_metrics['rmse']:,.0f}")
+    logger.info("MAPE: %.4f", lgbm_metrics["mape"])
 
 
 def _generate_evaluation_reports(
@@ -472,9 +485,7 @@ def _generate_evaluation_reports(
     train_df = split.train_engineered
     test_df = split.test_engineered
 
-    print("\n" + "=" * 80)
-    print("GENERATING EVALUATION REPORTS")
-    print("=" * 80)
+    logger.info("Generating evaluation reports")
 
     # Prepare predictions dictionary
     all_predictions = {
@@ -487,52 +498,57 @@ def _generate_evaluation_reports(
     figures_dir.mkdir(parents=True, exist_ok=True)
 
     # 1. Price tier analysis
-    print("\nAnalyzing performance by price tier...")
+    logger.info("Analyzing performance by price tier...")
     price_tier_analysis = generate_price_tier_analysis(y_test, all_predictions)
     if not price_tier_analysis.empty:
-        print("\nPerformance by Price Tier:")
-        # Create a formatted display
+        logger.info("Performance by price tier:")
         for _, row in price_tier_analysis.iterrows():
-            print(f"\n  {row['tier']} ({row['price_range']} SEK) - {row['n_samples']} samples:")
-            print(
-                f"    LGBM: MAE = {row['LGBM_MAE']:>9,.0f}  RMSE = {row['LGBM_RMSE']:>9,.0f}  MAPE = {row['LGBM_MAPE']:>6.2%}"
+            logger.info(
+                "  %s (%s SEK) - %s samples:", row["tier"], row["price_range"], row["n_samples"]
+            )
+            logger.info(
+                "    LGBM: MAE = %s  RMSE = %s  MAPE = %s",
+                f"{row['LGBM_MAE']:>9,.0f}",
+                f"{row['LGBM_RMSE']:>9,.0f}",
+                f"{row['LGBM_MAPE']:>6.2%}",
             )
 
         tier_path = reports_dir / "price_tier_performance.json"
         price_tier_analysis.to_json(tier_path, orient="records", indent=2)
-        print(f"\n   Saved detailed tier analysis to {tier_path}")
+        logger.info("Saved detailed tier analysis to %s", tier_path)
 
     # 2. Area-specific performance
-    print("\nAnalyzing performance by area...")
+    logger.info("Analyzing performance by area...")
     area_performance = generate_area_performance_report(
         test_df, y_test, all_predictions, min_samples=5
     )
     if not area_performance.empty:
-        print(f"   Found {len(area_performance)} areas with ≥5 test samples")
-        print("\n   Area performance (by LGBM MAE, descending order):")
+        logger.info("Found %d areas with >=5 test samples", len(area_performance))
+        logger.info("Area performance (by LGBM MAE, descending order):")
         for _, row in area_performance.iterrows():
-            print(
-                f"      {row['area']:30s}  MAE = {row['LGBM_MAE']:>9,.0f}  ({row['n_samples']:>3d} samples)"
+            logger.info(
+                "      %-30s  MAE = %s  (%3d samples)",
+                row["area"],
+                f"{row['LGBM_MAE']:>9,.0f}",
+                row["n_samples"],
             )
 
         area_path = reports_dir / "area_performance.json"
         area_performance.to_json(area_path, orient="records", indent=2)
-        print(f"\n   Saved area performance to {area_path}")
+        logger.info("Saved area performance to %s", area_path)
     # 3. Detailed error analysis (saved to file, not printed)
-    print("\nAnalyzing prediction errors...")
+    logger.info("Analyzing prediction errors...")
     error_analysis = analyze_prediction_errors(y_test, test_df, all_predictions, n_worst=20)
 
     error_path = reports_dir / "prediction_errors.json"
     with open(error_path, "w", encoding="utf-8") as f:
         json.dump(error_analysis, f, indent=2, ensure_ascii=False)
-    print(f"   Saved top 20 worst predictions (over/under) to {error_path}")
+    logger.info("Saved top 20 worst predictions (over/under) to %s", error_path)
 
     # 4. Temporal validation report
     _log_temporal_validation(train_df, test_df, train_size, test_count)
 
-    print("\n" + "=" * 80)
-    print("EVALUATION COMPLETE")
-    print("=" * 80)
+    logger.info("Evaluation complete")
 
 
 def _log_temporal_validation(
@@ -541,19 +557,23 @@ def _log_temporal_validation(
     train_size: int,
     test_count: int,
 ) -> None:
-    """Print the train/test date ranges and confirm chronological ordering."""
-    print("\nTemporal Split Validation:")
-    print(f"   Training set: {train_size:,} samples")
-    print(
-        f"      Date range: {train_df['sold_date'].min().date()} to {train_df['sold_date'].max().date()}"
+    """Log the train/test date ranges and confirm chronological ordering."""
+    logger.info("Temporal split validation:")
+    logger.info("   Training set: %s samples", f"{train_size:,}")
+    logger.info(
+        "      Date range: %s to %s",
+        train_df["sold_date"].min().date(),
+        train_df["sold_date"].max().date(),
     )
-    print(f"   Test set: {test_count:,} samples")
-    print(
-        f"      Date range: {test_df['sold_date'].min().date()} to {test_df['sold_date'].max().date()}"
+    logger.info("   Test set: %s samples", f"{test_count:,}")
+    logger.info(
+        "      Date range: %s to %s",
+        test_df["sold_date"].min().date(),
+        test_df["sold_date"].max().date(),
     )
     temporal_gap = (test_df["sold_date"].min() - train_df["sold_date"].max()).days
-    print(f"   Temporal gap: {temporal_gap} day(s)")
-    print("   Test data is strictly after training data")
+    logger.info("   Temporal gap: %d day(s)", temporal_gap)
+    logger.info("   Test data is strictly after training data")
 
 
 def _retrain_on_all_data(
@@ -563,18 +583,16 @@ def _retrain_on_all_data(
     all_features: list[str],
 ) -> dict[str, object]:
     """Refit on the full dataset so inference uses the latest area statistics."""
-    print("\n" + "=" * 80)
-    print("PRODUCTION MODE: RETRAINING ON ALL DATA")
-    print("=" * 80)
-    print("\nRetraining on FULL dataset (train+test) for production deployment...")
-    print("   This ensures inference uses most recent area statistics.\n")
+    logger.info("Production mode: retraining on all data")
+    logger.info("Retraining on FULL dataset (train+test) for production deployment...")
+    logger.info("   This ensures inference uses most recent area statistics.")
 
     # Use full engineered dataset (no temporal split)
     df_engineered = split.df_engineered
     X_full = df_engineered[all_features].copy()
     y_full = df_engineered["sold_price"].copy()
 
-    print(f"Full dataset size: {len(X_full)} samples")
+    logger.info("Full dataset size: %d samples", len(X_full))
 
     # Handle missing values using full dataset statistics
     X_full_train, _, numeric_fill_prod, categorical_fill_prod = handle_missing_values(
@@ -601,7 +619,7 @@ def _retrain_on_all_data(
     lgbm_trainer_prod = LGBMTrainer(random_state=random_state)
     categorical_indices_prod = get_categorical_indices(X_full_train, categorical_features)
 
-    print("Training production model with evaluation's best parameters...")
+    logger.info("Training production model with evaluation's best parameters...")
     lgbm_model_prod = lgbm_trainer_prod.train(
         X_full_train,
         y_full_log,
@@ -627,8 +645,8 @@ def _retrain_on_all_data(
         "n_samples": len(X_full_train),
     }
 
-    print(f"Production model trained on {len(X_full_train)} samples")
-    print("   Context updated with latest area statistics from all data")
+    logger.info("Production model trained on %d samples", len(X_full_train))
+    logger.info("   Context updated with latest area statistics from all data")
 
     return production_results
 
@@ -637,19 +655,25 @@ def _log_pruning_and_importance(
     dropped_feature_records: list[dict[str, object]],
     final_importance: dict[str, dict[str, float]],
 ) -> None:
-    """Summarise pruned features and print the top normalised importances."""
+    """Summarise pruned features and log the top normalised importances."""
     if dropped_feature_records:
-        print("\nFeature pruning summary:")
+        logger.info("Feature pruning summary:")
         for record in dropped_feature_records:
             feature_list = ", ".join(record["removed"])
-            print(
-                f"Iteration {record['iteration']}: removed {len(record['removed'])} feature(s) (≤ {record['threshold']:.4f}) -> {feature_list}"
+            logger.info(
+                "Iteration %s: removed %d feature(s) (<= %.4f) -> %s",
+                record["iteration"],
+                len(record["removed"]),
+                record["threshold"],
+                feature_list,
             )
 
-    print("\nFeature importance (LGBM, normalized - top 50):")
     importance_series = pd.Series(final_importance["lgbm_normalized"])
     top_importance = importance_series.sort_values(ascending=False).head(50)
-    print(top_importance.to_string(float_format=lambda x: f"{x:.4f}"))
+    logger.info(
+        "Feature importance (LGBM, normalized - top 50):\n%s",
+        top_importance.to_string(float_format=lambda x: f"{x:.4f}"),
+    )
 
 
 def _persist_evaluation_model(
@@ -719,20 +743,20 @@ def _upload_evaluation_artifacts(
     train_df: pd.DataFrame,
 ) -> None:
     """Push evaluation artifacts and a drift baseline to GCS when enabled."""
-    print("\nUploading model artifacts to GCS...")
+    logger.info("Uploading model artifacts to GCS...")
     gcs_artifacts = upload_model_artifacts(resolved_model_dir, prefix)
-    print(f"Uploaded {len(gcs_artifacts)} artifacts to Cloud Storage")
+    logger.info("Uploaded %d artifacts to Cloud Storage", len(gcs_artifacts))
     for artifact_type, uri in gcs_artifacts.items():
-        print(f"  - {artifact_type}: {uri}")
+        logger.info("  - %s: %s", artifact_type, uri)
 
     # Save training data as drift detection baseline
-    print("\nSaving training data as drift detection baseline...")
+    logger.info("Saving training data as drift detection baseline...")
     baseline_columns = []
     for col in CRITICAL_NUMERIC_FEATURES + CRITICAL_CATEGORICAL_FEATURES + ["sold_price"]:
         if col in train_df.columns:
             baseline_columns.append(col)
         else:
-            print(f"  Baseline column '{col}' not in training data, skipping")
+            logger.warning("Baseline column '%s' not in training data, skipping", col)
 
     if baseline_columns:
         baseline_df = train_df[baseline_columns].copy()
@@ -745,9 +769,11 @@ def _upload_evaluation_artifacts(
             source_file_name=str(local_baseline_path),
             destination_blob_name=BASELINE_DATA_PATH,
         )
-        print(f"Saved {len(baseline_df)} rows as drift baseline")
-        print(f"  - gs://{gcs_bucket}/{BASELINE_DATA_PATH}")
-        print(f"  - Columns: {len(baseline_columns)} ({', '.join(baseline_columns[:5])}...)")
+        logger.info("Saved %d rows as drift baseline", len(baseline_df))
+        logger.info("  - gs://%s/%s", gcs_bucket, BASELINE_DATA_PATH)
+        logger.info(
+            "  - Columns: %d (%s...)", len(baseline_columns), ", ".join(baseline_columns[:5])
+        )
 
 
 def _persist_production_model(
@@ -764,9 +790,7 @@ def _persist_production_model(
     lgbm_metrics = final_results["metrics"]["lgbm"]
     train_size = final_results["train_size"]
 
-    print("\n" + "=" * 80)
-    print("SAVING PRODUCTION MODEL")
-    print("=" * 80)
+    logger.info("Saving production model")
 
     prod_prefix = f"{prefix}_production"
 
@@ -804,18 +828,22 @@ def _persist_production_model(
 
     # Upload production artifacts to GCS if enabled
     if is_gcs_enabled():
-        print("\nUploading production model artifacts to GCS...")
+        logger.info("Uploading production model artifacts to GCS...")
         prod_gcs_artifacts = upload_model_artifacts(resolved_model_dir, prod_prefix)
-        print(f"Uploaded {len(prod_gcs_artifacts)} production artifacts to Cloud Storage")
+        logger.info(
+            "Uploaded %d production artifacts to Cloud Storage", len(prod_gcs_artifacts)
+        )
         for artifact_type, uri in prod_gcs_artifacts.items():
-            print(f"  - {artifact_type}: {uri}")
+            logger.info("  - %s: %s", artifact_type, uri)
 
-    print("\nProduction model saved:")
-    print(f"   Evaluation model: {resolved_model_dir / f'{prefix}_lgbm.joblib'}")
-    print(f"   Production model: {resolved_model_dir / f'{prod_prefix}_lgbm.joblib'}")
-    print(f"\nProduction model uses updated context from {production_results['n_samples']} samples")
-    print(f"   (vs evaluation model context from {train_size} samples)")
-    print("\nUse evaluation metrics to assess performance, production model for deployment!")
+    logger.info("Production model saved:")
+    logger.info("   Evaluation model: %s", resolved_model_dir / f"{prefix}_lgbm.joblib")
+    logger.info("   Production model: %s", resolved_model_dir / f"{prod_prefix}_lgbm.joblib")
+    logger.info(
+        "Production model uses updated context from %d samples", production_results["n_samples"]
+    )
+    logger.info("   (vs evaluation model context from %d samples)", train_size)
+    logger.info("Use evaluation metrics to assess performance, production model for deployment!")
 
 
 def run_training(config: TrainingConfig) -> float:
@@ -885,13 +913,12 @@ def run_training(config: TrainingConfig) -> float:
             final_importance,
         )
 
+    model_path = resolved_model_dir / f"{prefix}_lgbm.joblib"
     if config.hyperparameter_tuning:
-        print("\nHyperparameter-tuned model saved to:")
-        print(f"- {resolved_model_dir / f'{prefix}_lgbm.joblib'} (LGBM - Tuned)")
-        print("Hyperparameter tuning and training completed successfully!")
+        logger.info("Hyperparameter-tuned model saved to: %s (LGBM - Tuned)", model_path)
+        logger.info("Hyperparameter tuning and training completed successfully")
     else:
-        print("\nOptimized model saved to:")
-        print(f"- {resolved_model_dir / f'{prefix}_lgbm.joblib'} (LGBM - Optimized)")
-        print("Fast training with optimized parameters completed!")
+        logger.info("Optimized model saved to: %s (LGBM - Optimized)", model_path)
+        logger.info("Fast training with optimized parameters completed")
 
     return lgbm_metrics["mae"]
