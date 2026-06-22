@@ -8,6 +8,7 @@ properties (where the model over-predicted the sold price).
 from __future__ import annotations
 
 import json
+import logging
 from datetime import datetime
 from pathlib import Path
 
@@ -18,6 +19,8 @@ import pandas as pd
 # Import preprocessing functions to match training pipeline
 from estate_value_index.ml import drop_outliers_quantile, filter_valid_listings
 
+logger = logging.getLogger(__name__)
+
 
 def load_production_data(data_path: Path, apply_training_filters: bool = True) -> pd.DataFrame:
     """Load production listing data from JSON or JSONL file.
@@ -27,7 +30,7 @@ def load_production_data(data_path: Path, apply_training_filters: bool = True) -
         apply_training_filters: If True, apply the same filters used during training
                                (min_price=3M, outlier removal at 1st-99th percentile)
     """
-    print(f"Loading data from: {data_path}")
+    logger.info("Loading data from: %s", data_path)
 
     # Try loading as JSONL first (newline-delimited JSON)
     try:
@@ -36,33 +39,35 @@ def load_production_data(data_path: Path, apply_training_filters: bool = True) -
             for line in f:
                 if line.strip():  # Skip empty lines
                     data.append(json.loads(line))
-        print(f"   Loaded {len(data):,} listings (JSONL format)")
+        logger.info("Loaded %s listings (JSONL format)", f"{len(data):,}")
     except json.JSONDecodeError:
         # Fall back to regular JSON array
         with open(data_path, encoding="utf-8") as f:
             data = json.load(f)
-        print(f"   Loaded {len(data):,} listings (JSON format)")
+        logger.info("Loaded %s listings (JSON format)", f"{len(data):,}")
 
     df = pd.DataFrame(data)
 
     # Filter to only properties with sold_price (needed for comparison)
     df_with_price = df[df["sold_price"].notna()].copy()
-    print(f"   {len(df_with_price):,} listings with sold_price")
+    logger.info("%s listings with sold_price", f"{len(df_with_price):,}")
 
     # Apply the same preprocessing filters used during training
     if apply_training_filters:
-        print("\nApplying training filters:")
-        print(f"   Before filtering: {len(df_with_price):,} listings")
+        logger.info("Applying training filters")
+        logger.info("Before filtering: %s listings", f"{len(df_with_price):,}")
 
         # Step 1: Filter valid listings (min_price=3M, same as training)
         df_filtered = filter_valid_listings(
             df_with_price, min_price=3000000, drop_na_features=False
         )
-        print(f"   After min_price filter (>= 3M SEK): {len(df_filtered):,} listings")
+        logger.info("After min_price filter (>= 3M SEK): %s listings", f"{len(df_filtered):,}")
 
         # Step 2: Remove outliers using quantile filtering (1st-99th percentile, same as training)
         df_filtered = drop_outliers_quantile(df_filtered, lower=0.01, upper=0.99)
-        print(f"   After outlier removal (1st-99th percentile): {len(df_filtered):,} listings")
+        logger.info(
+            "After outlier removal (1st-99th percentile): %s listings", f"{len(df_filtered):,}"
+        )
 
         return df_filtered
 
@@ -77,15 +82,15 @@ def load_model(models_dir: Path, model_type: str, prefix: str = "price_predictio
     if not model_path.exists():
         raise FileNotFoundError(f"Model not found: {model_path}")
 
-    print(f"Loading model: {model_path}")
+    logger.info("Loading model: %s", model_path)
     model = joblib.load(model_path)
 
     metrics = {}
     if metrics_path.exists():
         with open(metrics_path, encoding="utf-8") as f:
             metrics = json.load(f)
-        print(f"   Model MAE: {metrics.get('mae', 'N/A'):,.0f} SEK")
-        print(f"   Model RMSE: {metrics.get('rmse', 'N/A'):,.0f} SEK")
+        logger.info("Model MAE: %s SEK", f"{metrics.get('mae', 'N/A'):,.0f}")
+        logger.info("Model RMSE: %s SEK", f"{metrics.get('rmse', 'N/A'):,.0f}")
 
     return model, metrics
 

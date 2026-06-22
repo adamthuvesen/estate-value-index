@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from pathlib import Path
 
@@ -11,6 +12,8 @@ import yaml
 
 from estate_value_index.ml.data_loader import load_features_from_bigquery, load_from_bigquery
 from estate_value_index.utils.gcs import is_gcs_enabled, resolve_data_path
+
+logger = logging.getLogger(__name__)
 
 
 def load_feature_subset(feature_set: str | None) -> tuple[list[str] | None, list[str] | None]:
@@ -26,7 +29,7 @@ def load_feature_subset(feature_set: str | None) -> tuple[list[str] | None, list
     config_path = Path("config/feature_subsets.yaml")
     if not config_path.exists():
         if feature_set is not None:
-            print(f"Feature subset config not found: {config_path}")
+            logger.warning("Feature subset config not found: %s", config_path)
         return None, None
 
     with open(config_path) as f:
@@ -38,16 +41,20 @@ def load_feature_subset(feature_set: str | None) -> tuple[list[str] | None, list
             return None, None
 
     if feature_set not in config:
-        print(f"Unknown feature set: {feature_set}")
-        print(f"   Available: {list(config.keys())}")
+        logger.warning(
+            "Unknown feature set: %s. Available: %s", feature_set, list(config.keys())
+        )
         return None, None
 
     subset = config[feature_set]
     numeric = subset.get("numeric") or []
     categorical = subset.get("categorical") or []
 
-    print(
-        f"Using feature set '{feature_set}': {len(numeric)} numeric, {len(categorical)} categorical"
+    logger.info(
+        "Using feature set '%s': %d numeric, %d categorical",
+        feature_set,
+        len(numeric),
+        len(categorical),
     )
 
     return numeric, categorical
@@ -61,16 +68,16 @@ def load_training_dataframe(
 ) -> tuple[pd.DataFrame, bool]:
     """Load training data and whether feature engineering can be skipped."""
     if use_materialized_features:
-        print("Loading pre-computed features from BigQuery...")
+        logger.info("Loading pre-computed features from BigQuery...")
         df = load_features_from_bigquery()
-        print(f"Loaded {len(df)} rows with pre-computed features")
-        print("Skipped feature engineering step (features already materialized)")
+        logger.info("Loaded %d rows with pre-computed features", len(df))
+        logger.info("Skipped feature engineering step (features already materialized)")
         return df, True
 
     if data_source.lower() == "bigquery":
-        print("Loading data from BigQuery...")
+        logger.info("Loading data from BigQuery...")
         df = load_from_bigquery()
-        print(f"Loaded {len(df)} listings from BigQuery")
+        logger.info("Loaded %d listings from BigQuery", len(df))
         return df, False
 
     default_data_file = Path(
@@ -83,9 +90,9 @@ def load_training_dataframe(
     )
 
     if is_gcs_enabled():
-        print(f"Using GCS-backed data file: {resolved_data_file}")
+        logger.info("Using GCS-backed data file: %s", resolved_data_file)
     else:
-        print(f"Using local data file: {resolved_data_file}")
+        logger.info("Using local data file: %s", resolved_data_file)
 
     if not resolved_data_file.exists():
         raise FileNotFoundError(f"Data file not found: {resolved_data_file}")
@@ -102,5 +109,5 @@ def load_training_dataframe(
                     raw_data.append(json.loads(line))
 
     df = pd.DataFrame(raw_data)
-    print(f"Loaded {len(df)} listings")
+    logger.info("Loaded %d listings", len(df))
     return df, False
