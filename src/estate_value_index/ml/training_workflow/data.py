@@ -41,9 +41,7 @@ def load_feature_subset(feature_set: str | None) -> tuple[list[str] | None, list
             return None, None
 
     if feature_set not in config:
-        logger.warning(
-            "Unknown feature set: %s. Available: %s", feature_set, list(config.keys())
-        )
+        logger.warning("Unknown feature set: %s. Available: %s", feature_set, list(config.keys()))
         return None, None
 
     subset = config[feature_set]

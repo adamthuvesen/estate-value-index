@@ -367,9 +367,7 @@ def _select_iteration_features(
             len(numeric_features),
             len(categorical_features),
         )
-        logger.info(
-            "Total samples: %d", len(split.train_engineered) + len(split.test_engineered)
-        )
+        logger.info("Total samples: %d", len(split.train_engineered) + len(split.test_engineered))
     else:
         logger.info(
             "Re-training with %d features after pruning low-importance signals", len(all_features)
@@ -830,9 +828,7 @@ def _persist_production_model(
     if is_gcs_enabled():
         logger.info("Uploading production model artifacts to GCS...")
         prod_gcs_artifacts = upload_model_artifacts(resolved_model_dir, prod_prefix)
-        logger.info(
-            "Uploaded %d production artifacts to Cloud Storage", len(prod_gcs_artifacts)
-        )
+        logger.info("Uploaded %d production artifacts to Cloud Storage", len(prod_gcs_artifacts))
         for artifact_type, uri in prod_gcs_artifacts.items():
             logger.info("  - %s: %s", artifact_type, uri)
 

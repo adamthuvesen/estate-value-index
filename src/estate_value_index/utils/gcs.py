@@ -162,7 +162,9 @@ def resolve_data_path(
         try:
             return client.download_file(gcs_path, default_local)
         except Exception as e:
-            logger.warning("GCS download failed: %s. Falling back to local file: %s", e, default_local)
+            logger.warning(
+                "GCS download failed: %s. Falling back to local file: %s", e, default_local
+            )
             if default_local.exists():
                 return default_local
             raise
