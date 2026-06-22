@@ -127,15 +127,7 @@ SELENIUM_DRIVER_ARGUMENTS = [
 # Request fingerprinting
 REQUEST_FINGERPRINTER_IMPLEMENTATION = "2.7"
 
-# Feed exports disabled - using command-line -o flag instead
-# FEEDS = {
-#     'data/debug_listings.json': {
-#         'format': 'json',
-#         'encoding': 'utf8',
-#         'fields': None,
-#         'indent': 2,
-#     }
-# }
+# Feed exports are configured via the command-line -o flag, not FEEDS here.
 
 # Booli-specific settings
 BOOLI_ENABLE_SCREENSHOTS = False
