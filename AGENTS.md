@@ -2,6 +2,8 @@
 
 **estate-value-index** is a Swedish real estate ML system: **Scrapy** → **BigQuery** → **LightGBM** → **Next.js** + **FastAPI**. Python 3.11+ with **uv**; Node 20+ for `web/`.
 
+User-level guidance (tone, principles, git etiquette) lives in `~/.claude/CLAUDE.md` and `~/dotfiles/agents/AGENTS.md` and is *not* duplicated here. This file is for project-specific facts.
+
 **Read next**
 
 - [docs/architecture.md](docs/architecture.md) — architecture, runtime shape, and system boundaries
@@ -26,7 +28,7 @@
 - Hand-edit **web/models/** (training outputs)
 - Use deprecated scripts: `clean_areas.py`, `merge_listings.py`, `impute_days_on_market.py`
 - Use **localStorage** / **sessionStorage** in **web** artifacts
-- **Trust** ad hoc strings in BigQuery SQL; use operator-only / parameterized patterns (see `utils/bigquery_safety.py`, [docs/data-pipeline.md](docs/data-pipeline.md))
+- **Trust** ad hoc strings in BigQuery SQL; use operator-only / parameterized patterns (see [src/estate_value_index/utils/bigquery_safety.py](src/estate_value_index/utils/bigquery_safety.py), [docs/data-pipeline.md](docs/data-pipeline.md))
 
 ---
 
@@ -44,27 +46,9 @@ cd web && npm run dev          # app on localhost:3000
 
 ---
 
-## Environment (`.env` — required)
+## Environment & BigQuery
 
-```bash
-GCP_PROJECT_ID=your-gcp-project-id
-GCP_REGION=europe-north1
-BIGQUERY_PROJECT_ID=your-gcp-project-id
-BIGQUERY_DATASET_RAW=booli_raw
-BIGQUERY_TABLE_LISTINGS=listings
-BIGQUERY_DATASET_FEATURES=booli_features
-BIGQUERY_TABLE_FEATURES=engineered_features
-GCS_BUCKET=your-gcs-bucket
-```
-
-**Optional (examples):** `GCS_ENABLED`, `MAX_MAE_THRESHOLD`, `DATA_SOURCE`, `MODEL_PREFIX`, `MODEL_OUTPUT_DIR`, `DEBUG`, `TRUST_PROXY_HEADERS`. **Precedence:** environment → [config/pipeline_config.yaml](config/pipeline_config.yaml) → code defaults.
-
----
-
-## BigQuery (names)
-
-- **booli_raw** — raw listings (e.g. `listings`, partitioned)
-- **booli_features** — engineered features (e.g. `engineered_features`, partitioned)
+Required `.env` vars, optional knobs, config precedence, and BigQuery dataset/table names → [docs/data-pipeline.md](docs/data-pipeline.md#environment). Precedence is environment → [config/pipeline_config.yaml](config/pipeline_config.yaml) → code defaults.
 
 ---
 
@@ -83,13 +67,14 @@ GCS_BUCKET=your-gcs-bucket
 
 ---
 
-## Top gotchas
+## Gotchas
 
-1. **Temporal leakage** — respect `sold_date` / chronological training; no naive random row split for production training.
-2. **Feature context** — inference must match training (`build_feature_context` in `ml/`).
-3. **Models** — not committed or baked in image; GCS + `startup.sh` when configured.
-4. **Categoricals** — follow trainer: pandas `category` + LightGBM; details in `ml/`.
-5. **GCS in CI** — often `GCS_ENABLED=false` to avoid creds issues.
+Read the matching guide before editing — the gotchas live with the code they bite:
+
+- **Temporal leakage, feature context, categoricals** → [docs/ml-and-models.md](docs/ml-and-models.md)
+- **Models (GCS sync, not baked in image), `GCS_ENABLED` across CI/dev/prod** → [docs/api-web-deploy.md](docs/api-web-deploy.md)
+
+If a doc disagrees with code, fix the doc in the same change.
 
 **Exploration:** [tests/conftest.py](tests/conftest.py).
 

@@ -19,6 +19,30 @@ Booli -> spider -> JSONL + upload path -> process_listings -> booli_raw.listings
 - BigQuery schemas: `schemas/bq_raw_listings.json`, `schemas/bq_features_engineered.json`
 - Pipeline config: `config/pipeline_config.yaml`
 
+## Environment
+
+Required `.env` vars:
+
+```bash
+GCP_PROJECT_ID=your-gcp-project-id
+GCP_REGION=europe-north1
+BIGQUERY_PROJECT_ID=your-gcp-project-id
+BIGQUERY_DATASET_RAW=booli_raw
+BIGQUERY_TABLE_LISTINGS=listings
+BIGQUERY_DATASET_FEATURES=booli_features
+BIGQUERY_TABLE_FEATURES=engineered_features
+GCS_BUCKET=your-gcs-bucket
+```
+
+Optional knobs (examples): `GCS_ENABLED`, `MAX_MAE_THRESHOLD`, `DATA_SOURCE`, `MODEL_PREFIX`, `MODEL_OUTPUT_DIR`, `DEBUG`, `TRUST_PROXY_HEADERS`.
+
+Precedence: environment → `config/pipeline_config.yaml` → code defaults.
+
+BigQuery datasets:
+
+- **booli_raw** — raw listings (e.g. `listings`, partitioned)
+- **booli_features** — engineered features (e.g. `engineered_features`, partitioned)
+
 ## BigQuery rules
 
 - Typical raw table: `booli_raw.listings`.
