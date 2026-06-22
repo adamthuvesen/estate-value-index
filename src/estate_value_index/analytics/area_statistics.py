@@ -455,9 +455,7 @@ def generate_area_statistics(
     raw_listings, raw_listings_source = load_raw_listings(data_source, raw_listings_path)
 
     logger.info("Loaded %d raw listings", len(raw_listings))
-    logger.info(
-        "Loaded %d value analysis properties", len(value_analysis.get("properties", []))
-    )
+    logger.info("Loaded %d value analysis properties", len(value_analysis.get("properties", [])))
 
     listings_by_area = defaultdict(list)
     for listing in raw_listings:
