@@ -14,22 +14,29 @@ jobs:
       contents: read
       pull-requests: read
     outputs:
-      docker: ${{ steps.filter.outputs.docker }}
+      web_docker: ${{ steps.filter.outputs.web_docker }}
+      trainer_docker: ${{ steps.filter.outputs.trainer_docker }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
         id: filter
         with:
           filters: |
-            docker:
+            web_docker:
               - 'Dockerfile'
-              - 'vertex_ai/Dockerfile'
               - 'pyproject.toml'
               - 'uv.lock'
               - 'src/**'
               - 'web/**'
               - 'api_server.py'
               - 'scripts/startup.sh'
+              - '.github/workflows/ci.yml'
+            trainer_docker:
+              - 'vertex_ai/Dockerfile'
+              - 'pyproject.toml'
+              - 'uv.lock'
+              - 'src/**'
+              - 'train_model.py'
               - '.github/workflows/ci.yml'
 
   python-tests:
@@ -114,12 +121,12 @@ jobs:
         working-directory: web
         run: npx tsc --noEmit
 
-  dockerfile-validation:
-    name: Dockerfile Build Tests
+  web-dockerfile-validation:
+    name: Build Web App Dockerfile
     runs-on: ubuntu-latest
     needs: changes
-    # Skip when no image-relevant files changed, or when the commit message asks to skip CI.
-    if: "needs.changes.outputs.docker == 'true' && !contains(github.event.head_commit.message, '[skip ci]') && !contains(github.event.head_commit.message, '[ci skip]') && !contains(github.event.head_commit.message, '[no ci]')"
+    # Skip when no web image-relevant files changed, or when the commit message asks to skip CI.
+    if: "needs.changes.outputs.web_docker == 'true' && !contains(github.event.head_commit.message, '[skip ci]') && !contains(github.event.head_commit.message, '[ci skip]') && !contains(github.event.head_commit.message, '[no ci]')"
 
     steps:
       - name: Checkout code
@@ -137,6 +144,20 @@ jobs:
           tags: estate-value-index-web:test
           cache-from: type=gha,scope=web
           cache-to: type=gha,mode=min,scope=web
+
+  trainer-dockerfile-validation:
+    name: Build Training Container Dockerfile
+    runs-on: ubuntu-latest
+    needs: changes
+    # Skip when no training image-relevant files changed, or when the commit message asks to skip CI.
+    if: "needs.changes.outputs.trainer_docker == 'true' && !contains(github.event.head_commit.message, '[skip ci]') && !contains(github.event.head_commit.message, '[ci skip]') && !contains(github.event.head_commit.message, '[no ci]')"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Build Training Container Dockerfile
         uses: docker/build-push-action@v5
