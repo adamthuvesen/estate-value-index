@@ -106,7 +106,9 @@ def _prior_rolling(grouped, column: str, window: str, method: str) -> pd.Series:
     )
 
 
-def _price_change_rolling(work_indexed: pd.DataFrame, grouped, window: str, method: str) -> pd.Series:
+def _price_change_rolling(
+    work_indexed: pd.DataFrame, grouped, window: str, method: str
+) -> pd.Series:
     if "price_change" not in work_indexed.columns:
         return pd.Series(np.nan, index=work_indexed.index)
     return _prior_rolling(grouped, "price_change", window, method)

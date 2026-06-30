@@ -191,7 +191,9 @@ def build_feature_context(training_frame: pd.DataFrame) -> FeatureEngineeringCon
         reference_date=_resolve_reference_date(training_frame),
         area_avg_price=area_avg_price,
         area_listing_count=_area_listing_count(training_frame),
-        area_price_tier={area: _price_tier(avg_price) for area, avg_price in area_avg_price.items()},
+        area_price_tier={
+            area: _price_tier(avg_price) for area, avg_price in area_avg_price.items()
+        },
         area_target_mean=area_target_mean,
         global_target_mean=global_target_mean,
         global_listing_price_mean=float(training_frame["listing_price"].mean()),

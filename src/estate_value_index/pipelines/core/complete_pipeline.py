@@ -274,8 +274,8 @@ def _run_deployment_stage(
 
     logger.info("Stage 4: Deploying to Cloud Run")
     try:
-        model_gcs_uri = training_result.get("steps", {}).get("download_artifacts", {}).get(
-            "model_uri"
+        model_gcs_uri = (
+            training_result.get("steps", {}).get("download_artifacts", {}).get("model_uri")
         )
         gcs_bucket = get_gcs_bucket()
 
@@ -332,7 +332,9 @@ def _record_pipeline_success(
     return results
 
 
-def _record_pipeline_failure(results: dict[str, Any], start_time: datetime, error: Exception) -> None:
+def _record_pipeline_failure(
+    results: dict[str, Any], start_time: datetime, error: Exception
+) -> None:
     end_time = datetime.now()
     duration = (end_time - start_time).total_seconds()
 

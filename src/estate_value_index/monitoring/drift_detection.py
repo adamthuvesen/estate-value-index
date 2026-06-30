@@ -192,11 +192,7 @@ class ModelMonitor:
         *,
         has_predictions: bool,
     ) -> tuple[bool, float | None]:
-        if (
-            not has_predictions
-            or extracted.current_mae is None
-            or extracted.reference_mae is None
-        ):
+        if not has_predictions or extracted.current_mae is None or extracted.reference_mae is None:
             return False, None
 
         degradation_pct = (

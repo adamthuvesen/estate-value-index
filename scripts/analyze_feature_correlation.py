@@ -79,8 +79,7 @@ def _area_feature_names(numeric_features: list[str]) -> list[str]:
     return [
         feature
         for feature in numeric_features
-        if "area" in feature.lower()
-        and feature not in {"living_area", "living_area_squared"}
+        if "area" in feature.lower() and feature not in {"living_area", "living_area_squared"}
     ]
 
 
@@ -376,9 +375,7 @@ def analyze_correlations():
     _, listing_corr, high_corr_area = _listing_correlation_report(
         df_eng, key_features, area_features
     )
-    mi_df, listing_mi, area_mi = _mutual_information_report(
-        df_eng, numeric_features, area_features
-    )
+    mi_df, listing_mi, area_mi = _mutual_information_report(df_eng, numeric_features, area_features)
     vif_df = _vif_report(df_eng, area_features)
     _generate_visualizations(df_eng, area_features, mi_df, _OUTPUT_DIR)
     _print_summary_report(

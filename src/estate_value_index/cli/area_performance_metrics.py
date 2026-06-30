@@ -340,7 +340,9 @@ def _print_summary(
 ) -> None:
     _print_section("SUMMARY", char="=")
     print("\n1. OVERALL PERFORMANCE:")
-    print(f"   MAE: {metrics['mae']:,.0f} SEK | MAPE: {metrics['mape']:.1f}% | R²: {metrics['r2']:.3f}")
+    print(
+        f"   MAE: {metrics['mae']:,.0f} SEK | MAPE: {metrics['mape']:.1f}% | R²: {metrics['r2']:.3f}"
+    )
 
     if tier_metrics is not None and "premium" in tier_metrics.index:
         premium_mae_val = tier_metrics.loc["premium", "mae"]
@@ -348,7 +350,9 @@ def _print_summary(
         print(f"\n2. PREMIUM AREAS (n={premium_count:.0f}):")
         print(f"   MAE: {premium_mae_val:,.0f} SEK")
         if premium_mae_val > metrics["mae"] * 1.1:
-            print(f"   {((premium_mae_val / metrics['mae'] - 1) * 100):.0f}% higher error than overall!")
+            print(
+                f"   {((premium_mae_val / metrics['mae'] - 1) * 100):.0f}% higher error than overall!"
+            )
 
     if len(over_predicted) > 0 or len(under_predicted) > 0:
         print("\n3. SYSTEMATIC BIAS:")

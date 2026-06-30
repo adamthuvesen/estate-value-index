@@ -188,7 +188,9 @@ def _execute_merge(client, table_ref: str, temp_table_ref: str, schema, *, updat
     return _merge_dml_counts(merge_job)
 
 
-def _merge_temp_table(logger, client, table_ref: str, temp_table_ref: str, schema) -> tuple[int, int]:
+def _merge_temp_table(
+    logger, client, table_ref: str, temp_table_ref: str, schema
+) -> tuple[int, int]:
     try:
         return _execute_merge(client, table_ref, temp_table_ref, schema, update_existing=True)
     except Exception as e:

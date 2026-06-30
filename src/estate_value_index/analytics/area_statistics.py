@@ -376,9 +376,7 @@ def _value_insights(value_properties: list[dict]) -> dict[str, Any]:
         if value_properties
         else 0,
         "avg_value_score": round(statistics.mean(value_scores), 1) if value_scores else 50.0,
-        "median_value_score": round(statistics.median(value_scores), 1)
-        if value_scores
-        else 50.0,
+        "median_value_score": round(statistics.median(value_scores), 1) if value_scores else 50.0,
         "avg_prediction_delta": round(statistics.mean(prediction_deltas))
         if prediction_deltas
         else 0,
@@ -493,7 +491,8 @@ def _resolve_area_statistics_paths(
     return AreaStatisticsPaths(
         feature_context=feature_context_path
         or project_root / "web" / "models" / "price_prediction_model_feature_context.json",
-        value_analysis=value_analysis_path or project_root / "data" / "enrichment" / "value_analysis.json",
+        value_analysis=value_analysis_path
+        or project_root / "data" / "enrichment" / "value_analysis.json",
         raw_listings=raw_listings_path
         or project_root / "data" / "raw" / "booli" / "booli_listings_prod.json",
         output=output_path or project_root / "data" / "enrichment" / "area_statistics.json",

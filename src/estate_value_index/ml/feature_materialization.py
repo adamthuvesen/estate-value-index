@@ -241,7 +241,9 @@ def _insert_feature_batches(
             logger.info("Batch %d/%d: %d rows inserted", batch_num, total_batches, len(batch))
 
     if all_errors:
-        raise RuntimeError(f"insert failed: {len(all_errors)} batch error(s); first: {all_errors[0]}")
+        raise RuntimeError(
+            f"insert failed: {len(all_errors)} batch error(s); first: {all_errors[0]}"
+        )
 
 
 def _table_row_count(client: Any, project_id: str, dataset_id: str, table_id: str) -> int:
@@ -253,7 +255,9 @@ def _table_row_count(client: Any, project_id: str, dataset_id: str, table_id: st
 
 
 def _swap_staging_to_production(client: Any, project_id: str, target: FeatureUploadTarget) -> None:
-    logger.info("Swapping staging → production via CREATE OR REPLACE TABLE %s", target.full_table_id)
+    logger.info(
+        "Swapping staging → production via CREATE OR REPLACE TABLE %s", target.full_table_id
+    )
     swap_sql = (
         f"CREATE OR REPLACE TABLE "
         f"{safe_table_ref(project_id, target.dataset_id, target.table_id, quote=True)} "
@@ -271,7 +275,9 @@ def _verify_and_publish_features(
 ) -> int:
     if target.staging_id is not None and target.staging_table_id is not None:
         logger.info("Verifying staging row count")
-        staging_count = _table_row_count(client, project_id, target.dataset_id, target.staging_table_id)
+        staging_count = _table_row_count(
+            client, project_id, target.dataset_id, target.staging_table_id
+        )
         if staging_count != expected_rows:
             raise RuntimeError(
                 f"staging row count mismatch: expected {expected_rows}, got {staging_count}"
