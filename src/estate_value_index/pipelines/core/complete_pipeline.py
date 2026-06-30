@@ -10,6 +10,7 @@ This flow connects all pipeline stages into a single automated workflow:
 """
 
 from datetime import datetime
+from typing import Any
 
 from prefect import flow, get_run_logger
 
@@ -24,6 +25,322 @@ from estate_value_index.pipelines.tasks import (
 )
 from estate_value_index.pipelines.utils import TrainingFlowConfig
 from estate_value_index.utils.gcs import get_gcs_bucket
+
+
+def _initial_results(
+    start_time: datetime,
+    *,
+    max_pages: int,
+    skip_scraping: bool,
+    tune: bool,
+    use_vertex: bool,
+    deploy_to_prod: bool,
+    dry_run: bool,
+) -> dict[str, Any]:
+    return {
+        "pipeline_start": start_time.isoformat(),
+        "configuration": {
+            "max_pages": max_pages,
+            "skip_scraping": skip_scraping,
+            "tune": tune,
+            "use_vertex": use_vertex,
+            "deploy_to_prod": deploy_to_prod,
+            "dry_run": dry_run,
+        },
+        "stages": {},
+    }
+
+
+def _log_pipeline_start(
+    logger: Any,
+    *,
+    max_pages: int,
+    skip_scraping: bool,
+    tune: bool,
+    use_vertex: bool,
+    deploy_to_prod: bool,
+    dry_run: bool,
+) -> None:
+    logger.info("Starting complete ML pipeline")
+    logger.info(
+        f"Config: scraping={'skip' if skip_scraping else max_pages}, "
+        f"training={'vertex' if use_vertex else 'local'}, tune={tune}, "
+        f"deploy={deploy_to_prod}, dry_run={dry_run}"
+    )
+
+
+def _log_data_collection_summary(logger: Any, scrape_result: dict[str, Any]) -> None:
+    scraping_info = scrape_result.get("scraping", {})
+    processing_info = scrape_result.get("processing", {})
+    bq_info = scrape_result.get("bigquery", {})
+    features_info = scrape_result.get("features", {})
+
+    scraped = scraping_info.get("validation", {}).get("valid_listings", 0)
+    processed = processing_info.get("total_listings", 0)
+    bq_rows = bq_info.get("uploaded", 0) if bq_info else 0
+    feat_rows = features_info.get("row_count", 0) if features_info else 0
+    logger.info(
+        "Stage 1 complete: "
+        f"scraped={scraped}, processed={processed}, bq={bq_rows}, features={feat_rows}"
+    )
+
+
+def _run_data_collection_stage(
+    logger: Any,
+    results: dict[str, Any],
+    *,
+    max_pages: int,
+    skip_scraping: bool,
+    config_file: str | None,
+    dry_run: bool,
+) -> None:
+    if skip_scraping:
+        logger.info("Stage 1: Skipped (using existing data)")
+        results["stages"]["data_collection"] = {"skipped": True, "reason": "skip_scraping=True"}
+        return
+
+    logger.info("Stage 1: Data collection (scrape, process, bigquery, features)")
+
+    # Prefect parameter validation in some environments rejects None for str-typed params.
+    # Ensure we pass a string (empty string means "no config file").
+    config_path = config_file or ""
+
+    scrape_result = complete_scrape_flow(
+        max_pages=max_pages,
+        upload_to_bq=not dry_run,
+        materialize_features=not dry_run,
+        upload_to_cloud=not dry_run,
+        config_file=config_path,
+    )
+
+    results["stages"]["data_collection"] = scrape_result
+    _log_data_collection_summary(logger, scrape_result)
+
+
+def _run_sync_stage(logger: Any, results: dict[str, Any], *, dry_run: bool) -> None:
+    if dry_run:
+        logger.info("Sync: Skipped (dry_run)")
+        results["stages"]["sync"] = {"skipped": True, "reason": "dry_run=True"}
+        return
+
+    logger.info("Syncing local file with BigQuery")
+    try:
+        sync_result = sync_bigquery_to_local_task()
+        results["stages"]["sync"] = sync_result
+
+        verify_result = verify_sync_task()
+        results["stages"]["sync"]["verification"] = verify_result
+
+        gcs_result = sync_local_to_gcs_task()
+        results["stages"]["sync"]["gcs_backup"] = gcs_result
+
+        logger.info(
+            "Sync complete: "
+            f"{sync_result.get('listings_count', 0)} listings, "
+            f"in_sync={verify_result.get('in_sync', False)}"
+        )
+    except Exception as e:
+        logger.warning(f"Sync failed but continuing: {e}")
+        results["stages"]["sync"] = {"error": str(e), "success": False}
+
+
+def _training_config(
+    *,
+    tune: bool,
+    use_vertex: bool,
+    machine_type: str,
+    rebuild_container: bool,
+    skip_scraping: bool,
+    dry_run: bool,
+) -> TrainingFlowConfig:
+    if use_vertex:
+        return TrainingFlowConfig(
+            tune=tune,
+            machine_type=machine_type,
+            rebuild_container=rebuild_container,
+            skip_materialization=not skip_scraping,
+            register_to_vertex=False,
+            stream_logs=True,
+            production_mode=True,
+            dry_run=dry_run,
+            use_vertex=True,
+        )
+
+    return TrainingFlowConfig(
+        tune=tune,
+        use_vertex=False,
+        production_mode=True,
+    )
+
+
+def _run_training_stage(
+    logger: Any,
+    results: dict[str, Any],
+    *,
+    tune: bool,
+    use_vertex: bool,
+    machine_type: str,
+    rebuild_container: bool,
+    skip_scraping: bool,
+    dry_run: bool,
+) -> dict[str, Any]:
+    logger.info(f"Stage 2: Training ({'vertex' if use_vertex else 'local'}, tune={tune})")
+    config = _training_config(
+        tune=tune,
+        use_vertex=use_vertex,
+        machine_type=machine_type,
+        rebuild_container=rebuild_container,
+        skip_scraping=skip_scraping,
+        dry_run=dry_run,
+    )
+    training_result = vertex_training_flow(config=config)
+    results["stages"]["training"] = training_result
+    return training_result
+
+
+def _abort_failed_training(logger: Any, results: dict[str, Any]) -> dict[str, Any]:
+    logger.error("Training failed - aborting pipeline")
+    results["success"] = False
+    results["aborted_at_stage"] = "training"
+    return results
+
+
+def _log_training_summary(logger: Any, training_result: dict[str, Any]) -> tuple[dict, bool, int]:
+    metrics = training_result.get("metrics", {})
+    validation_passed = training_result.get("validation_passed", False)
+    mae = metrics.get("mae", 0)
+    logger.info(
+        f"Stage 2 complete: validation={'passed' if validation_passed else 'failed'}, "
+        f"MAE={mae:,.0f}"
+    )
+    return metrics, validation_passed, mae
+
+
+def _record_enrichment_stage(
+    logger: Any,
+    results: dict[str, Any],
+    training_result: dict[str, Any],
+) -> None:
+    area_stats = training_result.get("steps", {}).get("area_statistics", {})
+    value_analysis = training_result.get("steps", {}).get("value_analysis", {})
+    logger.info(
+        "Stage 3: Enrichment complete "
+        f"(areas={area_stats.get('areas_count', 0)}, "
+        f"properties={value_analysis.get('properties_count', 0)})"
+    )
+
+    results["stages"]["enrichment"] = {
+        "completed_in_training_flow": True,
+        "area_statistics": area_stats,
+        "value_analysis": value_analysis,
+    }
+
+
+def _deployment_skip_reasons(
+    *,
+    deploy_to_prod: bool,
+    validation_passed: bool,
+    dry_run: bool,
+) -> list[str]:
+    reasons = []
+    if not deploy_to_prod:
+        reasons.append("deploy_to_prod=False")
+    if not validation_passed:
+        reasons.append("validation_failed")
+    if dry_run:
+        reasons.append("dry_run=True")
+    return reasons
+
+
+def _run_deployment_stage(
+    logger: Any,
+    results: dict[str, Any],
+    training_result: dict[str, Any],
+    *,
+    deploy_to_prod: bool,
+    validation_passed: bool,
+    dry_run: bool,
+    validate_deployment: bool,
+) -> None:
+    if not (deploy_to_prod and validation_passed and not dry_run):
+        reasons = _deployment_skip_reasons(
+            deploy_to_prod=deploy_to_prod,
+            validation_passed=validation_passed,
+            dry_run=dry_run,
+        )
+        logger.info(f"Stage 4: Skipped ({', '.join(reasons)})")
+        results["stages"]["deployment"] = {"skipped": True, "reasons": reasons}
+        return
+
+    logger.info("Stage 4: Deploying to Cloud Run")
+    try:
+        model_gcs_uri = training_result.get("steps", {}).get("download_artifacts", {}).get(
+            "model_uri"
+        )
+        gcs_bucket = get_gcs_bucket()
+
+        deploy_result = deploy_to_cloud_run_task(
+            model_artifacts_gcs_uri=model_gcs_uri or f"gs://{gcs_bucket}/models/",
+            enrichment_gcs_uri=f"gs://{gcs_bucket}/derived/",
+            validate=validate_deployment,
+        )
+        results["stages"]["deployment"] = deploy_result
+        logger.info(
+            "Stage 4 complete: "
+            f"deployed={deploy_result.get('deployed', False)}, "
+            f"url={deploy_result.get('url', 'N/A')}"
+        )
+    except ImportError:
+        logger.warning("Deployment tasks not available - skipping")
+        results["stages"]["deployment"] = {
+            "skipped": True,
+            "reason": "deployment_tasks_not_available",
+        }
+
+
+def _completed_stage_count(results: dict[str, Any]) -> int:
+    return len(
+        [s for s in results["stages"].values() if isinstance(s, dict) and not s.get("skipped")]
+    )
+
+
+def _record_pipeline_success(
+    logger: Any,
+    results: dict[str, Any],
+    *,
+    start_time: datetime,
+    deploy_to_prod: bool,
+    validation_passed: bool,
+    mae: int,
+) -> dict[str, Any]:
+    end_time = datetime.now()
+    duration = (end_time - start_time).total_seconds()
+
+    results["success"] = True
+    results["pipeline_end"] = end_time.isoformat()
+    results["duration_seconds"] = duration
+    results["duration_minutes"] = round(duration / 60, 2)
+
+    stages_done = _completed_stage_count(results)
+    deployed = deploy_to_prod and validation_passed
+    logger.info(
+        f"Pipeline complete: {duration / 60:.1f}min, {stages_done} stages, "
+        f"MAE={mae:,.0f}, validation={'passed' if validation_passed else 'failed'}, "
+        f"deployed={deployed}"
+    )
+
+    return results
+
+
+def _record_pipeline_failure(results: dict[str, Any], start_time: datetime, error: Exception) -> None:
+    end_time = datetime.now()
+    duration = (end_time - start_time).total_seconds()
+
+    results["success"] = False
+    results["error"] = str(error)
+    results["pipeline_end"] = end_time.isoformat()
+    results["duration_seconds"] = duration
+    results["duration_minutes"] = round(duration / 60, 2)
 
 
 @flow(name="Estate Value Index Complete ML Pipeline", log_prints=True)
@@ -45,210 +362,77 @@ def complete_pipeline_flow(
 ) -> dict:
     """End-to-end ML pipeline: data collection → training → enrichment → deployment."""
     logger = get_run_logger()
-
-    logger.info("Starting complete ML pipeline")
-    logger.info(
-        f"Config: scraping={'skip' if skip_scraping else max_pages}, "
-        f"training={'vertex' if use_vertex else 'local'}, tune={tune}, "
-        f"deploy={deploy_to_prod}, dry_run={dry_run}"
+    _log_pipeline_start(
+        logger,
+        max_pages=max_pages,
+        skip_scraping=skip_scraping,
+        tune=tune,
+        use_vertex=use_vertex,
+        deploy_to_prod=deploy_to_prod,
+        dry_run=dry_run,
     )
 
     start_time = datetime.now()
-    results = {
-        "pipeline_start": start_time.isoformat(),
-        "configuration": {
-            "max_pages": max_pages,
-            "skip_scraping": skip_scraping,
-            "tune": tune,
-            "use_vertex": use_vertex,
-            "deploy_to_prod": deploy_to_prod,
-            "dry_run": dry_run,
-        },
-        "stages": {},
-    }
+    results = _initial_results(
+        start_time,
+        max_pages=max_pages,
+        skip_scraping=skip_scraping,
+        tune=tune,
+        use_vertex=use_vertex,
+        deploy_to_prod=deploy_to_prod,
+        dry_run=dry_run,
+    )
 
     try:
-        # Stage 1: Data Collection
-        if not skip_scraping:
-            logger.info("Stage 1: Data collection (scrape, process, bigquery, features)")
+        _run_data_collection_stage(
+            logger,
+            results,
+            max_pages=max_pages,
+            skip_scraping=skip_scraping,
+            config_file=config_file,
+            dry_run=dry_run,
+        )
+        _run_sync_stage(logger, results, dry_run=dry_run)
 
-            # Prefect parameter validation in some environments rejects None for str-typed params.
-            # Ensure we pass a string (empty string means "no config file").
-            _cfg = config_file or ""
-
-            scrape_result = complete_scrape_flow(
-                max_pages=max_pages,
-                upload_to_bq=not dry_run,
-                materialize_features=not dry_run,
-                upload_to_cloud=not dry_run,
-                config_file=_cfg,
-            )
-
-            results["stages"]["data_collection"] = scrape_result
-
-            # Log summary
-            scraping_info = scrape_result.get("scraping", {})
-            processing_info = scrape_result.get("processing", {})
-            bq_info = scrape_result.get("bigquery", {})
-            features_info = scrape_result.get("features", {})
-
-            scraped = scraping_info.get("validation", {}).get("valid_listings", 0)
-            processed = processing_info.get("total_listings", 0)
-            bq_rows = bq_info.get("uploaded", 0) if bq_info else 0
-            feat_rows = features_info.get("row_count", 0) if features_info else 0
-            logger.info(
-                f"Stage 1 complete: scraped={scraped}, processed={processed}, bq={bq_rows}, features={feat_rows}"
-            )
-        else:
-            logger.info("Stage 1: Skipped (using existing data)")
-            results["stages"]["data_collection"] = {"skipped": True, "reason": "skip_scraping=True"}
-
-        # Sync: Ensure local file matches BigQuery
-        if not dry_run:
-            logger.info("Syncing local file with BigQuery")
-            try:
-                sync_result = sync_bigquery_to_local_task()
-                results["stages"]["sync"] = sync_result
-
-                verify_result = verify_sync_task()
-                results["stages"]["sync"]["verification"] = verify_result
-
-                gcs_result = sync_local_to_gcs_task()
-                results["stages"]["sync"]["gcs_backup"] = gcs_result
-
-                logger.info(
-                    f"Sync complete: {sync_result.get('listings_count', 0)} listings, in_sync={verify_result.get('in_sync', False)}"
-                )
-            except Exception as e:
-                logger.warning(f"Sync failed but continuing: {e}")
-                results["stages"]["sync"] = {"error": str(e), "success": False}
-        else:
-            logger.info("Sync: Skipped (dry_run)")
-            results["stages"]["sync"] = {"skipped": True, "reason": "dry_run=True"}
-
-        # Stage 2: Model Training
-        logger.info(f"Stage 2: Training ({'vertex' if use_vertex else 'local'}, tune={tune})")
-
-        if use_vertex:
-            training_config = TrainingFlowConfig(
-                tune=tune,
-                machine_type=machine_type,
-                rebuild_container=rebuild_container,
-                skip_materialization=not skip_scraping,  # Already materialized in Stage 1
-                register_to_vertex=False,  # Don't auto-register
-                stream_logs=True,
-                production_mode=True,  # Always retrain on full dataset for production
-                dry_run=dry_run,
-                use_vertex=True,
-            )
-            training_result = vertex_training_flow(config=training_config)
-        else:
-            # Use vertex_training_flow with use_vertex=False for local training
-            training_config = TrainingFlowConfig(
-                tune=tune,
-                use_vertex=False,  # Force local training
-                production_mode=True,  # Always retrain on full dataset
-            )
-            training_result = vertex_training_flow(config=training_config)
-
-        results["stages"]["training"] = training_result
-
-        # Check training success
+        training_result = _run_training_stage(
+            logger,
+            results,
+            tune=tune,
+            use_vertex=use_vertex,
+            machine_type=machine_type,
+            rebuild_container=rebuild_container,
+            skip_scraping=skip_scraping,
+            dry_run=dry_run,
+        )
         if not training_result.get("success", False):
-            logger.error("Training failed - aborting pipeline")
-            results["success"] = False
-            results["aborted_at_stage"] = "training"
-            return results
+            return _abort_failed_training(logger, results)
 
-        metrics = training_result.get("metrics", {})
-        validation_passed = training_result.get("validation_passed", False)
-        mae = metrics.get("mae", 0)
-        logger.info(
-            f"Stage 2 complete: validation={'passed' if validation_passed else 'failed'}, MAE={mae:,.0f}"
+        _, validation_passed, mae = _log_training_summary(logger, training_result)
+        _record_enrichment_stage(logger, results, training_result)
+        _run_deployment_stage(
+            logger,
+            results,
+            training_result,
+            deploy_to_prod=deploy_to_prod,
+            validation_passed=validation_passed,
+            dry_run=dry_run,
+            validate_deployment=validate_deployment,
         )
-
-        # Stage 3: Enrichment (completed in training flow)
-        area_stats = training_result.get("steps", {}).get("area_statistics", {})
-        value_analysis = training_result.get("steps", {}).get("value_analysis", {})
-        logger.info(
-            f"Stage 3: Enrichment complete (areas={area_stats.get('areas_count', 0)}, properties={value_analysis.get('properties_count', 0)})"
-        )
-
-        results["stages"]["enrichment"] = {
-            "completed_in_training_flow": True,
-            "area_statistics": area_stats,
-            "value_analysis": value_analysis,
-        }
-
-        # Stage 4: Deployment (optional)
-        if deploy_to_prod and validation_passed and not dry_run:
-            logger.info("Stage 4: Deploying to Cloud Run")
-            try:
-                model_gcs_uri = (
-                    training_result.get("steps", {}).get("download_artifacts", {}).get("model_uri")
-                )
-                gcs_bucket = get_gcs_bucket()
-
-                deploy_result = deploy_to_cloud_run_task(
-                    model_artifacts_gcs_uri=model_gcs_uri or f"gs://{gcs_bucket}/models/",
-                    enrichment_gcs_uri=f"gs://{gcs_bucket}/derived/",
-                    validate=validate_deployment,
-                )
-                results["stages"]["deployment"] = deploy_result
-                logger.info(
-                    f"Stage 4 complete: deployed={deploy_result.get('deployed', False)}, url={deploy_result.get('url', 'N/A')}"
-                )
-            except ImportError:
-                logger.warning("Deployment tasks not available - skipping")
-                results["stages"]["deployment"] = {
-                    "skipped": True,
-                    "reason": "deployment_tasks_not_available",
-                }
-        else:
-            reasons = []
-            if not deploy_to_prod:
-                reasons.append("deploy_to_prod=False")
-            if not validation_passed:
-                reasons.append("validation_failed")
-            if dry_run:
-                reasons.append("dry_run=True")
-
-            logger.info(f"Stage 4: Skipped ({', '.join(reasons)})")
-            results["stages"]["deployment"] = {"skipped": True, "reasons": reasons}
 
         results["stages"]["notification"] = {"skipped": True, "reason": "notifications_disabled"}
 
-        # Pipeline complete
-        end_time = datetime.now()
-        duration = (end_time - start_time).total_seconds()
-
-        results["success"] = True
-        results["pipeline_end"] = end_time.isoformat()
-        results["duration_seconds"] = duration
-        results["duration_minutes"] = round(duration / 60, 2)
-
-        stages_done = len(
-            [s for s in results["stages"].values() if isinstance(s, dict) and not s.get("skipped")]
+        return _record_pipeline_success(
+            logger,
+            results,
+            start_time=start_time,
+            deploy_to_prod=deploy_to_prod,
+            validation_passed=validation_passed,
+            mae=mae,
         )
-        deployed = deploy_to_prod and validation_passed
-        logger.info(
-            f"Pipeline complete: {duration / 60:.1f}min, {stages_done} stages, MAE={mae:,.0f}, validation={'passed' if validation_passed else 'failed'}, deployed={deployed}"
-        )
-
-        return results
 
     except Exception as e:
         logger.error(f"Pipeline failed: {e}")
-
-        end_time = datetime.now()
-        duration = (end_time - start_time).total_seconds()
-
-        results["success"] = False
-        results["error"] = str(e)
-        results["pipeline_end"] = end_time.isoformat()
-        results["duration_seconds"] = duration
-        results["duration_minutes"] = round(duration / 60, 2)
-
+        _record_pipeline_failure(results, start_time, e)
         raise
 
 

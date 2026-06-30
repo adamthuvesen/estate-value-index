@@ -36,8 +36,11 @@ REVIEWED_DYNAMIC_SQL: dict[str, str] = {
         "`table_ref` is the validated BigQueryConfig.full_table_id."
     ),
     "estate_value_index.pipelines.tasks.ingestion:upload_to_bigquery_task": (
-        "MERGE/TRUNCATE interpolate the validated full_table_id + a "
-        "safe_table_ref() temp ref; column lists go through quote_identifier()."
+        "TRUNCATE interpolates the validated BigQueryConfig.full_table_id."
+    ),
+    "estate_value_index.pipelines.tasks.ingestion:_merge_query": (
+        "MERGE interpolates the validated full_table_id + a safe_table_ref() "
+        "temp ref; column lists go through quote_identifier()."
     ),
     "estate_value_index.ingestion.bigquery_upload:_merge_temp_table": (
         "`full_table_id`/`temp_table_id` are validated by bq_table()/safe_table_ref() "

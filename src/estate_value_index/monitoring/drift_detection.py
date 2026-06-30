@@ -89,53 +89,25 @@ class ModelMonitor:
             f"{len(current_data)} current samples"
         )
 
-        # Restrict to features present in both datasets.
-        ref_cols = self.reference_data.columns
-        cur_cols = current_data.columns
-        categorical_cols = [
-            f for f in CRITICAL_CATEGORICAL_FEATURES if f in ref_cols and f in cur_cols
-        ]
-        numeric_cols = [f for f in CRITICAL_NUMERIC_FEATURES if f in ref_cols and f in cur_cols]
-
-        column_mapping = ColumnMapping()
-        column_mapping.numerical_features = numeric_cols
-        column_mapping.categorical_features = categorical_cols
-
-        has_predictions = prediction_column in cur_cols and target_column in cur_cols
-        if has_predictions:
-            column_mapping.target = target_column
-            column_mapping.prediction = prediction_column
-
-        metrics: list = [DataDriftPreset()]
-        if has_predictions:
-            metrics.append(RegressionPreset())
-        drift_report = Report(metrics=metrics)
-
-        drift_report.run(
-            reference_data=self.reference_data,
-            current_data=current_data,
-            column_mapping=column_mapping,
+        has_predictions = self._has_predictions(
+            current_data,
+            target_column=target_column,
+            prediction_column=prediction_column,
         )
+        column_mapping = self._column_mapping(
+            current_data,
+            has_predictions=has_predictions,
+            target_column=target_column,
+            prediction_column=prediction_column,
+        )
+        drift_report = self._run_drift_report(current_data, column_mapping, has_predictions)
 
         extracted = self._extract_all_metrics(drift_report.as_dict())
-
-        drift_score = (
-            sum(extracted.drift_scores) / len(extracted.drift_scores)
-            if extracted.drift_scores
-            else 0.0
+        drift_score = self._drift_score(extracted.drift_scores)
+        performance_degraded, degradation_pct = self._performance_degradation(
+            extracted,
+            has_predictions=has_predictions,
         )
-
-        performance_degraded = False
-        degradation_pct: float | None = None
-        if (
-            has_predictions
-            and extracted.current_mae is not None
-            and extracted.reference_mae is not None
-        ):
-            degradation_pct = (
-                (extracted.current_mae - extracted.reference_mae) / extracted.reference_mae * 100
-            )
-            performance_degraded = degradation_pct > (PERFORMANCE_DEGRADATION_THRESHOLD * 100)
 
         logger.info(
             f"Drift detection complete: drift={extracted.dataset_drift}, "
@@ -155,6 +127,82 @@ class ModelMonitor:
             timestamp=datetime.now().isoformat(),
             num_drifted_features=len(extracted.drifted_features),
         )
+
+    def _has_predictions(
+        self,
+        current_data: pd.DataFrame,
+        *,
+        target_column: str,
+        prediction_column: str,
+    ) -> bool:
+        cur_cols = current_data.columns
+        return prediction_column in cur_cols and target_column in cur_cols
+
+    def _critical_columns(self, current_data: pd.DataFrame) -> tuple[list[str], list[str]]:
+        ref_cols = self.reference_data.columns
+        cur_cols = current_data.columns
+        categorical_cols = [
+            f for f in CRITICAL_CATEGORICAL_FEATURES if f in ref_cols and f in cur_cols
+        ]
+        numeric_cols = [f for f in CRITICAL_NUMERIC_FEATURES if f in ref_cols and f in cur_cols]
+        return categorical_cols, numeric_cols
+
+    def _column_mapping(
+        self,
+        current_data: pd.DataFrame,
+        *,
+        has_predictions: bool,
+        target_column: str,
+        prediction_column: str,
+    ) -> ColumnMapping:
+        categorical_cols, numeric_cols = self._critical_columns(current_data)
+        column_mapping = ColumnMapping()
+        column_mapping.numerical_features = numeric_cols
+        column_mapping.categorical_features = categorical_cols
+
+        if has_predictions:
+            column_mapping.target = target_column
+            column_mapping.prediction = prediction_column
+
+        return column_mapping
+
+    def _run_drift_report(
+        self,
+        current_data: pd.DataFrame,
+        column_mapping: ColumnMapping,
+        has_predictions: bool,
+    ) -> Report:
+        metrics: list = [DataDriftPreset()]
+        if has_predictions:
+            metrics.append(RegressionPreset())
+        drift_report = Report(metrics=metrics)
+        drift_report.run(
+            reference_data=self.reference_data,
+            current_data=current_data,
+            column_mapping=column_mapping,
+        )
+        return drift_report
+
+    def _drift_score(self, drift_scores: list[float]) -> float:
+        return sum(drift_scores) / len(drift_scores) if drift_scores else 0.0
+
+    def _performance_degradation(
+        self,
+        extracted: _ExtractedMetrics,
+        *,
+        has_predictions: bool,
+    ) -> tuple[bool, float | None]:
+        if (
+            not has_predictions
+            or extracted.current_mae is None
+            or extracted.reference_mae is None
+        ):
+            return False, None
+
+        degradation_pct = (
+            (extracted.current_mae - extracted.reference_mae) / extracted.reference_mae * 100
+        )
+        return degradation_pct > (PERFORMANCE_DEGRADATION_THRESHOLD * 100), degradation_pct
 
     def _extract_all_metrics(self, report_dict: dict) -> _ExtractedMetrics:
         """Extract drift + regression metrics from an Evidently report dict."""

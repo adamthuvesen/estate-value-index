@@ -188,6 +188,86 @@ def save_geocode_cache(cache: dict[str, tuple[float, float]], cache_path: Path |
     logger.info(f"Saved {len(cache)} geocodes to {cache_path}")
 
 
+def _add_full_address_column(df: pd.DataFrame) -> pd.DataFrame:
+    address_clean = df["address"].fillna("").astype(str).str.strip()
+    area_clean = df["area"].fillna("").astype(str).str.strip()
+    df["_full_address"] = np.where(
+        address_clean.eq(""),
+        "",
+        address_clean + ", " + area_clean,
+    )
+    return df
+
+
+def _missing_cache_addresses(
+    df: pd.DataFrame,
+    cache: dict[str, tuple[float, float]],
+    sample_size: int | None,
+) -> list[str]:
+    unique_addresses = df["_full_address"].unique()
+    if sample_size:
+        unique_addresses = unique_addresses[:sample_size]
+    return [addr for addr in unique_addresses if addr not in cache]
+
+
+def _split_cached_address(addr: str) -> tuple[str, str]:
+    parts = addr.split(", ")
+    address = parts[0] if len(parts) > 0 else ""
+    area = parts[1] if len(parts) > 1 else ""
+    return address, area
+
+
+def _cache_geocode_result(
+    cache: dict[str, tuple[float, float]],
+    addr: str,
+    geolocator: Nominatim,
+) -> None:
+    if not addr or not addr.strip():
+        cache[addr] = (np.nan, np.nan)
+        return
+
+    address, area = _split_cached_address(addr)
+    coords = geocode_address(address, area, geolocator)
+    cache[addr] = coords if coords else (np.nan, np.nan)
+
+
+def _geocode_missing_addresses(
+    cache: dict[str, tuple[float, float]],
+    cache_path: Path,
+    missing_addresses: list[str],
+) -> None:
+    try:
+        from geopy.geocoders import Nominatim
+
+        geolocator = Nominatim(user_agent="estate-value-index")
+
+        logger.info(f"Geocoding {len(missing_addresses)} new addresses...")
+        for i, addr in enumerate(missing_addresses):
+            if not addr or not addr.strip():
+                cache[addr] = (np.nan, np.nan)
+                continue
+
+            _cache_geocode_result(cache, addr, geolocator)
+
+            if (i + 1) % 50 == 0:
+                logger.info(f"Geocoded {i + 1}/{len(missing_addresses)} addresses")
+                save_geocode_cache(cache, cache_path)
+
+        save_geocode_cache(cache, cache_path)
+
+    except ImportError:
+        logger.warning("geopy not installed. Install with: pip install geopy")
+
+
+def _apply_geocode_cache(
+    df: pd.DataFrame,
+    cache: dict[str, tuple[float, float]],
+) -> pd.DataFrame:
+    df["lat"] = df["_full_address"].map(lambda x: cache.get(x, (np.nan, np.nan))[0])
+    df["lon"] = df["_full_address"].map(lambda x: cache.get(x, (np.nan, np.nan))[1])
+    return df.drop(columns=["_full_address"])
+
+
 def batch_geocode(
     df: pd.DataFrame,
     cache_path: Path | str = DEFAULT_CACHE_PATH,
@@ -210,64 +290,15 @@ def batch_geocode(
 
     # Load existing cache
     cache = load_geocode_cache(cache_path)
-
-    # Create unique address key. Rows with an empty / whitespace-only address
-    # get the empty-string sentinel so we never send a centroid-only query
-    # ("", area, Stockholm, Sweden) to Nominatim.
-    address_clean = df["address"].fillna("").astype(str).str.strip()
-    area_clean = df["area"].fillna("").astype(str).str.strip()
-    df["_full_address"] = np.where(
-        address_clean.eq(""),
-        "",  # sentinel — empty string means "do not geocode"
-        address_clean + ", " + area_clean,
-    )
-
-    # Find addresses needing geocoding
-    unique_addresses = df["_full_address"].unique()
-    if sample_size:
-        unique_addresses = unique_addresses[:sample_size]
-
-    missing_addresses = [addr for addr in unique_addresses if addr not in cache]
+    df = _add_full_address_column(df)
+    missing_addresses = _missing_cache_addresses(df, cache, sample_size)
 
     if missing_addresses and geocode_missing:
-        try:
-            from geopy.geocoders import Nominatim
-
-            geolocator = Nominatim(user_agent="estate-value-index")
-
-            logger.info(f"Geocoding {len(missing_addresses)} new addresses...")
-            for i, addr in enumerate(missing_addresses):
-                # Skip the empty-address sentinel without hitting Nominatim;
-                # cache NaN so future runs don't re-attempt either.
-                if not addr or not addr.strip():
-                    cache[addr] = (np.nan, np.nan)
-                    continue
-
-                parts = addr.split(", ")
-                address = parts[0] if len(parts) > 0 else ""
-                area = parts[1] if len(parts) > 1 else ""
-
-                coords = geocode_address(address, area, geolocator)
-                if coords:
-                    cache[addr] = coords
-                else:
-                    cache[addr] = (np.nan, np.nan)
-
-                if (i + 1) % 50 == 0:
-                    logger.info(f"Geocoded {i + 1}/{len(missing_addresses)} addresses")
-                    save_geocode_cache(cache, cache_path)
-
-            save_geocode_cache(cache, cache_path)
-
-        except ImportError:
-            logger.warning("geopy not installed. Install with: pip install geopy")
+        _geocode_missing_addresses(cache, cache_path, missing_addresses)
     elif missing_addresses:
         logger.info(f"{len(missing_addresses)} addresses not in cache (geocode_missing=False)")
 
-    # Apply geocodes to dataframe
-    df["lat"] = df["_full_address"].map(lambda x: cache.get(x, (np.nan, np.nan))[0])
-    df["lon"] = df["_full_address"].map(lambda x: cache.get(x, (np.nan, np.nan))[1])
-    df = df.drop(columns=["_full_address"])
+    df = _apply_geocode_cache(df, cache)
 
     coverage = df["lat"].notna().mean()
     logger.info(f"Geocoding coverage: {coverage:.1%}")

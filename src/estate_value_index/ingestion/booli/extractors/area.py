@@ -8,6 +8,20 @@ from estate_value_index.ingestion.booli.normalization import (
     is_generic_token,
 )
 
+_STRUCTURED_AREA_KEYS = (
+    "neighborhoodName",
+    "neighbourhoodName",
+    "districtName",
+    "areaName",
+    "area",
+    "locationName",
+)
+_LOCATION_AREA_KEYS = ("neighborhood", "district", "area", "name")
+_BREADCRUMB_SELECTORS = (
+    "//nav//a/text()",
+    "//*[contains(@class, 'breadcrumb')]//a/text()",
+)
+
 
 class BooliAreaMixin:
     def extract_address(self, response):
@@ -34,91 +48,97 @@ class BooliAreaMixin:
           3) Breadcrumbs
         """
         try:
-            # 1) Structured data
-            try:
-                property_data = self._get_property_data(response)
-            except Exception:
-                property_data = None
-
-            if isinstance(property_data, dict) and property_data:
-                # Try common keys that often contain neighborhood/area names
-                for key in (
-                    "neighborhoodName",
-                    "neighbourhoodName",
-                    "districtName",
-                    "areaName",
-                    "area",
-                    "locationName",
-                ):
-                    value = property_data.get(key)
-                    if isinstance(value, str) and value.strip():
-                        area = self._normalize_text(value)
-                        if self._is_specific_area(area):
-                            return area
-
-                # Nested location object
-                location = property_data.get("location")
-                if isinstance(location, dict):
-                    for key in ("neighborhood", "district", "area", "name"):
-                        value = location.get(key)
-                        if isinstance(value, str) and value.strip():
-                            area = self._normalize_text(value)
-                            if self._is_specific_area(area):
-                                return area
-
-            # 2) Preamble line beneath the title
-            # Examples:
-            #   "Lägenhet · Kungsholmen"
-            #   "Lägenhet · Vasastan · Stockholm"
-            preamble_texts = []
-            try:
-                preamble_texts += response.css(".object-card__preamble::text").getall() or []
-            except Exception:
-                pass
-            try:
-                preamble_texts += (
-                    response.xpath(
-                        "//*[contains(@class,'text-content-secondary') and contains(@class,'text-sm')]/text()"
-                    ).getall()
-                    or []
-                )
-            except Exception:
-                pass
-
-            for raw in preamble_texts:
-                text = self._normalize_text(raw)
-                if not text:
-                    continue
-                tokens = [t.strip() for t in text.split("·") if t.strip()]
-                # Drop generic tokens like property type / municipality
-                cleaned = [t for t in tokens if not self._is_generic_token(t)]
-                # Prefer the most specific token (usually the middle if 3, else last)
-                if cleaned:
-                    candidate = cleaned[0] if len(cleaned) == 1 else cleaned[-1]
-                    if self._is_specific_area(candidate):
-                        return candidate
-
-            # 3) Breadcrumbs as a last resort
-            breadcrumb_candidates = []
-            for selector in (
-                "//nav//a/text()",
-                "//*[contains(@class, 'breadcrumb')]//a/text()",
+            for extractor in (
+                self._extract_area_from_property_data,
+                self._extract_area_from_preamble,
+                self._extract_area_from_breadcrumbs,
             ):
-                try:
-                    breadcrumb_candidates += response.xpath(selector).getall() or []
-                except Exception:
-                    continue
-
-            for raw in breadcrumb_candidates:
-                text = self._normalize_text(raw)
-                if not text:
-                    continue
-                if self._is_specific_area(text):
-                    return text
+                area = extractor(response)
+                if area:
+                    return area
 
         except Exception as e:
             self.logger.debug(f"Could not extract area: {e}")
         return None
+
+    def _extract_area_from_property_data(self, response):
+        try:
+            property_data = self._get_property_data(response)
+        except Exception:
+            return None
+
+        if not isinstance(property_data, dict) or not property_data:
+            return None
+
+        for value in self._property_area_candidates(property_data):
+            area = self._normalize_text(value)
+            if self._is_specific_area(area):
+                return area
+        return None
+
+    def _property_area_candidates(self, property_data):
+        for key in _STRUCTURED_AREA_KEYS:
+            value = property_data.get(key)
+            if isinstance(value, str) and value.strip():
+                yield value
+
+        location = property_data.get("location")
+        if isinstance(location, dict):
+            for key in _LOCATION_AREA_KEYS:
+                value = location.get(key)
+                if isinstance(value, str) and value.strip():
+                    yield value
+
+    def _extract_area_from_preamble(self, response):
+        for raw in self._preamble_texts(response):
+            candidate = self._area_from_preamble_text(raw)
+            if self._is_specific_area(candidate):
+                return candidate
+        return None
+
+    def _preamble_texts(self, response):
+        texts = []
+        try:
+            texts.extend(response.css(".object-card__preamble::text").getall() or [])
+        except Exception:
+            pass
+        try:
+            texts.extend(
+                response.xpath(
+                    "//*[contains(@class,'text-content-secondary') and contains(@class,'text-sm')]/text()"
+                ).getall()
+                or []
+            )
+        except Exception:
+            pass
+        return texts
+
+    def _area_from_preamble_text(self, raw):
+        text = self._normalize_text(raw)
+        if not text:
+            return None
+
+        tokens = [token.strip() for token in text.split("·") if token.strip()]
+        cleaned = [token for token in tokens if not self._is_generic_token(token)]
+        if not cleaned:
+            return None
+        return cleaned[0] if len(cleaned) == 1 else cleaned[-1]
+
+    def _extract_area_from_breadcrumbs(self, response):
+        for raw in self._breadcrumb_texts(response):
+            area = self._normalize_text(raw)
+            if self._is_specific_area(area):
+                return area
+        return None
+
+    def _breadcrumb_texts(self, response):
+        candidates = []
+        for selector in _BREADCRUMB_SELECTORS:
+            try:
+                candidates.extend(response.xpath(selector).getall() or [])
+            except Exception:
+                continue
+        return candidates
 
     def _is_generic_token(self, token):
         """Delegates to the shared ``is_generic_token`` helper."""

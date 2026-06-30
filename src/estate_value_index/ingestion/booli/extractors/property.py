@@ -4,6 +4,17 @@ from __future__ import annotations
 
 import re
 
+_FLOOR_PATTERNS = (
+    r"våning\s*(\d+)",
+    r"(\d+)\s*tr",
+    r"(\d+):\s*an",
+    r"plan\s*(\d+)",
+    r"etage\s*(\d+)",
+    r"(\d+)\s*våningar?\s+upp",
+)
+_GROUND_FLOOR_PATTERN = r"entr[ée]plan|bottenplan|markplan|gatuplan"
+_FLOOR_INFO_KEYS = ("floor", "våning")
+
 
 class BooliPropertyMixin:
     def extract_living_area(self, response):
@@ -76,67 +87,72 @@ class BooliPropertyMixin:
         """Extract the floor number (våning)."""
         try:
             property_data = self._get_property_data(response)
-            floor_patterns = [
-                r"våning\s*(\d+)",
-                r"(\d+)\s*tr",
-                r"(\d+):\s*an",
-                r"plan\s*(\d+)",
-                r"etage\s*(\d+)",
-                r"(\d+)\s*våningar?\s+upp",
-            ]
-            ground_regex = r"entr[ée]plan|bottenplan|markplan|gatuplan"
 
-            if property_data:
-                floor_value = property_data.get("floor") or property_data.get("floorNumber")
-                floor_number = self._extract_int_from_value(floor_value)
-                if floor_number is not None:
-                    return floor_number
-
-                for point in self._iter_info_points(property_data):
-                    key = (point.get("key") or "").lower()
-                    if key not in ("floor", "våning"):
-                        continue
-
-                    text_candidates = []
-                    label = point.get("label")
-                    if label:
-                        text_candidates.append(label)
-                    value = point.get("value")
-                    if isinstance(value, str):
-                        text_candidates.append(value)
-                    display = point.get("displayText")
-                    if isinstance(display, dict):
-                        markdown = display.get("markdown")
-                        if markdown:
-                            text_candidates.append(markdown)
-
-                    for text in text_candidates:
-                        normalized = self._normalize_text(text)
-                        if not normalized:
-                            continue
-                        if re.search(ground_regex, normalized, re.IGNORECASE):
-                            return 0
-                        for pattern in floor_patterns:
-                            match = re.search(pattern, normalized, re.IGNORECASE)
-                            if match:
-                                return int(match.group(1))
+            for extractor in (
+                self._floor_from_structured_value,
+                self._floor_from_structured_info_points,
+            ):
+                floor = extractor(property_data)
+                if floor is not None:
+                    return floor
 
             info_text = " ".join(self._get_info_point_texts(response))
-            if info_text:
-                if re.search(ground_regex, info_text, re.IGNORECASE):
-                    return 0
-                for pattern in floor_patterns:
-                    match = re.search(pattern, info_text, re.IGNORECASE)
-                    if match:
-                        return int(match.group(1))
+            floor = self._floor_from_text(info_text)
+            if floor is not None:
+                return floor
 
-            page_text = self._get_cached_page_text(response)
-            if re.search(ground_regex, page_text, re.IGNORECASE):
-                return 0
-            for pattern in floor_patterns:
-                match = re.search(pattern, page_text, re.IGNORECASE)
-                if match:
-                    return int(match.group(1))
+            return self._floor_from_text(self._get_cached_page_text(response))
         except Exception as e:
             self.logger.debug(f"Could not extract floor information: {e}")
+        return None
+
+    def _floor_from_structured_value(self, property_data):
+        if not property_data:
+            return None
+
+        floor_value = property_data.get("floor") or property_data.get("floorNumber")
+        return self._extract_int_from_value(floor_value)
+
+    def _floor_from_structured_info_points(self, property_data):
+        if not property_data:
+            return None
+
+        for point in self._iter_info_points(property_data):
+            key = (point.get("key") or "").lower()
+            if key not in _FLOOR_INFO_KEYS:
+                continue
+
+            for text in self._info_point_text_candidates(point):
+                floor = self._floor_from_text(text)
+                if floor is not None:
+                    return floor
+        return None
+
+    def _info_point_text_candidates(self, point):
+        label = point.get("label")
+        if label:
+            yield label
+
+        value = point.get("value")
+        if isinstance(value, str):
+            yield value
+
+        display = point.get("displayText")
+        if isinstance(display, dict):
+            markdown = display.get("markdown")
+            if markdown:
+                yield markdown
+
+    def _floor_from_text(self, text):
+        normalized = self._normalize_text(text)
+        if not normalized:
+            return None
+
+        if re.search(_GROUND_FLOOR_PATTERN, normalized, re.IGNORECASE):
+            return 0
+
+        for pattern in _FLOOR_PATTERNS:
+            match = re.search(pattern, normalized, re.IGNORECASE)
+            if match:
+                return int(match.group(1))
         return None

@@ -9,121 +9,132 @@ from estate_value_index.ingestion.booli.extractors.price_patterns import (
     extract_sold_price_from_text,
 )
 
+_LISTING_PRICE_KEYS = (
+    "firstPrice",
+    "listPrice",
+    "startingPrice",
+    "startPrice",
+    "price",
+    "askingPrice",
+)
+_LISTING_PRICE_KEYWORDS = (
+    "utropspris",
+    "utropspriset",
+    "utgångspris",
+    "utgångspriset",
+    "första utropspris",
+    "första utropspriset",
+    "utropspriset var",
+    "utgångspriset var",
+)
+_LISTING_PRICE_PATTERNS = (
+    r"Utropspriset.*?(\d[\d\s]*)",
+    r"utropspris.*?(\d[\d\s]*)",
+    r"Pris.*?(\d[\d\s]*)",
+    r"(\d[\d\s]*)\s*kr.*?utrop",
+    r"första.*?utropspriset.*?(\d[\d\s]*)",
+    r"utropspriset.*?var.*?(\d[\d\s]*)",
+)
+
 
 class BooliPriceMixin:
     def extract_listing_price(self, response):
         """Extract listing price (original asking price)"""
         try:
-            property_data = self._get_property_data(response)
-            if property_data:
-                # Prefer the initial asking price when available before falling back to later price fields.
-                price_keys = (
-                    "firstPrice",
-                    "listPrice",
-                    "startingPrice",
-                    "startPrice",
-                    "price",
-                    "askingPrice",
-                )
-
-                for key in price_keys:
-                    price = self._extract_price_from_value(property_data.get(key))
-                    if price is not None:
-                        self.logger.debug(
-                            f"Listing price resolved from property data key '{key}': {price}"
-                        )
-                        return price
-
-            # Try to extract from JSON-LD script tags first
-            json_scripts = response.css('script[type="application/ld+json"]::text').getall()
-            self.logger.debug(f"Found {len(json_scripts)} JSON-LD scripts")
-
-            for i, script in enumerate(json_scripts):
-                try:
-                    data = json.loads(script)
-                    self.logger.debug(f"JSON script {i}: {type(data)} - {str(data)[:200]}...")
-                    if isinstance(data, dict):
-                        # Handle nested structure - look for Product type with offers
-                        if data.get("@type") == "Product" and "offers" in data:
-                            offer = data["offers"]
-                            self.logger.debug(f"Found Product with offers: {offer}")
-                            if isinstance(offer, dict) and "price" in offer:
-                                price = self._sanitize_price(offer["price"])
-                                if price is not None:
-                                    self.logger.debug(
-                                        f"Extracted listing price from JSON-LD: {price}"
-                                    )
-                                    return price
-                        # Also check if it's a list of products
-                        elif isinstance(data, list):
-                            for item in data:
-                                if isinstance(item, dict) and item.get("@type") == "Product":
-                                    offer = item.get("offers", {})
-                                    if isinstance(offer, dict) and "price" in offer:
-                                        price = self._sanitize_price(offer["price"])
-                                        if price is not None:
-                                            self.logger.debug(
-                                                f"Extracted listing price from JSON-LD list: {price}"
-                                            )
-                                            return price
-                except json.JSONDecodeError as e:
-                    self.logger.debug(f"JSON decode error: {e}")
-                    continue
-
-            # Look for listing price in info-point sections
-            info_point_texts = self._get_info_point_texts(response)
-            self.logger.debug(f"Found {len(info_point_texts)} info-point entries")
-
-            # Enhanced patterns for listing price extraction
-            listing_price_keywords = [
-                "utropspris",
-                "utropspriset",
-                "utgångspris",
-                "utgångspriset",
-                "första utropspris",
-                "första utropspriset",
-                "utropspriset var",
-                "utgångspriset var",
-            ]
-
-            for idx, normalized_text in enumerate(info_point_texts):
-                if any(keyword in normalized_text for keyword in listing_price_keywords):
-                    self.logger.debug(f"Found price text in info-point {idx}: {normalized_text}")
-                    price_match = re.search(r"(\d[\d\s]*)", normalized_text)
-                    if price_match:
-                        price_str = price_match.group(1).replace(" ", "")
-                        price = self._sanitize_price(price_str)
-                        if price is not None:
-                            self.logger.debug(f"Extracted listing price from info-point: {price}")
-                            return price
-
-            # Fallback to page text search
-            page_text = self._get_cached_page_text(response).lower()
-
-            # Patterns for listing price
-            listing_patterns = [
-                r"Utropspriset.*?(\d+\s*\d+)",  # "Utropspriset var 6 750 000"
-                r"utropspris.*?(\d+\s*\d+)",  # "utropspris 6750000"
-                r"Pris.*?(\d+\s*\d+)",  # "Pris 6750000"
-                r"(\d+\s*\d+)\s*kr.*?utrop",  # "6750000 kr utrop"
-                r"första.*?utropspriset.*?(\d+\s*\d+)",  # "Första utropspriset var 8 495 000"
-                r"utropspriset.*?var.*?(\d+\s*\d+)",  # "utropspriset var 8495000"
-            ]
-
-            for pattern in listing_patterns:
-                match = re.search(pattern, page_text, re.IGNORECASE)
-                if match:
-                    price_str = match.group(1).replace(" ", "")
-                    price = self._sanitize_price(price_str)
-                    if price is not None:
-                        self.logger.debug(f"Pattern '{pattern}' matched listing price: {price}")
-                        return price
+            for extractor in (
+                self._listing_price_from_property_data,
+                self._listing_price_from_json_ld,
+                self._listing_price_from_info_points,
+                self._listing_price_from_page_text,
+            ):
+                price = extractor(response)
+                if price is not None:
+                    return price
 
             self.logger.debug("No listing price patterns matched")
 
         except Exception as e:
             self.logger.debug(f"Could not extract listing price: {e}")
         return None
+
+    def _listing_price_from_property_data(self, response):
+        property_data = self._get_property_data(response)
+        if not property_data:
+            return None
+
+        for key in _LISTING_PRICE_KEYS:
+            price = self._extract_price_from_value(property_data.get(key))
+            if price is not None:
+                self.logger.debug(f"Listing price resolved from property data key '{key}': {price}")
+                return price
+        return None
+
+    def _listing_price_from_json_ld(self, response):
+        json_scripts = response.css('script[type="application/ld+json"]::text').getall()
+        self.logger.debug(f"Found {len(json_scripts)} JSON-LD scripts")
+
+        for idx, script in enumerate(json_scripts):
+            try:
+                data = json.loads(script)
+            except json.JSONDecodeError as e:
+                self.logger.debug(f"JSON decode error: {e}")
+                continue
+
+            self.logger.debug(f"JSON script {idx}: {type(data)} - {str(data)[:200]}...")
+            for product in self._json_ld_products(data):
+                price = self._price_from_json_ld_product(product)
+                if price is not None:
+                    self.logger.debug(f"Extracted listing price from JSON-LD: {price}")
+                    return price
+        return None
+
+    def _json_ld_products(self, data):
+        if isinstance(data, dict):
+            if data.get("@type") == "Product":
+                yield data
+            return
+
+        if isinstance(data, list):
+            for item in data:
+                if isinstance(item, dict) and item.get("@type") == "Product":
+                    yield item
+
+    def _price_from_json_ld_product(self, product):
+        offer = product.get("offers", {})
+        self.logger.debug(f"Found Product with offers: {offer}")
+        if not isinstance(offer, dict) or "price" not in offer:
+            return None
+        return self._extract_price_from_value(offer["price"])
+
+    def _listing_price_from_info_points(self, response):
+        info_point_texts = self._get_info_point_texts(response)
+        self.logger.debug(f"Found {len(info_point_texts)} info-point entries")
+
+        for idx, normalized_text in enumerate(info_point_texts):
+            if not any(keyword in normalized_text for keyword in _LISTING_PRICE_KEYWORDS):
+                continue
+
+            self.logger.debug(f"Found price text in info-point {idx}: {normalized_text}")
+            price = self._price_from_text(normalized_text)
+            if price is not None:
+                self.logger.debug(f"Extracted listing price from info-point: {price}")
+                return price
+        return None
+
+    def _listing_price_from_page_text(self, response):
+        page_text = self._get_cached_page_text(response).lower()
+        for pattern in _LISTING_PRICE_PATTERNS:
+            price = self._price_from_text(page_text, pattern)
+            if price is not None:
+                self.logger.debug(f"Pattern '{pattern}' matched listing price: {price}")
+                return price
+        return None
+
+    def _price_from_text(self, text, pattern=r"(\d[\d\s]*)"):
+        match = re.search(pattern, text, re.IGNORECASE)
+        if not match:
+            return None
+        return self._sanitize_price(match.group(1).replace(" ", ""))
 
     def extract_sold_price(self, response):
         """Extract sold price (final sale price)"""
