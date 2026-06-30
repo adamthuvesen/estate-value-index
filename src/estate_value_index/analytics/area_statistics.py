@@ -12,6 +12,7 @@ import json
 import logging
 import statistics
 from collections import defaultdict
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -21,6 +22,14 @@ from estate_value_index.ml.area_names import get_display_name
 from estate_value_index.ml.preprocessing import normalize_area_for_model
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class AreaStatisticsPaths:
+    feature_context: Path
+    value_analysis: Path
+    raw_listings: Path
+    output: Path
 
 
 def load_json(filepath: Path) -> dict:
@@ -154,14 +163,9 @@ def calculate_size_distribution(properties: list[dict]) -> dict[str, Any]:
 
     room_counts = defaultdict(int)
     for r in rooms:
-        if r == 1:
-            room_counts["1"] += 1
-        elif r == 2:
-            room_counts["2"] += 1
-        elif r == 3:
-            room_counts["3"] += 1
-        elif r >= 4:
-            room_counts["4+"] += 1
+        bucket = _room_bucket(r)
+        if bucket:
+            room_counts[bucket] += 1
 
     return {
         "living_area": {
@@ -172,6 +176,18 @@ def calculate_size_distribution(properties: list[dict]) -> dict[str, Any]:
         },
         "room_distribution": dict(room_counts),
     }
+
+
+def _room_bucket(rooms: int | float | None) -> str | None:
+    if rooms == 1:
+        return "1"
+    if rooms == 2:
+        return "2"
+    if rooms == 3:
+        return "3"
+    if rooms is not None and rooms >= 4:
+        return "4+"
+    return None
 
 
 def calculate_value_tier_distribution(value_properties: list[dict]) -> dict[str, int]:
@@ -258,26 +274,9 @@ def calculate_monthly_median_prices(properties: list[dict], months: int = 12) ->
 
 def calculate_market_dynamics(properties: list[dict]) -> dict[str, Any]:
     """Compute days_on_market_median, price_change_mean, volatility (stdev of price/sqm), inventory."""
-    days_on_market_values = []
-    price_changes = []
-    price_per_sqm_values = []
-
-    for prop in properties:
-        dom = prop.get("days_on_market")
-        if dom is not None and dom > 0:
-            days_on_market_values.append(dom)
-
-        price_change = prop.get("price_change")
-        if price_change is not None:
-            price_changes.append(price_change)
-        elif prop.get("sold_price") and prop.get("listing_price"):
-            price_changes.append(prop.get("sold_price") - prop.get("listing_price"))
-
-        price_per_sqm = prop.get("price_per_sqm")
-        if price_per_sqm is not None:
-            price_per_sqm_values.append(price_per_sqm)
-        elif prop.get("sold_price") and prop.get("living_area") and prop.get("living_area") > 0:
-            price_per_sqm_values.append(prop.get("sold_price") / prop.get("living_area"))
+    days_on_market_values = _positive_days_on_market(properties)
+    price_changes = _price_change_values(properties)
+    price_per_sqm_values = _price_per_sqm_values(properties)
 
     volatility = (
         round(statistics.stdev(price_per_sqm_values)) if len(price_per_sqm_values) > 1 else 0
@@ -297,6 +296,50 @@ def calculate_market_dynamics(properties: list[dict]) -> dict[str, Any]:
     }
 
 
+def _positive_days_on_market(properties: list[dict]) -> list[float]:
+    return [
+        prop.get("days_on_market")
+        for prop in properties
+        if prop.get("days_on_market") is not None and prop.get("days_on_market") > 0
+    ]
+
+
+def _price_change_values(properties: list[dict]) -> list[float]:
+    values = []
+    for prop in properties:
+        price_change = prop.get("price_change")
+        if price_change is not None:
+            values.append(price_change)
+            continue
+
+        sold_price = prop.get("sold_price")
+        listing_price = prop.get("listing_price")
+        if sold_price and listing_price:
+            values.append(sold_price - listing_price)
+    return values
+
+
+def _price_per_sqm_values(properties: list[dict]) -> list[float]:
+    values = []
+    for prop in properties:
+        value = _price_per_sqm_value(prop)
+        if value is not None:
+            values.append(value)
+    return values
+
+
+def _price_per_sqm_value(prop: dict) -> float | None:
+    price_per_sqm = prop.get("price_per_sqm")
+    if price_per_sqm is not None:
+        return price_per_sqm
+
+    sold_price = prop.get("sold_price")
+    living_area = prop.get("living_area")
+    if sold_price and living_area and living_area > 0:
+        return sold_price / living_area
+    return None
+
+
 def filter_properties_by_room_count(properties: list[dict], room_filter: str) -> list[dict]:
     """Filter by room count: "all", "1", "2", "3", or "4+"."""
     if room_filter == "all":
@@ -304,20 +347,79 @@ def filter_properties_by_room_count(properties: list[dict], room_filter: str) ->
 
     filtered = []
     for prop in properties:
-        rooms = prop.get("rooms")
-        if rooms is None:
-            continue
-
-        if room_filter == "1" and rooms == 1:
-            filtered.append(prop)
-        elif room_filter == "2" and rooms == 2:
-            filtered.append(prop)
-        elif room_filter == "3" and rooms == 3:
-            filtered.append(prop)
-        elif room_filter == "4+" and rooms >= 4:
+        if _room_bucket(prop.get("rooms")) == room_filter:
             filtered.append(prop)
 
     return filtered
+
+
+def _mean_price_or_feature_value(
+    properties: list[dict],
+    property_key: str,
+    feature_context: dict,
+    feature_key: str,
+    area_key: str,
+) -> int:
+    prices = [p.get(property_key, 0) for p in properties if p.get(property_key)]
+    fallback = feature_context.get(feature_key, {}).get(area_key, 0)
+    return round(statistics.mean(prices) if prices else fallback)
+
+
+def _value_insights(value_properties: list[dict]) -> dict[str, Any]:
+    undervalued_count = sum(1 for p in value_properties if p.get("is_undervalued", False))
+    value_scores = [p.get("value_score", 50) for p in value_properties]
+    prediction_deltas = [p.get("prediction_delta_absolute", 0) for p in value_properties]
+
+    return {
+        "undervalued_count": undervalued_count,
+        "undervalued_pct": round(undervalued_count / len(value_properties) * 100, 1)
+        if value_properties
+        else 0,
+        "avg_value_score": round(statistics.mean(value_scores), 1) if value_scores else 50.0,
+        "median_value_score": round(statistics.median(value_scores), 1) if value_scores else 50.0,
+        "avg_prediction_delta": round(statistics.mean(prediction_deltas))
+        if prediction_deltas
+        else 0,
+        "value_tier_distribution": calculate_value_tier_distribution(value_properties),
+    }
+
+
+def _room_filtered_overview(
+    filtered_raw: list[dict],
+    market_dynamics: dict[str, Any],
+    feature_context: dict,
+    area_key: str,
+) -> dict[str, Any]:
+    return {
+        "avg_listing_price": _mean_price_or_feature_value(
+            filtered_raw, "listing_price", feature_context, "area_avg_price", area_key
+        ),
+        "avg_sold_price": _mean_price_or_feature_value(
+            filtered_raw, "sold_price", feature_context, "area_target_mean", area_key
+        ),
+        "avg_price_per_sqm": market_dynamics.get("avg_price_per_sqm"),
+        "listing_count": len(filtered_raw),
+        "inventory": len(filtered_raw),
+        # Monthly/volume series intentionally skipped for room-filtered views
+        "median_price_3m": None,
+        "median_price_6m": None,
+        "median_price_12m": None,
+    }
+
+
+def _room_filtered_market_dynamics(
+    filtered_raw: list[dict],
+    market_dynamics: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        "volatility": market_dynamics["volatility"],
+        "days_on_market_median": market_dynamics["days_on_market_median"],
+        "price_change_mean": market_dynamics["price_change_mean"],
+        "sales_volume_3m": 0,
+        "sales_volume_6m": 0,
+        "sales_volume_12m": 0,
+        "liquidity": round(len(filtered_raw) / max(market_dynamics["days_on_market_median"], 1), 2),
+    }
 
 
 def calculate_room_filtered_statistics(
@@ -326,7 +428,7 @@ def calculate_room_filtered_statistics(
     room_filter: str,
     feature_context: dict,
     area_key: str,
-) -> dict[str, Any]:
+) -> dict[str, Any] | None:
     """All statistics for a specific room-count filter; returns None if no properties match."""
     filtered_raw = filter_properties_by_room_count(raw_props, room_filter)
     filtered_value = filter_properties_by_room_count(value_props, room_filter)
@@ -335,59 +437,13 @@ def calculate_room_filtered_statistics(
         return None
 
     market_dynamics_filtered = calculate_market_dynamics(filtered_raw)
-    value_scores = [p.get("value_score", 50) for p in filtered_value]
-    prediction_deltas = [p.get("prediction_delta_absolute", 0) for p in filtered_value]
-    undervalued_count = sum(1 for p in filtered_value if p.get("is_undervalued", False))
 
     return {
-        "overview": {
-            "avg_listing_price": round(
-                statistics.mean(
-                    [p.get("listing_price", 0) for p in filtered_raw if p.get("listing_price")]
-                )
-                if any(p.get("listing_price") for p in filtered_raw)
-                else feature_context.get("area_avg_price", {}).get(area_key, 0)
-            ),
-            "avg_sold_price": round(
-                statistics.mean(
-                    [p.get("sold_price", 0) for p in filtered_raw if p.get("sold_price")]
-                )
-                if any(p.get("sold_price") for p in filtered_raw)
-                else feature_context.get("area_target_mean", {}).get(area_key, 0)
-            ),
-            "avg_price_per_sqm": market_dynamics_filtered.get("avg_price_per_sqm"),
-            "listing_count": len(filtered_raw),
-            "inventory": len(filtered_raw),
-            # Monthly/volume series intentionally skipped for room-filtered views
-            "median_price_3m": None,
-            "median_price_6m": None,
-            "median_price_12m": None,
-        },
-        "market_dynamics": {
-            "volatility": market_dynamics_filtered["volatility"],
-            "days_on_market_median": market_dynamics_filtered["days_on_market_median"],
-            "price_change_mean": market_dynamics_filtered["price_change_mean"],
-            "sales_volume_3m": 0,
-            "sales_volume_6m": 0,
-            "sales_volume_12m": 0,
-            "liquidity": round(
-                len(filtered_raw) / max(market_dynamics_filtered["days_on_market_median"], 1), 2
-            ),
-        },
-        "value_insights": {
-            "undervalued_count": undervalued_count,
-            "undervalued_pct": round(undervalued_count / len(filtered_value) * 100, 1)
-            if filtered_value
-            else 0,
-            "avg_value_score": round(statistics.mean(value_scores), 1) if value_scores else 50.0,
-            "median_value_score": round(statistics.median(value_scores), 1)
-            if value_scores
-            else 50.0,
-            "avg_prediction_delta": round(statistics.mean(prediction_deltas))
-            if prediction_deltas
-            else 0,
-            "value_tier_distribution": calculate_value_tier_distribution(filtered_value),
-        },
+        "overview": _room_filtered_overview(
+            filtered_raw, market_dynamics_filtered, feature_context, area_key
+        ),
+        "market_dynamics": _room_filtered_market_dynamics(filtered_raw, market_dynamics_filtered),
+        "value_insights": _value_insights(filtered_value),
         "property_characteristics": calculate_amenity_prevalence(filtered_raw),
         "construction_era": calculate_construction_era_distribution(filtered_raw),
         "recent_properties": get_recent_properties(filtered_raw, limit=10),
@@ -425,48 +481,125 @@ def get_recent_properties(properties: list[dict], limit: int = 10) -> list[dict]
     return result
 
 
-def generate_area_statistics(
-    *,
-    data_source: str = "bigquery",
-    feature_context_path: Path | None = None,
-    value_analysis_path: Path | None = None,
-    raw_listings_path: Path | None = None,
-    output_path: Path | None = None,
-) -> dict[str, Any]:
-    """Main function to generate area statistics."""
-
-    # Paths
+def _resolve_area_statistics_paths(
+    feature_context_path: Path | None,
+    value_analysis_path: Path | None,
+    raw_listings_path: Path | None,
+    output_path: Path | None,
+) -> AreaStatisticsPaths:
     project_root = Path(__file__).resolve().parents[3]
-    feature_context_path = feature_context_path or (
-        project_root / "web" / "models" / "price_prediction_model_feature_context.json"
+    return AreaStatisticsPaths(
+        feature_context=feature_context_path
+        or project_root / "web" / "models" / "price_prediction_model_feature_context.json",
+        value_analysis=value_analysis_path
+        or project_root / "data" / "enrichment" / "value_analysis.json",
+        raw_listings=raw_listings_path
+        or project_root / "data" / "raw" / "booli" / "booli_listings_prod.json",
+        output=output_path or project_root / "data" / "enrichment" / "area_statistics.json",
     )
-    value_analysis_path = value_analysis_path or (
-        project_root / "data" / "enrichment" / "value_analysis.json"
-    )
-    raw_listings_path = raw_listings_path or (
-        project_root / "data" / "raw" / "booli" / "booli_listings_prod.json"
-    )
-    output_path = output_path or (project_root / "data" / "enrichment" / "area_statistics.json")
 
-    logger.info("Loading data sources...")
 
-    feature_context = load_json(feature_context_path)
-    value_analysis = load_json(value_analysis_path)
-    raw_listings, raw_listings_source = load_raw_listings(data_source, raw_listings_path)
-
-    logger.info("Loaded %d raw listings", len(raw_listings))
-    logger.info("Loaded %d value analysis properties", len(value_analysis.get("properties", [])))
-
-    listings_by_area = defaultdict(list)
-    for listing in raw_listings:
-        area_key = normalize_area_for_model(listing.get("area", ""))
-        listings_by_area[area_key].append(listing)
-
-    value_props_by_area = defaultdict(list)
-    for prop in value_analysis.get("properties", []):
+def _group_by_area(properties: list[dict]) -> defaultdict[str, list[dict]]:
+    grouped: defaultdict[str, list[dict]] = defaultdict(list)
+    for prop in properties:
         area_key = normalize_area_for_model(prop.get("area", ""))
-        value_props_by_area[area_key].append(prop)
+        grouped[area_key].append(prop)
+    return grouped
 
+
+def _room_count_statistics(
+    raw_props: list[dict],
+    value_props: list[dict],
+    feature_context: dict,
+    area_key: str,
+) -> dict[str, Any]:
+    by_room_count = {}
+    for room_filter in ["all", "1", "2", "3", "4+"]:
+        room_stats = calculate_room_filtered_statistics(
+            raw_props, value_props, room_filter, feature_context, area_key
+        )
+        if room_stats:
+            by_room_count[room_filter] = room_stats
+    return by_room_count
+
+
+def _area_overview(
+    area_key: str,
+    raw_props: list[dict],
+    feature_context: dict,
+    market_dynamics: dict[str, Any],
+    monthly_prices: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        "avg_listing_price": round(feature_context.get("area_avg_price", {}).get(area_key, 0)),
+        "avg_sold_price": round(feature_context.get("area_target_mean", {}).get(area_key, 0)),
+        "avg_price_per_sqm": market_dynamics.get("avg_price_per_sqm"),
+        "listing_count": len(raw_props),
+        "inventory": market_dynamics["inventory"],
+        "median_price_3m": feature_context.get("area_median_price_3m", {}).get(area_key),
+        "median_price_6m": feature_context.get("area_median_price_6m", {}).get(area_key),
+        "median_price_12m": feature_context.get("area_median_price_12m", {}).get(area_key),
+        "monthly_prices": monthly_prices,
+    }
+
+
+def _area_market_dynamics(
+    area_key: str,
+    feature_context: dict,
+    market_dynamics: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        "volatility": market_dynamics["volatility"],
+        "days_on_market_median": market_dynamics["days_on_market_median"],
+        "price_change_mean": market_dynamics["price_change_mean"],
+        "sales_volume_3m": feature_context.get("area_sales_volume_3m", {}).get(area_key, 0),
+        "sales_volume_6m": feature_context.get("area_sales_volume_6m", {}).get(area_key, 0),
+        "sales_volume_12m": feature_context.get("area_sales_volume_12m", {}).get(area_key, 0),
+        "liquidity": round(
+            market_dynamics["inventory"] / max(market_dynamics["days_on_market_median"], 1),
+            2,
+        ),
+    }
+
+
+def _area_statistics_entry(
+    area_key: str,
+    raw_props: list[dict],
+    value_props: list[dict],
+    feature_context: dict,
+) -> dict[str, Any]:
+    market_dynamics = calculate_market_dynamics(raw_props)
+    monthly_prices = calculate_monthly_median_prices(raw_props, months=12)
+
+    return {
+        "area_name": area_key,
+        "display_name": get_display_name(area_key),
+        "price_tier": feature_context.get("area_price_tier", {}).get(area_key, "medium"),
+        "overview": _area_overview(
+            area_key, raw_props, feature_context, market_dynamics, monthly_prices
+        ),
+        "market_dynamics": _area_market_dynamics(area_key, feature_context, market_dynamics),
+        "value_insights": _value_insights(value_props),
+        "size_analysis": {
+            "price_per_sqm_by_rooms": calculate_price_per_sqm_by_rooms(raw_props),
+            "size_distribution": calculate_size_distribution(raw_props),
+        },
+        "property_characteristics": calculate_amenity_prevalence(raw_props),
+        "construction_era": calculate_construction_era_distribution(raw_props),
+        "recent_properties": get_recent_properties(raw_props, limit=10),
+        "by_room_count": _room_count_statistics(raw_props, value_props, feature_context, area_key),
+        "has_limited_data": len(raw_props) < 10,
+        "sample_size": len(raw_props),
+    }
+
+
+def _build_area_statistics(
+    feature_context: dict,
+    raw_listings: list[dict],
+    value_properties: list[dict],
+) -> dict[str, Any]:
+    listings_by_area = _group_by_area(raw_listings)
+    value_props_by_area = _group_by_area(value_properties)
     area_stats = {}
     areas = feature_context.get("area_avg_price", {}).keys()
 
@@ -482,106 +615,45 @@ def generate_area_statistics(
             logger.debug("Skipping %s - only %d properties", area_key, len(raw_props))
             continue
 
-        # Calculate market dynamics directly from raw data (more accurate than feature_context)
-        market_dynamics_raw = calculate_market_dynamics(raw_props)
+        area_stats[area_key] = _area_statistics_entry(
+            area_key, raw_props, value_props, feature_context
+        )
 
-        undervalued_count = sum(1 for p in value_props if p.get("is_undervalued", False))
-        value_scores = [p.get("value_score", 50) for p in value_props]
-        prediction_deltas = [p.get("prediction_delta_absolute", 0) for p in value_props]
+    return area_stats
 
-        monthly_prices = calculate_monthly_median_prices(raw_props, months=12)
 
-        by_room_count = {}
-        for room_filter in ["all", "1", "2", "3", "4+"]:
-            room_stats = calculate_room_filtered_statistics(
-                raw_props, value_props, room_filter, feature_context, area_key
-            )
-            if room_stats:
-                by_room_count[room_filter] = room_stats
-
-        area_stats[area_key] = {
-            "area_name": area_key,
-            "display_name": get_display_name(area_key),
-            "price_tier": feature_context.get("area_price_tier", {}).get(area_key, "medium"),
-            # Overview metrics for "all rooms" — consumed by the area web UI.
-            "overview": {
-                "avg_listing_price": round(
-                    feature_context.get("area_avg_price", {}).get(area_key, 0)
-                ),
-                "avg_sold_price": round(
-                    feature_context.get("area_target_mean", {}).get(area_key, 0)
-                ),
-                "avg_price_per_sqm": market_dynamics_raw.get("avg_price_per_sqm"),
-                "listing_count": len(raw_props),
-                "inventory": market_dynamics_raw["inventory"],
-                "median_price_3m": feature_context.get("area_median_price_3m", {}).get(area_key),
-                "median_price_6m": feature_context.get("area_median_price_6m", {}).get(area_key),
-                "median_price_12m": feature_context.get("area_median_price_12m", {}).get(area_key),
-                "monthly_prices": monthly_prices,
-            },
-            "market_dynamics": {
-                "volatility": market_dynamics_raw["volatility"],
-                "days_on_market_median": market_dynamics_raw["days_on_market_median"],
-                "price_change_mean": market_dynamics_raw["price_change_mean"],
-                "sales_volume_3m": feature_context.get("area_sales_volume_3m", {}).get(area_key, 0),
-                "sales_volume_6m": feature_context.get("area_sales_volume_6m", {}).get(area_key, 0),
-                "sales_volume_12m": feature_context.get("area_sales_volume_12m", {}).get(
-                    area_key, 0
-                ),
-                "liquidity": round(
-                    market_dynamics_raw["inventory"]
-                    / max(market_dynamics_raw["days_on_market_median"], 1),
-                    2,
-                ),
-            },
-            "value_insights": {
-                "undervalued_count": undervalued_count,
-                "undervalued_pct": round(undervalued_count / len(value_props) * 100, 1)
-                if value_props
-                else 0,
-                "avg_value_score": round(statistics.mean(value_scores), 1)
-                if value_scores
-                else 50.0,
-                "median_value_score": round(statistics.median(value_scores), 1)
-                if value_scores
-                else 50.0,
-                "avg_prediction_delta": round(statistics.mean(prediction_deltas))
-                if prediction_deltas
-                else 0,
-                "value_tier_distribution": calculate_value_tier_distribution(value_props),
-            },
-            "size_analysis": {
-                "price_per_sqm_by_rooms": calculate_price_per_sqm_by_rooms(raw_props),
-                "size_distribution": calculate_size_distribution(raw_props),
-            },
-            "property_characteristics": calculate_amenity_prevalence(raw_props),
-            "construction_era": calculate_construction_era_distribution(raw_props),
-            "recent_properties": get_recent_properties(raw_props, limit=10),
-            "by_room_count": by_room_count,
-            "has_limited_data": len(raw_props) < 10,
-            "sample_size": len(raw_props),
-        }
-
-    output_data = {
+def _area_statistics_output(
+    *,
+    feature_context: dict,
+    value_analysis: dict,
+    raw_listings: list[dict],
+    raw_listings_source: str,
+    paths: AreaStatisticsPaths,
+    area_stats: dict[str, Any],
+) -> dict[str, Any]:
+    return {
         "metadata": {
             "generated_at": resolve_generated_at(feature_context, value_analysis),
             "total_areas": len(area_stats),
             "total_properties": len(raw_listings),
             "data_sources": {
-                "feature_context": str(feature_context_path.name),
-                "value_analysis": str(value_analysis_path.name),
+                "feature_context": str(paths.feature_context.name),
+                "value_analysis": str(paths.value_analysis.name),
                 "raw_listings": str(raw_listings_source),
             },
         },
         "areas": area_stats,
     }
 
+
+def _write_area_statistics(output_data: dict[str, Any], output_path: Path) -> None:
     logger.info("Writing output to %s...", output_path)
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(output_data, f, indent=2, ensure_ascii=False)
 
-    logger.info("Generated statistics for %d areas -> %s", len(area_stats), output_path)
 
+def _log_area_summary(area_stats: dict[str, Any], output_path: Path) -> None:
+    logger.info("Generated statistics for %d areas -> %s", len(area_stats), output_path)
     logger.info("Area Summary:")
     for _, stats in sorted(area_stats.items(), key=lambda x: x[1]["sample_size"], reverse=True)[
         :10
@@ -595,4 +667,46 @@ def generate_area_statistics(
             flag,
         )
 
+
+def generate_area_statistics(
+    *,
+    data_source: str = "bigquery",
+    feature_context_path: Path | None = None,
+    value_analysis_path: Path | None = None,
+    raw_listings_path: Path | None = None,
+    output_path: Path | None = None,
+) -> dict[str, Any]:
+    """Main function to generate area statistics."""
+    paths = _resolve_area_statistics_paths(
+        feature_context_path,
+        value_analysis_path,
+        raw_listings_path,
+        output_path,
+    )
+
+    logger.info("Loading data sources...")
+
+    feature_context = load_json(paths.feature_context)
+    value_analysis = load_json(paths.value_analysis)
+    raw_listings, raw_listings_source = load_raw_listings(data_source, paths.raw_listings)
+
+    logger.info("Loaded %d raw listings", len(raw_listings))
+    logger.info("Loaded %d value analysis properties", len(value_analysis.get("properties", [])))
+
+    area_stats = _build_area_statistics(
+        feature_context,
+        raw_listings,
+        value_analysis.get("properties", []),
+    )
+    output_data = _area_statistics_output(
+        feature_context=feature_context,
+        value_analysis=value_analysis,
+        raw_listings=raw_listings,
+        raw_listings_source=raw_listings_source,
+        paths=paths,
+        area_stats=area_stats,
+    )
+
+    _write_area_statistics(output_data, paths.output)
+    _log_area_summary(area_stats, paths.output)
     return output_data

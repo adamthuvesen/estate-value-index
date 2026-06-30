@@ -110,6 +110,104 @@ def process_listings_task(
     )
 
 
+def _load_unique_bq_rows(processed_file: Path, prepare_bq_row) -> list[dict]:
+    listings = []
+    seen_ids: set[str] = set()
+
+    with open(processed_file, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            raw_listing = json.loads(line)
+            listing_id = raw_listing.get("listing_id")
+            if listing_id in seen_ids:
+                continue
+            if listing_id:
+                seen_ids.add(listing_id)
+            listings.append(prepare_bq_row(raw_listing))
+
+    return listings
+
+
+def _temp_table_ref(bq_config) -> str:
+    temp_table_id = f"{bq_config.table_id}_temp_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    return safe_table_ref(bq_config.project_id, bq_config.dataset_id, temp_table_id)
+
+
+def _load_temp_table(client, bigquery, temp_table_ref: str, listings: list[dict], schema) -> None:
+    temp_table = bigquery.Table(temp_table_ref, schema=schema)
+    client.create_table(temp_table)
+
+    load_job = client.load_table_from_json(
+        listings,
+        temp_table_ref,
+        job_config=bigquery.LoadJobConfig(schema=schema, write_disposition="WRITE_TRUNCATE"),
+    )
+    load_job.result()
+
+
+def _merge_query(table_ref: str, temp_table_ref: str, schema, *, update_existing: bool) -> str:
+    insert_fields = ", ".join(quote_identifier(field.name) for field in schema)
+    insert_values = ", ".join(f"source.{quote_identifier(field.name)}" for field in schema)
+    insert_clause = f"WHEN NOT MATCHED THEN INSERT ({insert_fields}) VALUES ({insert_values})"
+
+    if not update_existing:
+        matched_clause = ""
+    else:
+        field_names = [field.name for field in schema if field.name != "listing_id"]
+        update_clause = ", ".join(
+            f"target.{quote_identifier(f)} = source.{quote_identifier(f)}" for f in field_names
+        )
+        matched_clause = f"WHEN MATCHED THEN UPDATE SET {update_clause}"
+
+    return f"""
+        MERGE `{table_ref}` AS target
+        USING `{temp_table_ref}` AS source
+        ON target.listing_id = source.listing_id
+        {matched_clause}
+        {insert_clause}
+        """
+
+
+def _merge_dml_counts(merge_job) -> tuple[int, int]:
+    stats = merge_job._properties.get("statistics", {}).get("query", {}).get("dmlStats", {})
+    return int(stats.get("insertedRowCount", 0)), int(stats.get("updatedRowCount", 0))
+
+
+def _execute_merge(client, table_ref: str, temp_table_ref: str, schema, *, update_existing: bool):
+    merge_job = client.query(
+        _merge_query(
+            table_ref,
+            temp_table_ref,
+            schema,
+            update_existing=update_existing,
+        )
+    )
+    merge_job.result()
+    return _merge_dml_counts(merge_job)
+
+
+def _merge_temp_table(
+    logger, client, table_ref: str, temp_table_ref: str, schema
+) -> tuple[int, int]:
+    try:
+        return _execute_merge(client, table_ref, temp_table_ref, schema, update_existing=True)
+    except Exception as e:
+        if "streaming buffer" not in str(e).lower():
+            raise
+
+        logger.warning("Streaming buffer conflict - falling back to INSERT-only mode")
+        inserted_rows, _ = _execute_merge(
+            client,
+            table_ref,
+            temp_table_ref,
+            schema,
+            update_existing=False,
+        )
+        return inserted_rows, 0
+
+
 @task(
     name="upload-to-bigquery",
     description="Upload processed listings to BigQuery",
@@ -158,88 +256,21 @@ def upload_to_bigquery_task(
         logger.info(f"Truncating table {table_ref}")
         client.query(f"TRUNCATE TABLE `{table_ref}`").result()
 
-    # Load and deduplicate listings
-    listings = []
-    seen_ids: set[str] = set()
-
-    with open(processed_file, encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            raw_listing = json.loads(line)
-            listing_id = raw_listing.get("listing_id")
-            if listing_id in seen_ids:
-                continue
-            if listing_id:
-                seen_ids.add(listing_id)
-            listings.append(prepare_bq_row(raw_listing))
-
+    listings = _load_unique_bq_rows(processed_file, prepare_bq_row)
     logger.info(f"Loaded {len(listings)} unique listings from file")
 
-    # Use temp table + MERGE for upsert
-    temp_table_id = f"{bq_config.table_id}_temp_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-    temp_table_ref = safe_table_ref(bq_config.project_id, bq_config.dataset_id, temp_table_id)
+    temp_table_ref = _temp_table_ref(bq_config)
 
     try:
         target_table = client.get_table(table_ref)
-        temp_table = bigquery.Table(temp_table_ref, schema=target_table.schema)
-        client.create_table(temp_table)
-
-        load_job = client.load_table_from_json(
-            listings,
+        _load_temp_table(client, bigquery, temp_table_ref, listings, target_table.schema)
+        inserted_rows, updated_rows = _merge_temp_table(
+            logger,
+            client,
+            table_ref,
             temp_table_ref,
-            job_config=bigquery.LoadJobConfig(
-                schema=target_table.schema, write_disposition="WRITE_TRUNCATE"
-            ),
+            target_table.schema,
         )
-        load_job.result()
-
-        # Build MERGE query. Column names come from the table's own schema, but
-        # quote_identifier validates + backtick-quotes each one so the dynamic
-        # column lists can never carry a SQL fragment (see bigquery_safety).
-        insert_fields = ", ".join(quote_identifier(field.name) for field in target_table.schema)
-        insert_values = ", ".join(
-            f"source.{quote_identifier(field.name)}" for field in target_table.schema
-        )
-        field_names = [field.name for field in target_table.schema if field.name != "listing_id"]
-        update_clause = ", ".join(
-            f"target.{quote_identifier(f)} = source.{quote_identifier(f)}" for f in field_names
-        )
-
-        merge_query = f"""
-        MERGE `{table_ref}` AS target
-        USING `{temp_table_ref}` AS source
-        ON target.listing_id = source.listing_id
-        WHEN MATCHED THEN UPDATE SET {update_clause}
-        WHEN NOT MATCHED THEN INSERT ({insert_fields}) VALUES ({insert_values})
-        """
-
-        try:
-            merge_job = client.query(merge_query)
-            merge_job.result()
-            stats = merge_job._properties.get("statistics", {}).get("query", {}).get("dmlStats", {})
-            inserted_rows = int(stats.get("insertedRowCount", 0))
-            updated_rows = int(stats.get("updatedRowCount", 0))
-        except Exception as e:
-            # Fallback for streaming buffer conflict
-            if "streaming buffer" in str(e).lower():
-                logger.warning("Streaming buffer conflict - falling back to INSERT-only mode")
-                merge_query = f"""
-                MERGE `{table_ref}` AS target
-                USING `{temp_table_ref}` AS source
-                ON target.listing_id = source.listing_id
-                WHEN NOT MATCHED THEN INSERT ({insert_fields}) VALUES ({insert_values})
-                """
-                merge_job = client.query(merge_query)
-                merge_job.result()
-                stats = (
-                    merge_job._properties.get("statistics", {}).get("query", {}).get("dmlStats", {})
-                )
-                inserted_rows = int(stats.get("insertedRowCount", 0))
-                updated_rows = 0
-            else:
-                raise
 
         logger.info(f"MERGE complete: {inserted_rows} inserted, {updated_rows} updated")
 

@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime
 
 from estate_value_index.ingestion.booli.normalization import (
+    normalize_text,
     to_bool,
 )
 
@@ -32,27 +32,9 @@ class BooliExtractionHelpersMixin:
         """Delegates to the shared ``to_bool`` so spider/processing/ML cannot drift."""
         return to_bool(value)
 
-    def _log_progress(self):
-        """Log aggregate scraping progress to the console."""
-        elapsed = (datetime.now() - self.start_time).total_seconds() or 1.0
-        rate = self.total_listings_processed / elapsed
-        pages_seen = self.pages_processed
-        page_progress = f"{pages_seen}/{self.max_pages}" if self.max_pages else str(pages_seen)
-        message = (
-            "Progress: "
-            f"Listings {self.total_listings_processed} (rate {rate:.2f}/s), "
-            f"pages {page_progress} (last {self.last_processed_page}), "
-            f"duplicates skipped {self.total_duplicate_links}"
-        )
-        self.logger.info(message)
-
-        # Mirror to stdout for CLI runs where log formatting may differ
-        print(
-            f"[Booli] Listings {self.total_listings_processed} (rate {rate:.2f}/s) | "
-            f"Pages {page_progress} (last {self.last_processed_page}) | "
-            f"Duplicates {self.total_duplicate_links}",
-            flush=True,
-        )
+    def _normalize_text(self, value):
+        """Delegates to the shared Booli text normalizer."""
+        return normalize_text(value)
 
     def _extract_price_from_value(self, raw_value):
         """Normalise different price representations into an integer"""

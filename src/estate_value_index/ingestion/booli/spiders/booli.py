@@ -148,58 +148,95 @@ class BooliSpider(BooliExtractionMixins, scrapy.Spider):
     def parse_search_results(self, response):
         """Parse search results page and extract listing URLs"""
         current_page = response.meta.get("page", 1)
+        self._record_search_page_seen(response, current_page)
 
-        # Log current page details for debugging
+        listing_links = self._search_listing_links(response, current_page)
+        annons_count, bostad_count = self._count_listing_link_types(listing_links)
+        dom_inventory = self._search_dom_inventory(response)
+        listing_ids = listing_ids_from_links(listing_links)
+        unique_ids = set(listing_ids)
+        duplicates_on_page = sum(1 for lid in unique_ids if lid in self.scraped_listings)
+
+        self.total_duplicate_links += duplicates_on_page
+        self.total_listings_found += len(listing_links)
+        self._log_search_page_summary(
+            current_page=current_page,
+            listing_links=listing_links,
+            unique_ids=unique_ids,
+            duplicates_on_page=duplicates_on_page,
+            annons_count=annons_count,
+            bostad_count=bostad_count,
+            dom_inventory=dom_inventory,
+            response_url=response.url,
+        )
+        self._record_search_page_stats(
+            current_page=current_page,
+            listing_count=len(listing_links),
+            unique_count=len(unique_ids),
+            duplicates_on_page=duplicates_on_page,
+            annons_count=annons_count,
+            bostad_count=bostad_count,
+        )
+
+        yield from self._listing_requests(response, listing_links, current_page)
+
+        next_request = self._next_search_page_request(current_page)
+        if next_request is not None:
+            yield next_request
+
+    def _record_search_page_seen(self, response, current_page):
         self.logger.info(f"Processing page {current_page}/{self.max_pages}")
         self.logger.debug(f"Page URL: {response.url} (status {response.status})")
         self.crawler.stats.inc_value("booli/pages_seen", 1)
         self.pages_processed += 1
 
+    def _search_listing_links(self, response, current_page):
         listing_links = resolve_listing_links(response)
+        if listing_links:
+            return listing_links
+
+        self.logger.warning(
+            f"No listing anchors found on page {current_page} "
+            f"(status {response.status}); attempting Next.js fallback"
+        )
+        return self._fetch_listings_from_next_data(current_page)
+
+    def _count_listing_link_types(self, listing_links):
         annons_count = sum(1 for link in listing_links if "/annons/" in link)
         bostad_count = sum(1 for link in listing_links if "/bostad/" in link)
+        return annons_count, bostad_count
 
-        if not listing_links:
-            self.logger.warning(
-                f"No listing anchors found on page {current_page} (status {response.status}); attempting Next.js fallback"
-            )
-            listing_links = self._fetch_listings_from_next_data(current_page)
-            annons_count = sum(1 for link in listing_links if "/annons/" in link)
-            bostad_count = sum(1 for link in listing_links if "/bostad/" in link)
+    def _search_dom_inventory(self, response):
+        return {
+            "containers": len(response.css("li.search-page__module-container article").getall()),
+            "ad_wrappers": len(
+                response.css("li.search-page__horizontal-space-container.ad-wrapper").getall()
+            ),
+            "sponsored": len(response.xpath("//*[contains(., 'Sponsrad artikel')]").getall()),
+        }
 
-        # Additional diagnostics about page structure
-        container_count = len(response.css("li.search-page__module-container article").getall())
-        ad_wrappers = len(
-            response.css("li.search-page__horizontal-space-container.ad-wrapper").getall()
-        )
-        sponsored_count = len(response.xpath("//*[contains(., 'Sponsrad artikel')]").getall())
-
-        # De-duplicate links and compute duplicate ids
-        listing_ids = listing_ids_from_links(listing_links)
-        unique_ids = set(listing_ids)
-        duplicates_on_page = sum(1 for lid in unique_ids if lid in self.scraped_listings)
-        self.total_duplicate_links += duplicates_on_page
-
-        self.total_listings_found += len(listing_links)
+    def _log_search_page_summary(
+        self,
+        *,
+        current_page,
+        listing_links,
+        unique_ids,
+        duplicates_on_page,
+        annons_count,
+        bostad_count,
+        dom_inventory,
+        response_url,
+    ):
         self.logger.info(
             f"Found {len(listing_links)} listing anchors (annons: {annons_count}, bostad: {bostad_count}), "
             f"{len(unique_ids)} unique IDs on page {current_page} (seen before on this run: {duplicates_on_page}); "
             f"total anchors seen: {self.total_listings_found}"
         )
         self.logger.debug(
-            f"Page {current_page} DOM inventory → containers: {container_count}, ad wrappers: {ad_wrappers}, sponsored: {sponsored_count}"
+            f"Page {current_page} DOM inventory → containers: {dom_inventory['containers']}, "
+            f"ad wrappers: {dom_inventory['ad_wrappers']}, sponsored: {dom_inventory['sponsored']}"
         )
-        self.crawler.stats.set_value(f"booli/page_{current_page}/anchors", len(listing_links))
-        self.crawler.stats.set_value(f"booli/page_{current_page}/unique_ids", len(unique_ids))
-        self.crawler.stats.set_value(
-            f"booli/page_{current_page}/duplicates_seen", duplicates_on_page
-        )
-        self.crawler.stats.set_value(f"booli/page_{current_page}/annons_links", annons_count)
-        self.crawler.stats.set_value(f"booli/page_{current_page}/bostad_links", bostad_count)
-        self.crawler.stats.inc_value("booli/anchors_total", len(listing_links))
-        self.crawler.stats.inc_value("booli/unique_ids_total", len(unique_ids))
-        self.crawler.stats.inc_value("booli/duplicates_total", duplicates_on_page)
-        self.logger.debug(f"Response URL: {response.url}")
+        self.logger.debug(f"Response URL: {response_url}")
         if listing_links:
             self.logger.debug(f"Sample listing links: {listing_links[:3]}")
         else:
@@ -207,44 +244,71 @@ class BooliSpider(BooliExtractionMixins, scrapy.Spider):
                 f"No '/annons/' links extracted on page {current_page}. Will continue pagination until max_pages."
             )
 
-        # Process each listing with error isolation to keep pagination resilient
+    def _record_search_page_stats(
+        self,
+        *,
+        current_page,
+        listing_count,
+        unique_count,
+        duplicates_on_page,
+        annons_count,
+        bostad_count,
+    ):
+        self.crawler.stats.set_value(f"booli/page_{current_page}/anchors", listing_count)
+        self.crawler.stats.set_value(f"booli/page_{current_page}/unique_ids", unique_count)
+        self.crawler.stats.set_value(
+            f"booli/page_{current_page}/duplicates_seen", duplicates_on_page
+        )
+        self.crawler.stats.set_value(f"booli/page_{current_page}/annons_links", annons_count)
+        self.crawler.stats.set_value(f"booli/page_{current_page}/bostad_links", bostad_count)
+        self.crawler.stats.inc_value("booli/anchors_total", listing_count)
+        self.crawler.stats.inc_value("booli/unique_ids_total", unique_count)
+        self.crawler.stats.inc_value("booli/duplicates_total", duplicates_on_page)
+
+    def _listing_requests(self, response, listing_links, current_page):
         for listing_url in listing_links:
             try:
-                # Make absolute URL if needed
-                if listing_url.startswith("/"):
-                    listing_url = response.urljoin(listing_url)
-
-                listing_id = extract_listing_id(listing_url)
-
-                if listing_id and listing_id not in self.scraped_listings:
-                    self.scraped_listings.add(listing_id)
-                    yield scrapy.Request(
-                        url=listing_url,
-                        callback=self.parse_listing,
-                        meta={
-                            "listing_id": listing_id,
-                            "booli_slot": "detail",
-                            "source_page": current_page,
-                        },
-                        headers=self._default_http_headers(),
-                    )
-                else:
-                    self.crawler.stats.inc_value("booli/dedup_skipped", 1)
+                request = self._listing_request(response, listing_url, current_page)
+                if request is not None:
+                    yield request
             except Exception as e:
                 self.logger.warning(f"Error processing listing {listing_url}: {e}")
                 continue
 
-        # Handle pagination - construct next page URLs directly
+    def _listing_request(self, response, listing_url, current_page):
+        if listing_url.startswith("/"):
+            listing_url = response.urljoin(listing_url)
+
+        listing_id = extract_listing_id(listing_url)
+
+        if listing_id and listing_id not in self.scraped_listings:
+            self.scraped_listings.add(listing_id)
+            return scrapy.Request(
+                url=listing_url,
+                callback=self.parse_listing,
+                meta={
+                    "listing_id": listing_id,
+                    "booli_slot": "detail",
+                    "source_page": current_page,
+                },
+                headers=self._default_http_headers(),
+            )
+
+        self.crawler.stats.inc_value("booli/dedup_skipped", 1)
+        return None
+
+    def _next_search_page_request(self, current_page):
         try:
             if self.pages_processed >= self.max_pages:
                 self.logger.info(f"Reached max pages limit ({self.max_pages})")
+                return None
             else:
                 next_page = current_page + 1
                 next_url = self._build_search_url(page=next_page)
                 self.logger.info(
                     f"Following pagination to page {next_page} via direct URL: {next_url}"
                 )
-                yield scrapy.Request(
+                return scrapy.Request(
                     url=next_url,
                     callback=self.parse_search_results,
                     meta={"page": next_page, "booli_slot": "search"},
@@ -265,99 +329,14 @@ class BooliSpider(BooliExtractionMixins, scrapy.Spider):
             self.last_processed_page = source_page
 
         try:
-            # If the page appears blocked by JS/WAF, fetch structured data via Next.js JSON endpoint
-            page_text_snapshot = response.text or ""
-            if (
-                response.status in (401, 403, 429, 202)
-                or "JavaScript is disabled" in page_text_snapshot
-                or "AwsWafIntegration" in page_text_snapshot
-            ):
-                lid = listing_id or extract_listing_id(response.url)
-                record = self._fetch_property_data_from_next(response.url, str(lid) if lid else "")
-                if isinstance(record, dict) and record:
-                    response.meta["_booli_property_data"] = record
-
+            self._hydrate_blocked_listing(response, listing_id)
             self.total_listings_processed += 1
+            self._log_listing_start(listing_id, source_page, response.url)
 
-            # Create listing item
-            item = BooliListingItem()
-
-            # Basic info
-            item["listing_id"] = listing_id
-            item["url"] = response.url
-            item["scraped_at"] = datetime.now(UTC).isoformat()
-            if source_page is not None:
-                item["source_page"] = source_page
-
-            if source_page is not None:
-                self.logger.info(
-                    f"Processing listing {self.total_listings_processed} (ID: {listing_id}) "
-                    f"from page {source_page} - {response.url}"
-                )
-            else:
-                self.logger.info(
-                    f"Processing listing {self.total_listings_processed} (ID: {listing_id}) - {response.url}"
-                )
-
-            # Extract data using Booli-specific selectors
-            listing_price = self._sanitize_price(self.extract_listing_price(response))
-            sold_price = self._sanitize_price(self.extract_sold_price(response))
-
-            item["listing_price"] = listing_price
-            item["sold_price"] = sold_price
-            item["address"] = self.extract_address(response)
-            item["area"] = self.extract_area(response)
-            item["municipality"] = self.extract_municipality(response)
-            item["living_area"] = self.extract_living_area(response)
-            item["rooms"] = self.extract_rooms(response)
-            item["property_type"] = self.extract_property_type(response)
-            item["construction_year"] = self.extract_construction_year(response)
-            item["monthly_fee"] = self.extract_monthly_fee(response)
-            item["price_per_sqm"] = self.extract_price_per_sqm(response)
-            item["floor"] = self.extract_floor(response)
-            item["elevator"] = self.extract_elevator(response)
-            item["balcony"] = self.extract_balcony(response)
-            item["sold_date"] = self.extract_sold_date(response)
-            item["days_on_market"] = self.extract_days_on_market(response)
-            extracted_change = self.extract_price_change(response)
-            if listing_price is not None and sold_price is not None:
-                item["price_change"] = sold_price - listing_price
-            else:
-                item["price_change"] = extracted_change
-            item["description"] = self.extract_description(response)
-            item["images"] = self.extract_images(response)
-
-            if source_page is not None:
-                self.logger.info(
-                    f"Successfully scraped listing {listing_id} (page {source_page}): "
-                    f"{item.get('address', 'Unknown address')}"
-                )
-            else:
-                self.logger.info(
-                    f"Successfully scraped listing {listing_id}: {item.get('address', 'Unknown address')}"
-                )
-            if listing_price is None:
-                self.logger.debug(f"Listing {listing_id} missing listing_price")
-            if sold_price is None:
-                self.logger.debug(f"Listing {listing_id} missing sold_price")
-            if item.get("living_area") is None:
-                self.logger.debug(f"Listing {listing_id} missing living_area")
-            if item.get("rooms") is None:
-                self.logger.debug(f"Listing {listing_id} missing rooms")
-
-            # Emit stats counters for observability
-            try:
-                self.crawler.stats.inc_value("booli/listings_yielded", 1)
-                if listing_price is None:
-                    self.crawler.stats.inc_value("booli/missing/listing_price", 1)
-                if sold_price is None:
-                    self.crawler.stats.inc_value("booli/missing/sold_price", 1)
-                if item.get("price_per_sqm") is None:
-                    self.crawler.stats.inc_value("booli/missing/price_per_sqm", 1)
-                if item.get("sold_date") is None:
-                    self.crawler.stats.inc_value("booli/missing/sold_date", 1)
-            except Exception:
-                pass
+            item = self._build_listing_item(response, listing_id, source_page)
+            self._log_listing_success(item, listing_id, source_page)
+            self._log_missing_listing_fields(item, listing_id)
+            self._record_listing_stats(item)
 
             if (
                 self.progress_log_interval > 0
@@ -369,6 +348,108 @@ class BooliSpider(BooliExtractionMixins, scrapy.Spider):
 
         except Exception as e:
             self.logger.error(f"Error parsing listing {listing_id}: {e}")
+
+    def _hydrate_blocked_listing(self, response, listing_id):
+        if not self._needs_next_data_fallback(response):
+            return
+
+        lid = listing_id or extract_listing_id(response.url)
+        record = self._fetch_property_data_from_next(response.url, str(lid) if lid else "")
+        if isinstance(record, dict) and record:
+            response.meta["_booli_property_data"] = record
+
+    def _needs_next_data_fallback(self, response) -> bool:
+        page_text_snapshot = response.text or ""
+        return (
+            response.status in (401, 403, 429, 202)
+            or "JavaScript is disabled" in page_text_snapshot
+            or "AwsWafIntegration" in page_text_snapshot
+        )
+
+    def _log_listing_start(self, listing_id, source_page, url):
+        if source_page is not None:
+            self.logger.info(
+                f"Processing listing {self.total_listings_processed} (ID: {listing_id}) "
+                f"from page {source_page} - {url}"
+            )
+        else:
+            self.logger.info(
+                f"Processing listing {self.total_listings_processed} (ID: {listing_id}) - {url}"
+            )
+
+    def _build_listing_item(self, response, listing_id, source_page):
+        item = BooliListingItem()
+        item["listing_id"] = listing_id
+        item["url"] = response.url
+        item["scraped_at"] = datetime.now(UTC).isoformat()
+        if source_page is not None:
+            item["source_page"] = source_page
+
+        listing_price = self._sanitize_price(self.extract_listing_price(response))
+        sold_price = self._sanitize_price(self.extract_sold_price(response))
+
+        item["listing_price"] = listing_price
+        item["sold_price"] = sold_price
+        item["address"] = self.extract_address(response)
+        item["area"] = self.extract_area(response)
+        item["municipality"] = self.extract_municipality(response)
+        item["living_area"] = self.extract_living_area(response)
+        item["rooms"] = self.extract_rooms(response)
+        item["property_type"] = self.extract_property_type(response)
+        item["construction_year"] = self.extract_construction_year(response)
+        item["monthly_fee"] = self.extract_monthly_fee(response)
+        item["price_per_sqm"] = self.extract_price_per_sqm(response)
+        item["floor"] = self.extract_floor(response)
+        item["elevator"] = self.extract_elevator(response)
+        item["balcony"] = self.extract_balcony(response)
+        item["sold_date"] = self.extract_sold_date(response)
+        item["days_on_market"] = self.extract_days_on_market(response)
+        item["price_change"] = self._resolve_price_change(
+            listing_price, sold_price, self.extract_price_change(response)
+        )
+        item["description"] = self.extract_description(response)
+        item["images"] = self.extract_images(response)
+        return item
+
+    def _resolve_price_change(self, listing_price, sold_price, extracted_change):
+        if listing_price is not None and sold_price is not None:
+            return sold_price - listing_price
+        return extracted_change
+
+    def _log_listing_success(self, item, listing_id, source_page):
+        if source_page is not None:
+            self.logger.info(
+                f"Successfully scraped listing {listing_id} (page {source_page}): "
+                f"{item.get('address', 'Unknown address')}"
+            )
+        else:
+            self.logger.info(
+                f"Successfully scraped listing {listing_id}: {item.get('address', 'Unknown address')}"
+            )
+
+    def _log_missing_listing_fields(self, item, listing_id):
+        if item.get("listing_price") is None:
+            self.logger.debug(f"Listing {listing_id} missing listing_price")
+        if item.get("sold_price") is None:
+            self.logger.debug(f"Listing {listing_id} missing sold_price")
+        if item.get("living_area") is None:
+            self.logger.debug(f"Listing {listing_id} missing living_area")
+        if item.get("rooms") is None:
+            self.logger.debug(f"Listing {listing_id} missing rooms")
+
+    def _record_listing_stats(self, item):
+        try:
+            self.crawler.stats.inc_value("booli/listings_yielded", 1)
+            if item.get("listing_price") is None:
+                self.crawler.stats.inc_value("booli/missing/listing_price", 1)
+            if item.get("sold_price") is None:
+                self.crawler.stats.inc_value("booli/missing/sold_price", 1)
+            if item.get("price_per_sqm") is None:
+                self.crawler.stats.inc_value("booli/missing/price_per_sqm", 1)
+            if item.get("sold_date") is None:
+                self.crawler.stats.inc_value("booli/missing/sold_date", 1)
+        except Exception:
+            pass
 
     def _log_progress(self):
         """Log aggregate scraping progress to the console."""

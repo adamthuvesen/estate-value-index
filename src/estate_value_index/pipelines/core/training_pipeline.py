@@ -50,6 +50,14 @@ class _VertexJobState:
     submission_results: dict = field(default_factory=dict)
 
 
+@dataclass(frozen=True)
+class _ArtifactLocations:
+    """Model artifact locations recovered from Vertex job metadata."""
+
+    model_uri: str | None = None
+    model_prefix: str | None = None
+
+
 def _log_flow_configuration(config: TrainingFlowConfig, logger: Logger) -> None:
     """Log the flow header and resolved configuration."""
     logger.info("=" * 80)
@@ -227,33 +235,57 @@ def _submit_training_job_stage(
     return state, False
 
 
-def _resolve_artifacts_from_job_info(
-    monitoring_results: dict, state: _VertexJobState, results: dict, logger: Logger
-) -> None:
-    """Recover the model URI and prefix from the job's worker pool spec when missing."""
-    job_info = monitoring_results.get("job_info", {}) or {}
+def _flag_value(args: list[str], flag: str) -> str | None:
+    """Return the value following a CLI flag, if present."""
+    try:
+        idx = args.index(flag)
+    except ValueError:
+        return None
+
+    value_idx = idx + 1
+    if value_idx >= len(args):
+        return None
+    return args[value_idx]
+
+
+def _env_value(env_vars: list[dict], name: str) -> str | None:
+    """Return a Vertex container env var value by name."""
+    for env_var in env_vars:
+        if env_var.get("name") == name:
+            return env_var.get("value")
+    return None
+
+
+def _artifact_locations_from_job_info(job_info: dict) -> _ArtifactLocations:
+    """Recover artifact locations from Vertex worker container specs."""
     job_spec = job_info.get("jobSpec", {}) or {}
     worker_specs = job_spec.get("workerPoolSpecs", []) or []
 
+    model_uri = None
+    model_prefix = None
     for spec in worker_specs:
         container_spec = spec.get("containerSpec", {}) or {}
         args = container_spec.get("args", []) or []
         env_vars = container_spec.get("env", []) or []
 
-        for idx, arg in enumerate(args):
-            if arg == "--model-dir" and idx + 1 < len(args) and not state.model_uri:
-                state.model_uri = args[idx + 1]
-            if arg == "--model-prefix" and idx + 1 < len(args) and not state.resolved_model_prefix:
-                state.resolved_model_prefix = args[idx + 1]
+        model_uri = model_uri or _flag_value(args, "--model-dir")
+        model_prefix = model_prefix or _flag_value(args, "--model-prefix")
+        model_uri = model_uri or _env_value(env_vars, "MODEL_ARTIFACTS_URI")
 
-        if not state.model_uri:
-            for env_var in env_vars:
-                if env_var.get("name") == "MODEL_ARTIFACTS_URI":
-                    state.model_uri = env_var.get("value")
-                    break
-
-        if state.model_uri and state.resolved_model_prefix:
+        if model_uri and model_prefix:
             break
+
+    return _ArtifactLocations(model_uri=model_uri, model_prefix=model_prefix)
+
+
+def _resolve_artifacts_from_job_info(
+    monitoring_results: dict, state: _VertexJobState, results: dict, logger: Logger
+) -> None:
+    """Recover the model URI and prefix from the job's worker pool spec when missing."""
+    job_info = monitoring_results.get("job_info", {}) or {}
+    artifact_locations = _artifact_locations_from_job_info(job_info)
+    state.model_uri = state.model_uri or artifact_locations.model_uri
+    state.resolved_model_prefix = state.resolved_model_prefix or artifact_locations.model_prefix
 
     if state.model_uri and not state.run_id:
         state.run_id = state.model_uri.rstrip("/").split("/")[-1]

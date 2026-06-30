@@ -199,16 +199,7 @@ def upload_html_to_gcs(
     bucket.blob(destination_blob_name).upload_from_string(html_content, content_type="text/html")
 
 
-def upload_model_artifacts(
-    model_dir: str | Path, model_prefix: str, gcs_prefix: str = "models"
-) -> dict[str, str]:
-    """Upload model artifacts to GCS, returning a map of ``{kind: gs:// URI}``."""
-    model_dir = Path(model_dir)
-
-    if not is_gcs_enabled():
-        logger.info("GCS disabled, skipping upload")
-        return {}
-
+def _resolve_model_artifact_destination(gcs_prefix: str) -> tuple[str | None, str]:
     env_artifacts_uri = os.getenv("MODEL_ARTIFACTS_URI", "").strip()
     env_artifacts_prefix = os.getenv("MODEL_ARTIFACTS_PREFIX", "").strip()
 
@@ -221,56 +212,92 @@ def upload_model_artifacts(
             resolved_bucket = parsed.netloc
             resolved_prefix = parsed.path.lstrip("/")
         else:
-            # Allow a plain prefix without the gs:// scheme.
             resolved_prefix = env_artifacts_uri.strip("/")
     elif env_artifacts_prefix:
         resolved_prefix = env_artifacts_prefix.strip("/")
+
+    return resolved_bucket, resolved_prefix
+
+
+def _destination_path(resolved_prefix: str, filename: str) -> str:
+    return posixpath.join(resolved_prefix, filename) if resolved_prefix else filename
+
+
+def _rollback_partial_upload(client: GCSClient, artefact_dest: str) -> None:
+    if not client.enabled:
+        return
+    try:
+        client._bucket.blob(artefact_dest).delete()
+    except Exception as cleanup_exc:  # pragma: no cover - best-effort
+        logger.warning(
+            "Failed to roll back partial upload %s: %s",
+            artefact_dest,
+            cleanup_exc,
+        )
+
+
+def _upload_joblib_with_sidecar(
+    client: GCSClient,
+    local_file: Path,
+    key: str,
+    resolved_prefix: str,
+    artifacts: dict[str, str],
+) -> None:
+    sidecar_path = write_sha256_sidecar(local_file)
+    sidecar_dest = _destination_path(resolved_prefix, sidecar_path.name)
+    artefact_dest = _destination_path(resolved_prefix, local_file.name)
+
+    uploaded_artefact_uri: str | None = None
+    try:
+        uploaded_artefact_uri = client.upload_file(local_file, artefact_dest)
+        client.upload_file(sidecar_path, sidecar_dest)
+    except Exception:
+        if uploaded_artefact_uri is not None:
+            _rollback_partial_upload(client, artefact_dest)
+        raise
+
+    artifacts[key] = uploaded_artefact_uri
+    artifacts[f"{key}_sha256"] = f"gs://{client.bucket_name}/{sidecar_dest}"
+
+
+def _upload_json_model_artifacts(
+    client: GCSClient,
+    model_dir: Path,
+    model_prefix: str,
+    resolved_prefix: str,
+    artifacts: dict[str, str],
+) -> None:
+    for key, suffix in (
+        ("context", "_feature_context.json"),
+        ("metrics", "_metrics_lgbm.json"),
+        ("importance", "_feature_importance.json"),
+    ):
+        path = model_dir / f"{model_prefix}{suffix}"
+        if path.exists():
+            artifacts[key] = client.upload_file(path, _destination_path(resolved_prefix, path.name))
+
+
+def upload_model_artifacts(
+    model_dir: str | Path, model_prefix: str, gcs_prefix: str = "models"
+) -> dict[str, str]:
+    """Upload model artifacts to GCS, returning a map of ``{kind: gs:// URI}``."""
+    model_dir = Path(model_dir)
+
+    if not is_gcs_enabled():
+        logger.info("GCS disabled, skipping upload")
+        return {}
+
+    resolved_bucket, resolved_prefix = _resolve_model_artifact_destination(gcs_prefix)
 
     try:
         client = GCSClient(bucket_name=resolved_bucket)
         artifacts: dict[str, str] = {}
 
-        def destination_path(filename: str) -> str:
-            return posixpath.join(resolved_prefix, filename) if resolved_prefix else filename
-
-        def upload_joblib_with_sidecar(local_file: Path, key: str) -> None:
-            # Atomic: if the sidecar fails we delete the partial artefact so we
-            # never leave an unverifiable `.joblib` in the bucket.
-            sidecar_path = write_sha256_sidecar(local_file)
-            sidecar_dest = destination_path(sidecar_path.name)
-            artefact_dest = destination_path(local_file.name)
-
-            uploaded_artefact_uri: str | None = None
-            try:
-                uploaded_artefact_uri = client.upload_file(local_file, artefact_dest)
-                client.upload_file(sidecar_path, sidecar_dest)
-            except Exception:
-                if uploaded_artefact_uri is not None and client.enabled:
-                    try:
-                        client._bucket.blob(artefact_dest).delete()
-                    except Exception as cleanup_exc:  # pragma: no cover - best-effort
-                        logger.warning(
-                            "Failed to roll back partial upload %s: %s",
-                            artefact_dest,
-                            cleanup_exc,
-                        )
-                raise
-
-            artifacts[key] = uploaded_artefact_uri
-            artifacts[f"{key}_sha256"] = f"gs://{client.bucket_name}/{sidecar_dest}"
-
         model_file = model_dir / f"{model_prefix}_lgbm.joblib"
         if model_file.exists():
-            upload_joblib_with_sidecar(model_file, "model")
+            _upload_joblib_with_sidecar(client, model_file, "model", resolved_prefix, artifacts)
 
-        for key, suffix in (
-            ("context", "_feature_context.json"),
-            ("metrics", "_metrics_lgbm.json"),
-            ("importance", "_feature_importance.json"),
-        ):
-            path = model_dir / f"{model_prefix}{suffix}"
-            if path.exists():
-                artifacts[key] = client.upload_file(path, destination_path(path.name))
+        _upload_json_model_artifacts(client, model_dir, model_prefix, resolved_prefix, artifacts)
 
         return artifacts
 

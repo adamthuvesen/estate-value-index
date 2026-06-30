@@ -4,8 +4,8 @@ The package's public API is re-exported here as the stable import surface.
 """
 
 from estate_value_index.ml.features.context import FeatureEngineeringContext
+from estate_value_index.ml.features.context_builder import build_feature_context
 from estate_value_index.ml.features.orchestrator import (
-    build_feature_context,
     create_optimized_features,
 )
 from estate_value_index.ml.features.pipeline import SimplePredictionPipeline

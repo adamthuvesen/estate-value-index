@@ -14,6 +14,21 @@ from estate_value_index.ingestion.booli.normalization import (
 )
 
 _UNRECOGNISED_TOKEN_LOG_LIMIT = 20
+_TEXT_FIELDS = ("address", "area", "municipality", "property_type", "description")
+_FLOAT_FIELDS = ("living_area",)
+_INT_FIELDS = (
+    "listing_price",
+    "sold_price",
+    "price_per_sqm",
+    "monthly_fee",
+    "rooms",
+    "construction_year",
+    "days_on_market",
+    "price_change",
+    "floor",
+    "source_page",
+)
+_BOOL_FIELDS = ("balcony", "elevator")
 
 
 class BooliPipeline:
@@ -41,70 +56,67 @@ class BooliPipeline:
         """Process and validate items"""
         adapter = ItemAdapter(item)
 
-        # Basic validation
         if not adapter.get("listing_id"):
             spider.logger.warning(f"Missing listing_id for item: {dict(adapter)}")
             return None
 
-        # Clean up text fields
-        text_fields = ("address", "area", "municipality", "property_type", "description")
-        for field in text_fields:
+        self._clean_text_fields(adapter)
+        self._coerce_float_fields(adapter, spider)
+        self._coerce_int_fields(adapter, spider)
+        self._coerce_bool_fields(adapter, spider)
+        self._coerce_images(adapter)
+
+        spider.logger.debug(f"Processed item: {adapter['listing_id']}")
+        return item
+
+    def _clean_text_fields(self, adapter):
+        for field in _TEXT_FIELDS:
             adapter[field] = clean_text(adapter.get(field))
 
-        float_fields = ("living_area",)
-        int_fields = (
-            "listing_price",
-            "sold_price",
-            "price_per_sqm",
-            "monthly_fee",
-            "rooms",
-            "construction_year",
-            "days_on_market",
-            "price_change",
-            "floor",
-            "source_page",
-        )
-
-        for field in float_fields:
+    def _coerce_float_fields(self, adapter, spider):
+        for field in _FLOAT_FIELDS:
             raw_value = adapter.get(field)
             converted = to_float(raw_value)
             if raw_value is not None and converted is None:
                 spider.logger.warning(f"Could not convert {field} to float: {raw_value}")
             adapter[field] = converted
 
-        for field in int_fields:
+    def _coerce_int_fields(self, adapter, spider):
+        for field in _INT_FIELDS:
             raw_value = adapter.get(field)
             converted = to_int(raw_value)
             if raw_value is not None and converted is None:
                 spider.logger.warning(f"Could not convert {field} to integer: {raw_value}")
             adapter[field] = converted
 
-        for field in ("balcony", "elevator"):
+    def _coerce_bool_fields(self, adapter, spider):
+        for field in _BOOL_FIELDS:
             raw_value = adapter.get(field)
             converted = to_bool(raw_value)
             if converted is None and raw_value is not None and raw_value != "":
-                # Don't fall back to bool(raw_value) — bool('no') is True, which
-                # silently corrupts amenity features. Keep the value nullable
-                # and log enough to surface HTML format changes.
-                key = (field, raw_value)
-                self._unrecognised_counts[key] = self._unrecognised_counts.get(key, 0) + 1
-                if (
-                    key not in self._unrecognised_seen
-                    and len(self._unrecognised_seen) < _UNRECOGNISED_TOKEN_LOG_LIMIT
-                ):
-                    self._unrecognised_seen.add(key)
-                    spider.logger.warning(
-                        "Unrecognised boolean token for %s: %r (listing_id=%s)",
-                        field,
-                        raw_value,
-                        adapter.get("listing_id"),
-                    )
+                self._record_unrecognised_bool(field, raw_value, adapter, spider)
             adapter[field] = converted
 
-        adapter["images"] = ensure_list(adapter.get("images"))
+    def _record_unrecognised_bool(self, field, raw_value, adapter, spider):
+        # Don't fall back to bool(raw_value) — bool('no') is True, which silently
+        # corrupts amenity features. Keep the value nullable and log enough to
+        # surface HTML format changes.
+        key = (field, raw_value)
+        self._unrecognised_counts[key] = self._unrecognised_counts.get(key, 0) + 1
+        if (
+            key not in self._unrecognised_seen
+            and len(self._unrecognised_seen) < _UNRECOGNISED_TOKEN_LOG_LIMIT
+        ):
+            self._unrecognised_seen.add(key)
+            spider.logger.warning(
+                "Unrecognised boolean token for %s: %r (listing_id=%s)",
+                field,
+                raw_value,
+                adapter.get("listing_id"),
+            )
 
-        spider.logger.debug(f"Processed item: {adapter['listing_id']}")
-        return item
+    def _coerce_images(self, adapter):
+        adapter["images"] = ensure_list(adapter.get("images"))
 
 
 class JsonWriterPipeline:

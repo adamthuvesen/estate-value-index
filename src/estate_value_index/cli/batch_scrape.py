@@ -57,6 +57,20 @@ class ValidationSummary:
     valid: bool
 
 
+@dataclass(frozen=True)
+class BatchRunContext:
+    run_id: str
+    base_dir: Path
+    production_file: Path
+
+
+@dataclass(frozen=True)
+class CandidateArtifacts:
+    combined_new_file: Path
+    candidate_file: Path
+    merge_stats: dict[str, Any]
+
+
 def _validate_candidate(candidate_file: Path, production_file: Path) -> ValidationSummary:
     production = load_jsonl_file(production_file)
     candidate = load_jsonl_file(candidate_file)
@@ -185,8 +199,7 @@ def _run_promotion_workflow(
     return 0
 
 
-def main(argv: list[str] | None = None, *, args: Namespace | None = None) -> int:
-    """Run the batch scraper. ``args`` takes precedence over ``argv`` when given."""
+def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Batch scrape Booli listings with staging.")
     parser.add_argument("--batches", type=int, default=None, help="Number of scrape batches to run")
     parser.add_argument("--max-pages", type=int, default=5, help="Max pages per batch scrape")
@@ -264,10 +277,10 @@ def main(argv: list[str] | None = None, *, args: Namespace | None = None) -> int
         help="Increase output verbosity",
     )
 
-    if args is None:
-        args = parser.parse_args(argv)
+    return parser
 
-    # Input validation
+
+def _validate_args(args: Namespace, parser: argparse.ArgumentParser) -> int | None:
     if args.max_pages < 0:
         parser.error("--max-pages must be >= 0")
     if args.delay < 0:
@@ -284,6 +297,10 @@ def main(argv: list[str] | None = None, *, args: Namespace | None = None) -> int
         print("Materialization requested without BigQuery upload. Skipping materialization.")
         args.materialize_features = False
 
+    return None
+
+
+def _build_run_context(args: Namespace) -> BatchRunContext:
     production_file = Path(args.production_file)
     production_file.parent.mkdir(parents=True, exist_ok=True)
 
@@ -293,36 +310,45 @@ def main(argv: list[str] | None = None, *, args: Namespace | None = None) -> int
     )
     base_dir.mkdir(parents=True, exist_ok=True)
 
-    if args.promote_from:
-        candidate_file = Path(args.promote_from)
-        if not candidate_file.exists():
-            print(f"Candidate file not found: {candidate_file}")
-            return 1
+    return BatchRunContext(
+        run_id=run_id,
+        base_dir=base_dir,
+        production_file=production_file,
+    )
 
-        base_dir = candidate_file.parent
-        validation = _validate_candidate(candidate_file, production_file)
-        summary = {
-            "run_id": run_id,
-            "candidate_file": str(candidate_file),
-            "production_file": str(production_file),
-            "validation": validation.__dict__,
-            "mode": "promote_from",
-        }
-        _save_summary(base_dir, summary)
 
-        return _run_promotion_workflow(
-            candidate_file=candidate_file,
-            production_file=production_file,
-            run_id=run_id,
-            base_dir=base_dir,
-            upload_bq=args.upload_bq,
-            materialize=args.materialize_features,
-            sync_after=args.sync_after_upload,
-            allow_no_new=args.allow_no_new,
-            promote=args.promote,
-            json_mode=args.json,
-        )
+def _run_promote_from(args: Namespace, context: BatchRunContext) -> int:
+    candidate_file = Path(args.promote_from)
+    if not candidate_file.exists():
+        print(f"Candidate file not found: {candidate_file}")
+        return 1
 
+    candidate_base_dir = candidate_file.parent
+    validation = _validate_candidate(candidate_file, context.production_file)
+    summary = {
+        "run_id": context.run_id,
+        "candidate_file": str(candidate_file),
+        "production_file": str(context.production_file),
+        "validation": validation.__dict__,
+        "mode": "promote_from",
+    }
+    _save_summary(candidate_base_dir, summary)
+
+    return _run_promotion_workflow(
+        candidate_file=candidate_file,
+        production_file=context.production_file,
+        run_id=context.run_id,
+        base_dir=candidate_base_dir,
+        upload_bq=args.upload_bq,
+        materialize=args.materialize_features,
+        sync_after=args.sync_after_upload,
+        allow_no_new=args.allow_no_new,
+        promote=args.promote,
+        json_mode=args.json,
+    )
+
+
+def _select_start_pages(args: Namespace) -> list[int] | None:
     if args.sequential:
         start_pages = list(range(args.start_page_min, args.start_page_max + 1, args.max_pages))
     else:
@@ -335,31 +361,40 @@ def main(argv: list[str] | None = None, *, args: Namespace | None = None) -> int
     if args.batches is not None:
         if args.batches < 1:
             print("Batches must be >= 1.")
-            return 1
+            return None
         start_pages = start_pages[: args.batches]
 
+    return start_pages
+
+
+def _print_batch_header(args: Namespace, context: BatchRunContext, start_pages: list[int]) -> None:
+    if args.json:
+        return
+
+    print(f"Running batch scrape: batches={len(start_pages)}, max_pages={args.max_pages}")
+    print(f"Start pages: {start_pages}")
+    print(f"Output dir: {context.base_dir}")
+    print(f"Dry run: {args.dry_run}")
+
+
+def _run_dry_run(args: Namespace, context: BatchRunContext, start_pages: list[int]) -> int:
+    summary = {
+        "run_id": context.run_id,
+        "batches": args.batches,
+        "max_pages": args.max_pages,
+        "start_pages": start_pages,
+        "dry_run": True,
+    }
+    _save_summary(context.base_dir, summary)
+    if args.json:
+        print(json.dumps(summary, ensure_ascii=False, indent=2))
+    return 0
+
+
+def _scrape_batches(args: Namespace, base_dir: Path, start_pages: list[int]) -> list[Path]:
     batch_files: list[Path] = []
     scrape_fn = _task_fn(run_scrapy_spider)
-
     total_batches = len(start_pages)
-    if not args.json:
-        print(f"Running batch scrape: batches={total_batches}, max_pages={args.max_pages}")
-        print(f"Start pages: {start_pages}")
-        print(f"Output dir: {base_dir}")
-        print(f"Dry run: {args.dry_run}")
-
-    if args.dry_run:
-        summary = {
-            "run_id": run_id,
-            "batches": args.batches,
-            "max_pages": args.max_pages,
-            "start_pages": start_pages,
-            "dry_run": True,
-        }
-        _save_summary(base_dir, summary)
-        if args.json:
-            print(json.dumps(summary, ensure_ascii=False, indent=2))
-        return 0
 
     for idx, start_page in enumerate(start_pages, start=1):
         batch_file = base_dir / f"batch_{idx:02d}_start_{start_page}.jsonl"
@@ -377,43 +412,80 @@ def main(argv: list[str] | None = None, *, args: Namespace | None = None) -> int
         if idx < total_batches and args.cooldown_seconds > 0:
             time.sleep(args.cooldown_seconds)
 
-    combined_new_file = base_dir / "new_listings_combined.jsonl"
+    return batch_files
+
+
+def _load_batch_listings(batch_files: list[Path]) -> list[dict]:
     new_listings: list[dict] = []
     for batch_file in batch_files:
         new_listings.extend(load_jsonl_file(batch_file))
+    return new_listings
 
-    deduped_new, new_stats = merge_listings(new_listings, [])
+
+def _build_candidate_file(
+    args: Namespace,
+    context: BatchRunContext,
+    batch_files: list[Path],
+) -> CandidateArtifacts:
+    combined_new_file = context.base_dir / "new_listings_combined.jsonl"
+
+    deduped_new, new_stats = merge_listings(_load_batch_listings(batch_files), [])
     _write_jsonl(deduped_new, combined_new_file)
 
-    candidate_file = base_dir / f"booli_listings_prod_candidate_{run_id}.jsonl"
+    candidate_file = context.base_dir / f"booli_listings_prod_candidate_{context.run_id}.jsonl"
     process_pipeline(
         input_file=combined_new_file,
-        production_file=production_file,
+        production_file=context.production_file,
         output_file=candidate_file,
         min_area_count=args.min_area_count,
         days_threshold=args.days_threshold,
         dry_run=False,
     )
 
-    validation = _validate_candidate(candidate_file, production_file)
+    return CandidateArtifacts(
+        combined_new_file=combined_new_file,
+        candidate_file=candidate_file,
+        merge_stats=new_stats,
+    )
+
+
+def _save_scrape_summary(
+    args: Namespace,
+    context: BatchRunContext,
+    start_pages: list[int],
+    batch_files: list[Path],
+    artifacts: CandidateArtifacts,
+    validation: ValidationSummary,
+) -> None:
     summary = {
-        "run_id": run_id,
+        "run_id": context.run_id,
         "batches": args.batches,
         "max_pages": args.max_pages,
         "start_pages": start_pages,
         "batch_files": [str(path) for path in batch_files],
-        "combined_new_file": str(combined_new_file),
-        "candidate_file": str(candidate_file),
-        "merge_stats": new_stats,
+        "combined_new_file": str(artifacts.combined_new_file),
+        "candidate_file": str(artifacts.candidate_file),
+        "merge_stats": artifacts.merge_stats,
         "validation": validation.__dict__,
     }
-    _save_summary(base_dir, summary)
+    _save_summary(context.base_dir, summary)
+
+
+def _run_scrape_workflow(
+    args: Namespace,
+    context: BatchRunContext,
+    start_pages: list[int],
+) -> int:
+    batch_files = _scrape_batches(args, context.base_dir, start_pages)
+    artifacts = _build_candidate_file(args, context, batch_files)
+    validation = _validate_candidate(artifacts.candidate_file, context.production_file)
+    _save_scrape_summary(args, context, start_pages, batch_files, artifacts, validation)
 
     return _run_promotion_workflow(
-        candidate_file=candidate_file,
-        production_file=production_file,
-        run_id=run_id,
-        base_dir=base_dir,
+        candidate_file=artifacts.candidate_file,
+        production_file=context.production_file,
+        run_id=context.run_id,
+        base_dir=context.base_dir,
         upload_bq=args.upload_bq,
         materialize=args.materialize_features,
         sync_after=args.sync_after_upload,
@@ -421,6 +493,33 @@ def main(argv: list[str] | None = None, *, args: Namespace | None = None) -> int
         promote=args.promote,
         json_mode=args.json,
     )
+
+
+def main(argv: list[str] | None = None, *, args: Namespace | None = None) -> int:
+    """Run the batch scraper. ``args`` takes precedence over ``argv`` when given."""
+    parser = _build_parser()
+    if args is None:
+        args = parser.parse_args(argv)
+
+    validation_exit = _validate_args(args, parser)
+    if validation_exit is not None:
+        return validation_exit
+
+    context = _build_run_context(args)
+
+    if args.promote_from:
+        return _run_promote_from(args, context)
+
+    start_pages = _select_start_pages(args)
+    if start_pages is None:
+        return 1
+
+    _print_batch_header(args, context, start_pages)
+
+    if args.dry_run:
+        return _run_dry_run(args, context, start_pages)
+
+    return _run_scrape_workflow(args, context, start_pages)
 
 
 if __name__ == "__main__":

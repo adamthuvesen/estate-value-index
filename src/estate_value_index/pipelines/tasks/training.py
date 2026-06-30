@@ -27,8 +27,54 @@ _TERMINAL_JOB_STATES: Final[frozenset[str]] = frozenset(
     {"JOB_STATE_SUCCEEDED", "JOB_STATE_FAILED", "JOB_STATE_CANCELLED"}
 )
 _JOB_STATE_SUCCEEDED: Final[str] = "JOB_STATE_SUCCEEDED"
+_CUSTOM_JOB_RE: Final[re.Pattern[str]] = re.compile(
+    r"(projects/[\w-]+/locations/[\w-]+/customJobs/\d+)"
+)
+_RUN_ID_RE: Final[re.Pattern[str]] = re.compile(r"Run ID:\s*([\d-]+)")
+_TIMESTAMP_RE: Final[re.Pattern[str]] = re.compile(r"(\d{8}-\d{6})")
+_MODEL_URI_RE: Final[re.Pattern[str]] = re.compile(r"(gs://[\w-]+/vertex-ai/models/[\w-]+)")
+_OUTPUT_URI_RE: Final[re.Pattern[str]] = re.compile(r"(gs://[\w-]+/vertex-ai/jobs/[\w-]+)")
 
 # --- Helper functions for complex tasks ---
+
+
+def _output_lines(stdout: str, stderr: str) -> list[str]:
+    return stdout.split("\n") + stderr.split("\n")
+
+
+def _search_line(pattern: re.Pattern[str], line: str) -> str | None:
+    match = pattern.search(line)
+    return match.group(1) if match else None
+
+
+def _job_id_from_line(line: str) -> str | None:
+    if "customJobs" not in line:
+        return None
+    return _search_line(_CUSTOM_JOB_RE, line)
+
+
+def _explicit_run_id_from_line(line: str) -> str | None:
+    if "Run ID:" not in line:
+        return None
+    return _search_line(_RUN_ID_RE, line)
+
+
+def _run_id_from_model_line(line: str) -> str | None:
+    if "models/" not in line or "gs://" not in line:
+        return None
+    return _search_line(_TIMESTAMP_RE, line)
+
+
+def _model_uri_from_line(line: str) -> str | None:
+    if "gs://" not in line or "models/" not in line:
+        return None
+    return _search_line(_MODEL_URI_RE, line)
+
+
+def _output_uri_from_line(line: str) -> str | None:
+    if "gs://" not in line or "jobs/" not in line:
+        return None
+    return _search_line(_OUTPUT_URI_RE, line)
 
 
 def _parse_vertex_job_output(stdout: str, stderr: str) -> VertexJobResult:
@@ -38,31 +84,13 @@ def _parse_vertex_job_output(stdout: str, stderr: str) -> VertexJobResult:
     model_uri = None
     output_uri = None
 
-    for line in stdout.split("\n") + stderr.split("\n"):
-        if "customJobs" in line:
-            match = re.search(r"(projects/[\w-]+/locations/[\w-]+/customJobs/\d+)", line)
-            if match:
-                job_id = match.group(1)
-
-        if "Run ID:" in line:
-            match = re.search(r"Run ID:\s*([\d-]+)", line)
-            if match:
-                run_id = match.group(1)
-
-        if "models/" in line and "gs://" in line:
-            match = re.search(r"(\d{8}-\d{6})", line)
-            if match and not run_id:
-                run_id = match.group(1)
-
-        if "gs://" in line and "models/" in line:
-            match = re.search(r"(gs://[\w-]+/vertex-ai/models/[\w-]+)", line)
-            if match:
-                model_uri = match.group(1)
-
-        if "gs://" in line and "jobs/" in line:
-            match = re.search(r"(gs://[\w-]+/vertex-ai/jobs/[\w-]+)", line)
-            if match:
-                output_uri = match.group(1)
+    for line in _output_lines(stdout, stderr):
+        job_id = _job_id_from_line(line) or job_id
+        run_id = _explicit_run_id_from_line(line) or run_id
+        if not run_id:
+            run_id = _run_id_from_model_line(line)
+        model_uri = _model_uri_from_line(line) or model_uri
+        output_uri = _output_uri_from_line(line) or output_uri
 
     if model_uri and not run_id:
         run_id = model_uri.rstrip("/").split("/")[-1]

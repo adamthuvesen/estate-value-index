@@ -21,6 +21,37 @@ from estate_value_index.utils.clients import get_bq_client
 from estate_value_index.utils.settings import load_env_config
 
 JSON_GLOB = "*.json"
+_NUMERIC_COLUMNS = [
+    "listing_price",
+    "sold_price",
+    "living_area",
+    "rooms",
+    "monthly_fee",
+    "price_per_sqm",
+    "days_on_market",
+    "construction_year",
+    "floor",
+]
+_DATETIME_COLUMNS = ("scraped_at", "sold_date")
+_FEATURE_CATEGORICAL_COLUMNS = [
+    "area",
+    "age_bucket",
+    "space_efficiency",
+    "area_price_tier",
+    "postal_prefix",
+    "stockholm_district",
+    "market_cycle",
+    "swedish_season",
+    "school_period",
+    "dom_momentum",
+    "area_price_momentum",
+    "architectural_era",
+    "renovation_likelihood",
+    "has_elevator",
+    "has_balcony",
+    "floor_tier",
+]
+_FEATURE_DATE_COLUMNS = ("sold_date", "feature_date")
 
 # Optional BigQuery support
 HAS_BIGQUERY = importlib.util.find_spec("google.cloud.bigquery") is not None
@@ -71,6 +102,101 @@ def _coerce_numeric(df: pd.DataFrame, columns: Iterable[str]) -> None:
             df[column] = pd.to_numeric(df[column], errors="coerce")
 
 
+def _coerce_datetime(df: pd.DataFrame, columns: Iterable[str]) -> None:
+    for column in columns:
+        if column in df.columns:
+            df[column] = pd.to_datetime(df[column], errors="coerce")
+
+
+def _listing_json_paths(data_path: Path, glob: str) -> list[Path]:
+    json_paths = sorted(p for p in data_path.glob(glob) if p.is_file())
+    if json_paths:
+        return json_paths
+    return sorted(p for p in data_path.rglob(glob) if p.is_file())
+
+
+def _normalize_listing_frame(
+    frame: pd.DataFrame,
+    *,
+    drop_duplicate_listing_ids: bool,
+) -> pd.DataFrame:
+    _coerce_numeric(frame, _NUMERIC_COLUMNS)
+    _coerce_datetime(frame, _DATETIME_COLUMNS)
+
+    if drop_duplicate_listing_ids and "listing_id" in frame.columns:
+        sort_columns = [col for col in ("listing_id", "scraped_at") if col in frame.columns]
+        frame = frame.sort_values(sort_columns)
+        frame = frame.drop_duplicates(subset=["listing_id"], keep="last")
+
+    return frame.reset_index(drop=True)
+
+
+def _require_bigquery() -> None:
+    if not HAS_BIGQUERY:
+        raise ImportError(
+            "google-cloud-bigquery is required for BigQuery support. "
+            "Install it with: pip install google-cloud-bigquery"
+        )
+
+
+def _resolve_bigquery_table(
+    project_id: str | None,
+    dataset_id: str | None,
+    table_id: str | None,
+    *,
+    dataset_attr: str,
+    table_attr: str,
+) -> tuple[str, str, str]:
+    env_config = load_env_config()
+    return (
+        _validate_bq_project_id(project_id or env_config.bigquery_project_id),
+        dataset_id or getattr(env_config, dataset_attr),
+        table_id or getattr(env_config, table_attr),
+    )
+
+
+def _query_bigquery_table(
+    *,
+    project_id: str,
+    dataset_id: str,
+    table_id: str,
+    filters: Sequence[Filter] | None,
+    error_context: str,
+    error_message: str,
+) -> pd.DataFrame:
+    from google.cloud import bigquery
+
+    query = f"""
+        SELECT *
+        FROM {safe_table_ref(project_id, dataset_id, table_id, quote=True)}
+    """
+
+    where_sql, query_params = build_filter_clause(filters or [])
+    if where_sql:
+        query += f"\n        {where_sql}"
+
+    try:
+        client = get_bq_client(project_id)
+        job_config = (
+            bigquery.QueryJobConfig(query_parameters=query_params) if query_params else None
+        )
+        return client.query(query, job_config=job_config).to_dataframe()
+    except Exception as e:
+        raise BigQueryError(
+            f"{error_message}: {e}",
+            context=exception_context(error_context, dataset=dataset_id, table=table_id),
+        ) from e
+
+
+def _normalize_feature_frame(df: pd.DataFrame) -> pd.DataFrame:
+    for col in _FEATURE_CATEGORICAL_COLUMNS:
+        if col in df.columns:
+            df[col] = df[col].astype("category")
+
+    _coerce_datetime(df, _FEATURE_DATE_COLUMNS)
+    return df
+
+
 def load_listings(
     data_dir: Path | str,
     glob: str = JSON_GLOB,
@@ -83,10 +209,7 @@ def load_listings(
     if not data_path.exists():
         raise FileNotFoundError(f"Data directory does not exist: {data_path}")
 
-    json_paths = sorted(p for p in data_path.glob(glob) if p.is_file())
-    # Also search in subdirectories if no files found in root
-    if not json_paths:
-        json_paths = sorted(p for p in data_path.rglob(glob) if p.is_file())
+    json_paths = _listing_json_paths(data_path, glob)
     if not json_paths:
         return pd.DataFrame()
 
@@ -95,31 +218,10 @@ def load_listings(
         return pd.DataFrame()
 
     frame = pd.DataFrame.from_records(records)
-
-    # Normalise common column types
-    numeric_columns = [
-        "listing_price",
-        "sold_price",
-        "living_area",
-        "rooms",
-        "monthly_fee",
-        "price_per_sqm",
-        "days_on_market",
-        "construction_year",
-        "floor",
-    ]
-    _coerce_numeric(frame, numeric_columns)
-
-    for column in ("scraped_at", "sold_date"):
-        if column in frame.columns:
-            frame[column] = pd.to_datetime(frame[column], errors="coerce")
-
-    if drop_duplicate_listing_ids and "listing_id" in frame.columns:
-        sort_columns = [col for col in ("listing_id", "scraped_at") if col in frame.columns]
-        frame = frame.sort_values(sort_columns)
-        frame = frame.drop_duplicates(subset=["listing_id"], keep="last")
-
-    return frame.reset_index(drop=True)
+    return _normalize_listing_frame(
+        frame,
+        drop_duplicate_listing_ids=drop_duplicate_listing_ids,
+    )
 
 
 def _find_project_root(start: Path) -> Path:
@@ -175,68 +277,26 @@ def load_from_bigquery(
         ImportError: If google-cloud-bigquery is not installed.
         BigQueryError: If the BigQuery query fails.
     """
-    if not HAS_BIGQUERY:
-        raise ImportError(
-            "google-cloud-bigquery is required for BigQuery support. "
-            "Install it with: pip install google-cloud-bigquery"
-        )
-
-    from google.cloud import bigquery
-
-    # Load environment configuration
-    env_config = load_env_config()
-
-    # Use provided values or fall back to environment config
-    project_id = _validate_bq_project_id(project_id or env_config.bigquery_project_id)
-    dataset_id = dataset_id or env_config.bq_dataset_raw
-    table_id = table_id or env_config.bq_table_listings
-
-    # Build query
-    query = f"""
-        SELECT *
-        FROM {safe_table_ref(project_id, dataset_id, table_id, quote=True)}
-    """
-
-    where_sql, query_params = build_filter_clause(filters or [])
-    if where_sql:
-        query += f"\n        {where_sql}"
-
-    try:
-        client = get_bq_client(project_id)
-        job_config = (
-            bigquery.QueryJobConfig(query_parameters=query_params) if query_params else None
-        )
-        df = client.query(query, job_config=job_config).to_dataframe()
-    except Exception as e:
-        raise BigQueryError(
-            f"Failed to query BigQuery: {e}",
-            context=exception_context("load_from_bigquery", dataset=dataset_id, table=table_id),
-        ) from e
-
-    # Apply same normalization as load_listings()
-    numeric_columns = [
-        "listing_price",
-        "sold_price",
-        "living_area",
-        "rooms",
-        "monthly_fee",
-        "price_per_sqm",
-        "days_on_market",
-        "construction_year",
-        "floor",
-    ]
-    _coerce_numeric(df, numeric_columns)
-
-    for column in ("scraped_at", "sold_date"):
-        if column in df.columns:
-            df[column] = pd.to_datetime(df[column], errors="coerce")
-
-    if drop_duplicate_listing_ids and "listing_id" in df.columns:
-        sort_columns = [col for col in ("listing_id", "scraped_at") if col in df.columns]
-        df = df.sort_values(sort_columns)
-        df = df.drop_duplicates(subset=["listing_id"], keep="last")
-
-    return df.reset_index(drop=True)
+    _require_bigquery()
+    project_id, dataset_id, table_id = _resolve_bigquery_table(
+        project_id,
+        dataset_id,
+        table_id,
+        dataset_attr="bq_dataset_raw",
+        table_attr="bq_table_listings",
+    )
+    df = _query_bigquery_table(
+        project_id=project_id,
+        dataset_id=dataset_id,
+        table_id=table_id,
+        filters=filters,
+        error_context="load_from_bigquery",
+        error_message="Failed to query BigQuery",
+    )
+    return _normalize_listing_frame(
+        df,
+        drop_duplicate_listing_ids=drop_duplicate_listing_ids,
+    )
 
 
 def load_features_from_bigquery(
@@ -267,74 +327,20 @@ def load_features_from_bigquery(
         ImportError: If google-cloud-bigquery is not installed.
         BigQueryError: If the BigQuery query fails.
     """
-    if not HAS_BIGQUERY:
-        raise ImportError(
-            "google-cloud-bigquery is required for BigQuery support. "
-            "Install it with: pip install google-cloud-bigquery"
-        )
-
-    from google.cloud import bigquery
-
-    # Load environment configuration
-    env_config = load_env_config()
-
-    # Use provided values or fall back to environment config
-    project_id = _validate_bq_project_id(project_id or env_config.bigquery_project_id)
-    dataset_id = dataset_id or env_config.bq_dataset_features
-    table_id = table_id or env_config.bq_table_features
-
-    # Build query
-    query = f"""
-        SELECT *
-        FROM {safe_table_ref(project_id, dataset_id, table_id, quote=True)}
-    """
-
-    where_sql, query_params = build_filter_clause(filters or [])
-    if where_sql:
-        query += f"\n        {where_sql}"
-
-    try:
-        client = get_bq_client(project_id)
-        job_config = (
-            bigquery.QueryJobConfig(query_parameters=query_params) if query_params else None
-        )
-        df = client.query(query, job_config=job_config).to_dataframe()
-    except Exception as e:
-        raise BigQueryError(
-            f"Failed to query BigQuery features: {e}",
-            context=exception_context(
-                "load_features_from_bigquery", dataset=dataset_id, table=table_id
-            ),
-        ) from e
-
-    # Convert categorical features to category dtype
-    categorical_cols = [
-        "area",
-        "age_bucket",
-        "space_efficiency",
-        "area_price_tier",
-        "postal_prefix",
-        "stockholm_district",
-        "market_cycle",
-        "swedish_season",
-        "school_period",
-        "dom_momentum",
-        "area_price_momentum",
-        "architectural_era",
-        "renovation_likelihood",
-        "has_elevator",
-        "has_balcony",
-        "floor_tier",
-    ]
-
-    for col in categorical_cols:
-        if col in df.columns:
-            df[col] = df[col].astype("category")
-
-    # Convert date columns
-    if "sold_date" in df.columns:
-        df["sold_date"] = pd.to_datetime(df["sold_date"], errors="coerce")
-    if "feature_date" in df.columns:
-        df["feature_date"] = pd.to_datetime(df["feature_date"], errors="coerce")
-
-    return df
+    _require_bigquery()
+    project_id, dataset_id, table_id = _resolve_bigquery_table(
+        project_id,
+        dataset_id,
+        table_id,
+        dataset_attr="bq_dataset_features",
+        table_attr="bq_table_features",
+    )
+    df = _query_bigquery_table(
+        project_id=project_id,
+        dataset_id=dataset_id,
+        table_id=table_id,
+        filters=filters,
+        error_context="load_features_from_bigquery",
+        error_message="Failed to query BigQuery features",
+    )
+    return _normalize_feature_frame(df)

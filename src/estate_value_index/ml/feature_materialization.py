@@ -9,6 +9,7 @@ This module provides functions for:
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from datetime import date
 from typing import Any
 
@@ -25,6 +26,16 @@ from estate_value_index.utils.clients import get_bq_client
 from estate_value_index.utils.settings import bq_table, get_batch_size, load_env_config
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class FeatureUploadTarget:
+    dataset_id: str
+    table_id: str
+    full_table_id: str
+    staging_table_id: str | None
+    staging_id: str | None
+    upload_target: str
 
 
 def join_geocodes(
@@ -140,6 +151,176 @@ def prepare_feature_rows(df_engineered: pd.DataFrame, feature_date: date) -> lis
     return df_subset.to_dict("records")
 
 
+def _feature_counts(df_engineered: pd.DataFrame) -> tuple[int, int]:
+    numeric_count = sum(1 for f in NUMERIC_FEATURE_NAMES if f in df_engineered.columns)
+    categorical_count = sum(1 for f in CATEGORICAL_FEATURE_NAMES if f in df_engineered.columns)
+    logger.info(
+        "Feature counts: numeric=%d/%d, categorical=%d/%d",
+        numeric_count,
+        len(NUMERIC_FEATURE_NAMES),
+        categorical_count,
+        len(CATEGORICAL_FEATURE_NAMES),
+    )
+    return numeric_count, categorical_count
+
+
+def _dry_run_result(
+    rows: list[dict[str, Any]],
+    feature_date: date,
+    numeric_count: int,
+    categorical_count: int,
+) -> dict[str, Any]:
+    logger.info("Dry run: features computed but not uploaded")
+    if rows:
+        sample = dict(list(rows[0].items())[:10])
+        logger.info("Sample row (first 10 fields): %s", sample)
+    return {
+        "row_count": len(rows),
+        "dry_run": True,
+        "feature_date": str(feature_date),
+        "numeric_features": numeric_count,
+        "categorical_features": categorical_count,
+    }
+
+
+def _feature_upload_target(project_id: str, env_config: Any, truncate: bool) -> FeatureUploadTarget:
+    dataset_id = env_config.bq_dataset_features
+    table_id = env_config.bq_table_features
+    full_table_id = bq_table(project_id, dataset_id, table_id)
+
+    if not truncate:
+        logger.info("Uploading to %s", full_table_id)
+        return FeatureUploadTarget(
+            dataset_id=dataset_id,
+            table_id=table_id,
+            full_table_id=full_table_id,
+            staging_table_id=None,
+            staging_id=None,
+            upload_target=full_table_id,
+        )
+
+    from uuid import uuid4
+
+    staging_table_id = f"{table_id}_staging_{uuid4().hex[:8]}"
+    staging_id = bq_table(project_id, dataset_id, staging_table_id)
+    logger.info("Uploading to staging table %s (production swap on success)", staging_id)
+    return FeatureUploadTarget(
+        dataset_id=dataset_id,
+        table_id=table_id,
+        full_table_id=full_table_id,
+        staging_table_id=staging_table_id,
+        staging_id=staging_id,
+        upload_target=staging_id,
+    )
+
+
+def _insert_feature_batches(
+    client: Any,
+    upload_target: str,
+    rows: list[dict[str, Any]],
+    batch_size: int,
+) -> None:
+    total_batches = (len(rows) + batch_size - 1) // batch_size
+    all_errors: list[Any] = []
+
+    for i in range(0, len(rows), batch_size):
+        batch = rows[i : i + batch_size]
+        batch_num = (i // batch_size) + 1
+
+        errors = client.insert_rows_json(upload_target, batch)
+
+        if errors:
+            logger.error(
+                "Batch %d/%d: errors occurred (first 3): %s",
+                batch_num,
+                total_batches,
+                errors[:3],
+            )
+            all_errors.extend(errors)
+        else:
+            logger.info("Batch %d/%d: %d rows inserted", batch_num, total_batches, len(batch))
+
+    if all_errors:
+        raise RuntimeError(
+            f"insert failed: {len(all_errors)} batch error(s); first: {all_errors[0]}"
+        )
+
+
+def _table_row_count(client: Any, project_id: str, dataset_id: str, table_id: str) -> int:
+    count_query = (
+        "SELECT COUNT(*) as count "
+        f"FROM {safe_table_ref(project_id, dataset_id, table_id, quote=True)}"
+    )
+    return list(client.query(count_query).result())[0]["count"]
+
+
+def _swap_staging_to_production(client: Any, project_id: str, target: FeatureUploadTarget) -> None:
+    logger.info(
+        "Swapping staging → production via CREATE OR REPLACE TABLE %s", target.full_table_id
+    )
+    swap_sql = (
+        f"CREATE OR REPLACE TABLE "
+        f"{safe_table_ref(project_id, target.dataset_id, target.table_id, quote=True)} "
+        f"AS SELECT * FROM "
+        f"{safe_table_ref(project_id, target.dataset_id, target.staging_table_id, quote=True)}"
+    )
+    client.query(swap_sql).result()
+
+
+def _verify_and_publish_features(
+    client: Any,
+    project_id: str,
+    target: FeatureUploadTarget,
+    expected_rows: int,
+) -> int:
+    if target.staging_id is not None and target.staging_table_id is not None:
+        logger.info("Verifying staging row count")
+        staging_count = _table_row_count(
+            client, project_id, target.dataset_id, target.staging_table_id
+        )
+        if staging_count != expected_rows:
+            raise RuntimeError(
+                f"staging row count mismatch: expected {expected_rows}, got {staging_count}"
+            )
+
+        _swap_staging_to_production(client, project_id, target)
+        return staging_count
+
+    logger.info("Verifying data")
+    return _table_row_count(client, project_id, target.dataset_id, target.table_id)
+
+
+def _upload_feature_rows(
+    client: Any,
+    project_id: str,
+    target: FeatureUploadTarget,
+    rows: list[dict[str, Any]],
+    batch_size: int,
+) -> int:
+    try:
+        _insert_feature_batches(client, target.upload_target, rows, batch_size)
+        row_count = _verify_and_publish_features(client, project_id, target, len(rows))
+        logger.info("BigQuery table has %d rows", row_count)
+        return row_count
+    finally:
+        if target.staging_id is not None:
+            client.delete_table(target.staging_id, not_found_ok=True)
+
+
+def _materialization_result(
+    row_count: int,
+    feature_date: date,
+    numeric_count: int,
+    categorical_count: int,
+) -> dict[str, Any]:
+    return {
+        "row_count": row_count,
+        "feature_date": str(feature_date),
+        "numeric_features": numeric_count,
+        "categorical_features": categorical_count,
+    }
+
+
 def materialize_features(
     project_id: str | None = None,
     dry_run: bool = False,
@@ -184,15 +365,7 @@ def materialize_features(
     df_engineered = create_optimized_features(df_filtered)
     logger.info("Engineered %d total columns", len(df_engineered.columns))
 
-    numeric_count = sum(1 for f in NUMERIC_FEATURE_NAMES if f in df_engineered.columns)
-    categorical_count = sum(1 for f in CATEGORICAL_FEATURE_NAMES if f in df_engineered.columns)
-    logger.info(
-        "Feature counts: numeric=%d/%d, categorical=%d/%d",
-        numeric_count,
-        len(NUMERIC_FEATURE_NAMES),
-        categorical_count,
-        len(CATEGORICAL_FEATURE_NAMES),
-    )
+    numeric_count, categorical_count = _feature_counts(df_engineered)
 
     logger.info("Preparing data for BigQuery")
     feature_date = date.today()
@@ -200,97 +373,14 @@ def materialize_features(
     logger.info("Prepared %d rows", len(rows))
 
     if dry_run:
-        logger.info("Dry run: features computed but not uploaded")
-        if rows:
-            sample = dict(list(rows[0].items())[:10])
-            logger.info("Sample row (first 10 fields): %s", sample)
-        return {
-            "row_count": len(rows),
-            "dry_run": True,
-            "feature_date": str(feature_date),
-            "numeric_features": numeric_count,
-            "categorical_features": categorical_count,
-        }
+        return _dry_run_result(rows, feature_date, numeric_count, categorical_count)
 
     logger.info("Connecting to BigQuery")
     client = get_bq_client(project_id)
-
-    dataset_id = env_config.bq_dataset_features
-    table_id = env_config.bq_table_features
-    full_table_id = bq_table(project_id, dataset_id, table_id)
-
-    if truncate:
-        from uuid import uuid4
-
-        staging_table_id = f"{table_id}_staging_{uuid4().hex[:8]}"
-        staging_id = bq_table(project_id, dataset_id, staging_table_id)
-        upload_target = staging_id
-        logger.info("Uploading to staging table %s (production swap on success)", staging_id)
-    else:
-        staging_table_id = None
-        staging_id = None
-        upload_target = full_table_id
-        logger.info("Uploading %d rows to %s", len(rows), full_table_id)
-
-    total_batches = (len(rows) + batch_size - 1) // batch_size
-    all_errors: list[Any] = []
-
-    try:
-        for i in range(0, len(rows), batch_size):
-            batch = rows[i : i + batch_size]
-            batch_num = (i // batch_size) + 1
-
-            errors = client.insert_rows_json(upload_target, batch)
-
-            if errors:
-                logger.error(
-                    "Batch %d/%d: errors occurred (first 3): %s",
-                    batch_num,
-                    total_batches,
-                    errors[:3],
-                )
-                all_errors.extend(errors)
-            else:
-                logger.info("Batch %d/%d: %d rows inserted", batch_num, total_batches, len(batch))
-
-        if all_errors:
-            raise RuntimeError(
-                f"insert failed: {len(all_errors)} batch error(s); first: {all_errors[0]}"
-            )
-
-        if staging_id is not None:
-            logger.info("Verifying staging row count")
-            count_query = (
-                "SELECT COUNT(*) as count "
-                f"FROM {safe_table_ref(project_id, dataset_id, staging_table_id, quote=True)}"
-            )
-            staging_count = list(client.query(count_query).result())[0]["count"]
-            if staging_count != len(rows):
-                raise RuntimeError(
-                    f"staging row count mismatch: expected {len(rows)}, got {staging_count}"
-                )
-
-            logger.info(
-                "Swapping staging → production via CREATE OR REPLACE TABLE %s", full_table_id
-            )
-            swap_sql = (
-                f"CREATE OR REPLACE TABLE {safe_table_ref(project_id, dataset_id, table_id, quote=True)} "
-                f"AS SELECT * FROM {safe_table_ref(project_id, dataset_id, staging_table_id, quote=True)}"
-            )
-            client.query(swap_sql).result()
-            row_count = staging_count
-        else:
-            logger.info("Verifying data")
-            count_query = (
-                "SELECT COUNT(*) as count "
-                f"FROM {safe_table_ref(project_id, dataset_id, table_id, quote=True)}"
-            )
-            row_count = list(client.query(count_query).result())[0]["count"]
-
-        logger.info("BigQuery table has %d rows", row_count)
-    finally:
-        if staging_id is not None:
-            client.delete_table(staging_id, not_found_ok=True)
+    target = _feature_upload_target(project_id, env_config, truncate)
+    if not truncate:
+        logger.info("Uploading %d rows to %s", len(rows), target.full_table_id)
+    row_count = _upload_feature_rows(client, project_id, target, rows, batch_size)
 
     logger.info(
         "Materialization complete: rows=%d, feature_date=%s, numeric=%d, categorical=%d",
@@ -300,9 +390,4 @@ def materialize_features(
         categorical_count,
     )
 
-    return {
-        "row_count": row_count,
-        "feature_date": str(feature_date),
-        "numeric_features": numeric_count,
-        "categorical_features": categorical_count,
-    }
+    return _materialization_result(row_count, feature_date, numeric_count, categorical_count)

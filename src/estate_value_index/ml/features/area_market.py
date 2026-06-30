@@ -18,6 +18,16 @@ from estate_value_index.ml.features.utils import _safe_divide
 """Area-level market and temporal aggregate features."""
 
 
+_AREA_MARKET_DEFAULTS = {
+    "area_inventory": DEFAULT_AREA_INVENTORY,
+    "area_price_volatility": DEFAULT_PRICE_VOLATILITY,
+    "area_price_median": DEFAULT_MEDIAN_PRICE,
+    "area_days_on_market_median": DEFAULT_DAYS_ON_MARKET,
+    "area_price_change_mean": DEFAULT_PRICE_CHANGE,
+    "area_price_change_count": 10.0,
+}
+
+
 def _create_area_market_features(
     df: pd.DataFrame, context: FeatureEngineeringContext | None
 ) -> pd.DataFrame:
@@ -26,104 +36,115 @@ def _create_area_market_features(
     During training, each row's area statistics are computed from other
     listings only (leave-one-out), using a time-based expanding window.
     """
-    # Ensure days_on_market is available for downstream statistics
+    _ensure_days_on_market(df)
+    if context is None:
+        _add_training_area_market_features(df)
+    else:
+        df = _add_context_area_market_features(df, context)
+
+    _fill_area_market_defaults(df)
+    _add_area_market_indicators(df)
+    return df
+
+
+def _ensure_days_on_market(df: pd.DataFrame) -> None:
     if "days_on_market" not in df.columns:
         df["days_on_market"] = 0
     else:
         df["days_on_market"] = pd.to_numeric(df["days_on_market"], errors="coerce")
 
-    if context is None:
-        # Training mode: time-based rolling with closed='left' so same-day rows
-        # in the same area do not contribute to each other's statistics. The
-        # window is unbounded ("100000D") to mimic an expanding window.
-        # closed='left' excludes the current row's date, so two listings at
-        # (area=A, date=D) see the same prior history (everything before D).
-        if "sold_date" in df.columns:
-            df["sold_date"] = pd.to_datetime(df["sold_date"], errors="coerce")
-            unbounded = "100000D"
-            work = df[
-                ["area", "sold_date", "listing_price", "days_on_market"]
-                + (["price_change"] if "price_change" in df.columns else [])
-            ].copy()
-            work["_orig_idx"] = work.index
-            work_indexed = (
-                work.dropna(subset=["sold_date"]).sort_values("sold_date").set_index("sold_date")
-            )
-            grouped = work_indexed.groupby("area", observed=True)
 
-            inventory = grouped["listing_price"].transform(
-                lambda x: x.rolling(window=unbounded, closed="left").count()
-            )
-            price_median = grouped["listing_price"].transform(
-                lambda x: x.rolling(window=unbounded, closed="left").median()
-            )
-            price_volatility = grouped["listing_price"].transform(
-                lambda x: x.rolling(window=unbounded, closed="left").std()
-            )
-            dom_median = grouped["days_on_market"].transform(
-                lambda x: x.rolling(window=unbounded, closed="left").median()
-            )
-            if "price_change" in work_indexed.columns:
-                pc_mean = grouped["price_change"].transform(
-                    lambda x: x.rolling(window=unbounded, closed="left").mean()
-                )
-                pc_count = grouped["price_change"].transform(
-                    lambda x: x.rolling(window=unbounded, closed="left").count()
-                )
-            else:
-                pc_mean = pd.Series(np.nan, index=work_indexed.index)
-                pc_count = pd.Series(np.nan, index=work_indexed.index)
-
-            stats = pd.DataFrame(
-                {
-                    "area_inventory": inventory.values,
-                    "area_price_median": price_median.values,
-                    "area_price_volatility": price_volatility.values,
-                    "area_days_on_market_median": dom_median.values,
-                    "area_price_change_mean": pc_mean.values,
-                    "area_price_change_count": pc_count.values,
-                },
-                index=work_indexed["_orig_idx"].values,
-            )
-            for column in stats.columns:
-                df[column] = stats[column].reindex(df.index)
-        else:
-            # No dates: use global area statistics (simpler fallback)
-            grouped = df.groupby("area", observed=True)
-            df["area_inventory"] = grouped["listing_price"].transform("count") - 1
-            df["area_price_median"] = grouped["listing_price"].transform("median")
-            df["area_price_volatility"] = grouped["listing_price"].transform("std")
-            df["area_days_on_market_median"] = grouped["days_on_market"].transform("median")
-            if "price_change" in df.columns:
-                df["area_price_change_mean"] = grouped["price_change"].transform("mean")
-                df["area_price_change_count"] = grouped["price_change"].transform("count")
-            else:
-                df["area_price_change_mean"] = np.nan
-                df["area_price_change_count"] = np.nan
+def _add_training_area_market_features(df: pd.DataFrame) -> None:
+    if "sold_date" in df.columns:
+        _add_prior_area_market_features(df)
     else:
-        # Inference mode: Use cached values from training
-        if hasattr(context, "area_market_stats") and context.area_market_stats:
-            area_stats_df = pd.DataFrame.from_dict(
-                context.area_market_stats, orient="index"
-            ).reset_index()
-            area_stats_df.rename(columns={"index": "area"}, inplace=True)
-            df = df.merge(area_stats_df, on="area", how="left")
+        _add_group_area_market_features(df)
 
-        # Ensure all required columns exist (either from merge or as defaults)
-        if "area_inventory" not in df.columns:
-            df["area_inventory"] = DEFAULT_AREA_INVENTORY
-        if "area_price_volatility" not in df.columns:
-            df["area_price_volatility"] = DEFAULT_PRICE_VOLATILITY
-        if "area_price_median" not in df.columns:
-            df["area_price_median"] = DEFAULT_MEDIAN_PRICE
-        if "area_days_on_market_median" not in df.columns:
-            df["area_days_on_market_median"] = DEFAULT_DAYS_ON_MARKET
-        if "area_price_change_mean" not in df.columns:
-            df["area_price_change_mean"] = DEFAULT_PRICE_CHANGE
-        if "area_price_change_count" not in df.columns:
-            df["area_price_change_count"] = 10.0
 
-    # Fill missing values
+def _add_prior_area_market_features(df: pd.DataFrame) -> None:
+    # Time-based rolling with closed='left' ensures same-day rows in the same
+    # area see identical prior history and cannot leak into each other.
+    df["sold_date"] = pd.to_datetime(df["sold_date"], errors="coerce")
+    work_columns = ["area", "sold_date", "listing_price", "days_on_market"]
+    if "price_change" in df.columns:
+        work_columns.append("price_change")
+
+    work = df[work_columns].copy()
+    work["_orig_idx"] = work.index
+    work_indexed = work.dropna(subset=["sold_date"]).sort_values("sold_date").set_index("sold_date")
+    grouped = work_indexed.groupby("area", observed=True)
+    unbounded = "100000D"
+
+    stats = pd.DataFrame(
+        {
+            "area_inventory": _prior_rolling(grouped, "listing_price", unbounded, "count").values,
+            "area_price_median": _prior_rolling(
+                grouped, "listing_price", unbounded, "median"
+            ).values,
+            "area_price_volatility": _prior_rolling(
+                grouped, "listing_price", unbounded, "std"
+            ).values,
+            "area_days_on_market_median": _prior_rolling(
+                grouped, "days_on_market", unbounded, "median"
+            ).values,
+            "area_price_change_mean": _price_change_rolling(
+                work_indexed, grouped, unbounded, "mean"
+            ).values,
+            "area_price_change_count": _price_change_rolling(
+                work_indexed, grouped, unbounded, "count"
+            ).values,
+        },
+        index=work_indexed["_orig_idx"].values,
+    )
+    for column in stats.columns:
+        df[column] = stats[column].reindex(df.index)
+
+
+def _prior_rolling(grouped, column: str, window: str, method: str) -> pd.Series:
+    return grouped[column].transform(
+        lambda values: getattr(values.rolling(window=window, closed="left"), method)()
+    )
+
+
+def _price_change_rolling(
+    work_indexed: pd.DataFrame, grouped, window: str, method: str
+) -> pd.Series:
+    if "price_change" not in work_indexed.columns:
+        return pd.Series(np.nan, index=work_indexed.index)
+    return _prior_rolling(grouped, "price_change", window, method)
+
+
+def _add_group_area_market_features(df: pd.DataFrame) -> None:
+    grouped = df.groupby("area", observed=True)
+    df["area_inventory"] = grouped["listing_price"].transform("count") - 1
+    df["area_price_median"] = grouped["listing_price"].transform("median")
+    df["area_price_volatility"] = grouped["listing_price"].transform("std")
+    df["area_days_on_market_median"] = grouped["days_on_market"].transform("median")
+    if "price_change" in df.columns:
+        df["area_price_change_mean"] = grouped["price_change"].transform("mean")
+        df["area_price_change_count"] = grouped["price_change"].transform("count")
+    else:
+        df["area_price_change_mean"] = np.nan
+        df["area_price_change_count"] = np.nan
+
+
+def _add_context_area_market_features(
+    df: pd.DataFrame, context: FeatureEngineeringContext
+) -> pd.DataFrame:
+    if hasattr(context, "area_market_stats") and context.area_market_stats:
+        area_stats_df = pd.DataFrame.from_dict(
+            context.area_market_stats, orient="index"
+        ).reset_index()
+        area_stats_df.rename(columns={"index": "area"}, inplace=True)
+        df = df.merge(area_stats_df, on="area", how="left")
+
+    for column, default in _AREA_MARKET_DEFAULTS.items():
+        if column not in df.columns:
+            df[column] = default
+    return df
+
+
+def _fill_area_market_defaults(df: pd.DataFrame) -> None:
     df["area_inventory"] = df["area_inventory"].fillna(df["area_inventory"].median() or 50.0)
     df["area_price_volatility"] = df["area_price_volatility"].fillna(
         df["area_price_volatility"].median() or 500000.0
@@ -139,7 +160,8 @@ def _create_area_market_features(
     )
     df["area_price_change_count"] = df["area_price_change_count"].fillna(10.0)
 
-    # Derived market indicators
+
+def _add_area_market_indicators(df: pd.DataFrame) -> None:
     df["area_liquidity"] = _safe_divide(
         df["area_inventory"], df["area_days_on_market_median"], df.index
     )
@@ -150,8 +172,6 @@ def _create_area_market_features(
 
     # Area price momentum (categorical, based on area stats)
     df["area_price_momentum"] = df["area_price_change_mean"].apply(_classify_area_price_momentum)
-
-    return df
 
 
 def _create_area_temporal_metrics(
