@@ -24,6 +24,7 @@ The app serves predictions through FastAPI and a Next.js frontend/API layer in o
 
 - The container runs Next.js and FastAPI together.
 - The Cloud Run service uses internal ingress and runs under a dedicated least-privilege runtime service account (`evi-cloud-run-runtime@…`, created by `scripts/setup_gcp.sh`), not the default compute SA. It has bucket-scoped GCS object-read and nothing else — no BigQuery, no project Editor — because the request path only reads model/enrichment artifacts. Deploy paths attach it via `--service-account` and refuse to deploy if it is missing, so the service can never silently fall back to the broad default identity.
+- Post-deploy validation adapts to ingress: with internal ingress (the default here) it checks Cloud Run revision readiness via `gcloud run services describe` instead of probing the service URL — an external probe of an internal-ingress service only hits a Google Frontend 404.
 - Models are not committed or baked into the image; `scripts/startup.sh` can sync required artifacts from your configured GCS bucket.
 - `GCS_ENABLED` often differs between dev, CI, and production.
 - Rate limiting is in-process unless a shared backend is added.

@@ -5,6 +5,7 @@ import os
 import subprocess
 import time
 from datetime import datetime
+from logging import Logger
 from pathlib import Path
 
 import requests
@@ -104,6 +105,77 @@ def _get_service_url(
 ) -> str | None:
     """Get the service URL."""
     return _describe_service(service_name, region, "status.url", project_id)
+
+
+def _get_service_ingress(
+    service_name: str,
+    region: str,
+    project_id: str | None = None,
+) -> str | None:
+    """Get the service ingress setting (all, internal, internal-and-cloud-load-balancing)."""
+    return _describe_service(
+        service_name,
+        region,
+        'metadata.annotations."run.googleapis.com/ingress"',
+        project_id,
+    )
+
+
+def _revision_ready(
+    service_name: str,
+    region: str,
+    project_id: str | None = None,
+) -> bool:
+    """Platform readiness: the latest created revision is also the latest ready one."""
+    created = _describe_service(
+        service_name, region, "status.latestCreatedRevisionName", project_id
+    )
+    ready = _describe_service(service_name, region, "status.latestReadyRevisionName", project_id)
+    return created is not None and created == ready
+
+
+def _validate_deployment(
+    logger: Logger,
+    service_name: str,
+    region: str,
+    project_id: str,
+    service_url: str | None,
+) -> None:
+    """Post-deploy validation. Warning-only: a failed check never fails the deploy.
+
+    The service is deployed with internal ingress, so an unauthenticated
+    external probe from the runner always hits a Google Frontend 404. For
+    anything but public ingress ("all"), use Cloud Run's own revision
+    readiness (gcloud run services describe) instead of an HTTP probe.
+    """
+    # Deploy always sets --ingress internal; if the lookup fails, assume internal.
+    ingress = _get_service_ingress(service_name, region, project_id) or "internal"
+
+    if ingress != "all":
+        logger.info("External health check skipped: internal ingress, platform readiness used")
+        for _ in range(3):
+            if _revision_ready(service_name, region, project_id):
+                logger.info("Platform readiness check passed")
+                return
+            time.sleep(10)
+        logger.warning("Platform readiness check failed: latest revision not ready")
+        return
+
+    if not service_url:
+        logger.warning("No service URL available - skipping health check")
+        return
+
+    # Retry health check while the Cloud Run revision warms up
+    for attempt in range(3):
+        try:
+            health_result = health_check_task(f"{service_url}/api/health")
+            if health_result["healthy"]:
+                logger.info("Health check passed")
+                return
+        except Exception as e:
+            logger.warning(f"Health check attempt {attempt + 1} failed: {e}")
+        time.sleep(10)
+    logger.warning("Health check did not pass after 3 attempts")
 
 
 def _assert_runtime_service_account_exists(runtime_service_account: str) -> None:
@@ -233,18 +305,8 @@ def deploy_to_cloud_run_task(
 
     logger.info(f"Deployment complete: {current_revision} -> {new_revision}")
 
-    # Validate if requested
-    if validate and service_url:
-        # Retry health check while Cloud Run revision warms up
-        for attempt in range(3):
-            try:
-                health_result = health_check_task(f"{service_url}/api/health")
-                if health_result["healthy"]:
-                    logger.info("Health check passed")
-                    break
-            except Exception as e:
-                logger.warning(f"Health check attempt {attempt + 1} failed: {e}")
-                time.sleep(10)
+    if validate:
+        _validate_deployment(logger, service_name, region, project_id, service_url)
 
     return DeploymentResult(
         success=True,

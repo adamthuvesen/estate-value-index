@@ -11,8 +11,11 @@ import pytest
 from estate_value_index.pipelines.tasks.deployment import (
     _cloud_run_env_vars,
     _get_current_revision,
+    _get_service_ingress,
     _get_service_url,
+    _revision_ready,
     _runtime_service_account,
+    _validate_deployment,
     deploy_to_cloud_run_task,
     health_check_task,
     log_metrics_task,
@@ -203,6 +206,172 @@ class TestGetServiceUrl:
     def test_handles_exception(self, mocker: Any) -> None:
         mocker.patch("subprocess.run", side_effect=Exception("Timeout"))
         assert _get_service_url("my-service", "europe-north1") is None
+
+
+class TestGetServiceIngress:
+    @pytest.mark.unit
+    def test_queries_ingress_annotation(self, mocker: Any) -> None:
+        describe = mocker.patch(
+            "estate_value_index.pipelines.tasks.deployment._describe_service",
+            return_value="internal",
+        )
+
+        ingress = _get_service_ingress("estate-value-index-app", "europe-north1", "my-project")
+
+        assert ingress == "internal"
+        field = describe.call_args[0][2]
+        assert "run.googleapis.com/ingress" in field
+
+
+class TestRevisionReady:
+    @pytest.mark.unit
+    def test_ready_when_latest_created_is_latest_ready(self, mocker: Any) -> None:
+        mocker.patch(
+            "estate_value_index.pipelines.tasks.deployment._describe_service",
+            side_effect=["app-00042-abc", "app-00042-abc"],
+        )
+
+        assert _revision_ready("app", "europe-north1", "my-project") is True
+
+    @pytest.mark.unit
+    def test_not_ready_when_created_revision_is_newer(self, mocker: Any) -> None:
+        mocker.patch(
+            "estate_value_index.pipelines.tasks.deployment._describe_service",
+            side_effect=["app-00043-def", "app-00042-abc"],
+        )
+
+        assert _revision_ready("app", "europe-north1", "my-project") is False
+
+    @pytest.mark.unit
+    def test_not_ready_when_describe_fails(self, mocker: Any) -> None:
+        mocker.patch(
+            "estate_value_index.pipelines.tasks.deployment._describe_service",
+            side_effect=[None, None],
+        )
+
+        assert _revision_ready("app", "europe-north1", "my-project") is False
+
+
+class TestValidateDeployment:
+    @pytest.mark.unit
+    def test_internal_ingress_uses_platform_readiness_not_external_probe(self, mocker: Any) -> None:
+        mocker.patch(
+            "estate_value_index.pipelines.tasks.deployment._get_service_ingress",
+            return_value="internal",
+        )
+        revision_ready = mocker.patch(
+            "estate_value_index.pipelines.tasks.deployment._revision_ready",
+            return_value=True,
+        )
+        probe = mocker.patch("estate_value_index.pipelines.tasks.deployment.requests.get")
+        logger = MagicMock()
+
+        _validate_deployment(
+            logger, "app", "europe-north1", "my-project", "https://app-abc.run.app"
+        )
+
+        revision_ready.assert_called_once_with("app", "europe-north1", "my-project")
+        probe.assert_not_called()
+        messages = [str(call.args[0]) for call in logger.info.call_args_list]
+        assert any("internal ingress, platform readiness used" in m for m in messages)
+        assert any("Platform readiness check passed" in m for m in messages)
+
+    @pytest.mark.unit
+    def test_unknown_ingress_defaults_to_platform_readiness(self, mocker: Any) -> None:
+        mocker.patch(
+            "estate_value_index.pipelines.tasks.deployment._get_service_ingress",
+            return_value=None,
+        )
+        revision_ready = mocker.patch(
+            "estate_value_index.pipelines.tasks.deployment._revision_ready",
+            return_value=True,
+        )
+        probe = mocker.patch("estate_value_index.pipelines.tasks.deployment.requests.get")
+
+        _validate_deployment(MagicMock(), "app", "europe-north1", "my-project", None)
+
+        revision_ready.assert_called_once()
+        probe.assert_not_called()
+
+    @pytest.mark.unit
+    def test_platform_readiness_failure_is_warning_only(self, mocker: Any) -> None:
+        mocker.patch(
+            "estate_value_index.pipelines.tasks.deployment._get_service_ingress",
+            return_value="internal",
+        )
+        mocker.patch(
+            "estate_value_index.pipelines.tasks.deployment._revision_ready",
+            return_value=False,
+        )
+        mocker.patch("time.sleep")
+        logger = MagicMock()
+
+        _validate_deployment(logger, "app", "europe-north1", "my-project", None)
+
+        warnings = [str(call.args[0]) for call in logger.warning.call_args_list]
+        assert any("latest revision not ready" in m for m in warnings)
+
+    @pytest.mark.unit
+    def test_public_ingress_probes_health_endpoint(self, mocker: Any) -> None:
+        mocker.patch(
+            "estate_value_index.pipelines.tasks.deployment._get_service_ingress",
+            return_value="all",
+        )
+        revision_ready = mocker.patch(
+            "estate_value_index.pipelines.tasks.deployment._revision_ready"
+        )
+        health_check = mocker.patch(
+            "estate_value_index.pipelines.tasks.deployment.health_check_task",
+            return_value={"healthy": True},
+        )
+
+        _validate_deployment(
+            MagicMock(), "app", "europe-north1", "my-project", "https://app-abc.run.app"
+        )
+
+        revision_ready.assert_not_called()
+        health_check.assert_called_once_with("https://app-abc.run.app/api/health")
+
+    @pytest.mark.unit
+    def test_deploy_task_routes_validation_through_validate_deployment(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        mocker: Any,
+    ) -> None:
+        monkeypatch.setenv("GCP_PROJECT_ID", "estate-value-index")
+        monkeypatch.setenv("GCS_BUCKET", "estate-value-index-data-production")
+        mocker.patch(
+            "estate_value_index.pipelines.tasks.deployment._get_current_revision",
+            side_effect=["old-revision", "new-revision"],
+        )
+        mocker.patch(
+            "estate_value_index.pipelines.tasks.deployment._get_service_url",
+            return_value="https://app-abc.run.app",
+        )
+        mocker.patch("time.sleep")
+        ok_result = MagicMock()
+        ok_result.returncode = 0
+        ok_result.stdout = ""
+        ok_result.stderr = ""
+        mocker.patch("subprocess.run", return_value=ok_result)
+        validate = mocker.patch(
+            "estate_value_index.pipelines.tasks.deployment._validate_deployment"
+        )
+
+        result = deploy_to_cloud_run_task.fn(
+            model_artifacts_gcs_uri="gs://bucket/models",
+            enrichment_gcs_uri="gs://bucket/derived",
+            validate=True,
+        )
+
+        assert result["success"] is True
+        validate.assert_called_once()
+        assert validate.call_args[0][1:] == (
+            "estate-value-index-app",
+            "europe-north1",
+            "estate-value-index",
+            "https://app-abc.run.app",
+        )
 
 
 class TestHealthCheckTask:
