@@ -270,14 +270,14 @@ def _table_row_count(client: Any, project_id: str, dataset_id: str, table_id: st
 
 
 def _swap_staging_to_production(client: Any, project_id: str, target: FeatureUploadTarget) -> None:
-    logger.info(
-        "Swapping staging → production via CREATE OR REPLACE TABLE %s", target.full_table_id
-    )
+    logger.info("Publishing staging rows to existing production table %s", target.full_table_id)
     swap_sql = (
-        f"CREATE OR REPLACE TABLE "
-        f"{safe_table_ref(project_id, target.dataset_id, target.table_id, quote=True)} "
-        f"AS SELECT * FROM "
-        f"{safe_table_ref(project_id, target.dataset_id, target.staging_table_id, quote=True)}"
+        "BEGIN TRANSACTION;\n"
+        f"DELETE FROM {safe_table_ref(project_id, target.dataset_id, target.table_id, quote=True)} "
+        "WHERE TRUE;\n"
+        f"INSERT INTO {safe_table_ref(project_id, target.dataset_id, target.table_id, quote=True)} "
+        f"SELECT * FROM {safe_table_ref(project_id, target.dataset_id, target.staging_table_id, quote=True)};\n"
+        "COMMIT TRANSACTION;"
     )
     client.query(swap_sql).result()
 
