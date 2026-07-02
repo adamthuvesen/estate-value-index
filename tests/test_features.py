@@ -180,6 +180,29 @@ class TestMissingValueHandling:
         assert X_train_filled["numeric_col"].iloc[0] == 0
         assert X_train_filled["categorical_col"].iloc[0] == "unknown"
 
+    @pytest.mark.unit
+    def test_handle_missing_values_fills_categorical_dtype_with_new_unknown(self):
+        X_train = pd.DataFrame(
+            {
+                "area": pd.Categorical(["Sodermalm", None], categories=["Sodermalm"]),
+            }
+        )
+        X_test = pd.DataFrame(
+            {
+                "area": pd.Categorical([None, "Vasastan"], categories=["Vasastan"]),
+            }
+        )
+
+        X_train_filled, X_test_filled, _, categorical_fill = handle_missing_values(
+            X_train, X_test, [], ["area"]
+        )
+
+        assert categorical_fill["area"] == "Sodermalm"
+        assert not X_train_filled["area"].isna().any()
+        assert not X_test_filled["area"].isna().any()
+        assert str(X_train_filled["area"].dtype) == "category"
+        assert str(X_test_filled["area"].dtype) == "category"
+
 
 class TestFeatureContext:
     @pytest.mark.unit
