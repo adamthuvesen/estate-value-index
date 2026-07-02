@@ -266,10 +266,11 @@ class TestValidateDeployment:
         probe = mocker.patch("estate_value_index.pipelines.tasks.deployment.requests.get")
         logger = MagicMock()
 
-        _validate_deployment(
+        result = _validate_deployment(
             logger, "app", "europe-north1", "my-project", "https://app-abc.run.app"
         )
 
+        assert result is True
         revision_ready.assert_called_once_with("app", "europe-north1", "my-project")
         probe.assert_not_called()
         messages = [str(call.args[0]) for call in logger.info.call_args_list]
@@ -306,8 +307,9 @@ class TestValidateDeployment:
         sleep = mocker.patch("time.sleep")
         logger = MagicMock()
 
-        _validate_deployment(logger, "app", "europe-north1", "my-project", None)
+        result = _validate_deployment(logger, "app", "europe-north1", "my-project", None)
 
+        assert result is False
         warnings = [str(call.args[0]) for call in logger.warning.call_args_list]
         assert any("latest revision not ready" in m for m in warnings)
         # Sleeps only between attempts, never after the final failed one.
@@ -327,10 +329,11 @@ class TestValidateDeployment:
             return_value={"healthy": True},
         )
 
-        _validate_deployment(
+        result = _validate_deployment(
             MagicMock(), "app", "europe-north1", "my-project", "https://app-abc.run.app"
         )
 
+        assert result is True
         revision_ready.assert_not_called()
         health_check.assert_called_once_with("https://app-abc.run.app/api/health")
 
@@ -347,10 +350,11 @@ class TestValidateDeployment:
         mocker.patch("time.sleep")
         logger = MagicMock()
 
-        _validate_deployment(
+        result = _validate_deployment(
             logger, "app", "europe-north1", "my-project", "https://app-abc.run.app"
         )
 
+        assert result is False
         assert health_check.call_count == 3
         warnings = [str(call.args[0]) for call in logger.warning.call_args_list]
         assert any("did not pass after 3 attempts" in m for m in warnings)
@@ -378,7 +382,8 @@ class TestValidateDeployment:
         ok_result.stderr = ""
         mocker.patch("subprocess.run", return_value=ok_result)
         validate = mocker.patch(
-            "estate_value_index.pipelines.tasks.deployment._validate_deployment"
+            "estate_value_index.pipelines.tasks.deployment._validate_deployment",
+            return_value=False,
         )
 
         result = deploy_to_cloud_run_task.fn(
@@ -395,6 +400,26 @@ class TestValidateDeployment:
             "estate-value-index",
             "https://app-abc.run.app",
         )
+        # The validation verdict and the pre-deploy revision are recorded so
+        # flows can act on them (auto-rollback).
+        assert result["healthy"] is False
+        assert result["previous_revision"] == "old-revision"
+
+    @pytest.mark.unit
+    def test_dry_run_records_no_health_or_previous_revision(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("GCP_PROJECT_ID", "estate-value-index")
+
+        result = deploy_to_cloud_run_task.fn(
+            model_artifacts_gcs_uri="gs://bucket/models",
+            enrichment_gcs_uri="gs://bucket/derived",
+            dry_run=True,
+        )
+
+        assert result["success"] is True
+        assert result["healthy"] is None
+        assert result["previous_revision"] is None
 
 
 class TestHealthCheckTask:

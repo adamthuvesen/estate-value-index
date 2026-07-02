@@ -140,13 +140,17 @@ def _validate_deployment(
     region: str,
     project_id: str,
     service_url: str | None,
-) -> None:
+) -> bool | None:
     """Post-deploy validation. Warning-only: a failed check never fails the deploy.
 
     The service is deployed with internal ingress, so an unauthenticated
     external probe from the runner always hits a Google Frontend 404. For
     anything but public ingress ("all"), use Cloud Run's own revision
     readiness (gcloud run services describe) instead of an HTTP probe.
+
+    Returns True when the check passed, False when it failed after retries,
+    None when it was skipped. The caller records this in DeploymentResult so
+    flows can act on it (auto-rollback); it never raises.
     """
     # Deploy always sets --ingress internal; if the lookup fails, assume internal.
     ingress = _get_service_ingress(service_name, region, project_id) or "internal"
@@ -158,13 +162,13 @@ def _validate_deployment(
                 time.sleep(10)
             if _revision_ready(service_name, region, project_id):
                 logger.info("Platform readiness check passed")
-                return
+                return True
         logger.warning("Platform readiness check failed: latest revision not ready")
-        return
+        return False
 
     if not service_url:
         logger.warning("No service URL available - skipping health check")
-        return
+        return None
 
     # Retry health check while the Cloud Run revision warms up
     for attempt in range(3):
@@ -172,11 +176,12 @@ def _validate_deployment(
             health_result = health_check_task(f"{service_url}/api/health")
             if health_result["healthy"]:
                 logger.info("Health check passed")
-                return
+                return True
         except Exception as e:
             logger.warning(f"Health check attempt {attempt + 1} failed: {e}")
         time.sleep(10)
     logger.warning("Health check did not pass after 3 attempts")
+    return False
 
 
 def _assert_runtime_service_account_exists(runtime_service_account: str) -> None:
@@ -245,6 +250,8 @@ def deploy_to_cloud_run_task(
             timestamp=datetime.now().isoformat(),
             service_url=None,
             revision=None,
+            previous_revision=None,
+            healthy=None,
         )
 
     gcs_bucket = get_gcs_bucket()
@@ -306,14 +313,17 @@ def deploy_to_cloud_run_task(
 
     logger.info(f"Deployment complete: {current_revision} -> {new_revision}")
 
+    healthy = None
     if validate:
-        _validate_deployment(logger, service_name, region, project_id, service_url)
+        healthy = _validate_deployment(logger, service_name, region, project_id, service_url)
 
     return DeploymentResult(
         success=True,
         timestamp=datetime.now().isoformat(),
         service_url=service_url,
         revision=new_revision,
+        previous_revision=current_revision,
+        healthy=healthy,
     )
 
 

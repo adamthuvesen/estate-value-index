@@ -45,9 +45,9 @@ def deployment_pipeline_flow(config: DeploymentFlowConfig | None = None) -> dict
 
     # A dry run returns success=True without deploying anything; never report it as deployed.
     deployed = deployment_result.get("success", False) and not config.dry_run
-    health_check = deployment_result.get("health_check", {})
-    # Assume healthy if no health check was run
-    is_healthy = health_check.get("healthy", False) if health_check else True
+    # healthy is True/False from post-deploy validation, None when validation was
+    # skipped — only an explicit failure counts as unhealthy.
+    is_healthy = deployment_result.get("healthy") is not False
 
     if deployed and not is_healthy and config.auto_rollback_on_failure:
         previous_revision = deployment_result.get("previous_revision")

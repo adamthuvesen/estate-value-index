@@ -63,6 +63,8 @@ class DeploymentResult(TaskResult):
 
     service_url: str | None
     revision: str | None
+    previous_revision: str | None
+    healthy: bool | None
 
 
 class HealthCheckResult(TaskResult):
