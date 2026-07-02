@@ -43,10 +43,11 @@ def deployment_pipeline_flow(config: DeploymentFlowConfig | None = None) -> dict
         dry_run=config.dry_run,
     )
 
-    deployed = deployment_result.get("deployed", False)
-    health_check = deployment_result.get("health_check", {})
-    # Assume healthy if no health check was run
-    is_healthy = health_check.get("healthy", False) if health_check else True
+    # A dry run returns success=True without deploying anything; never report it as deployed.
+    deployed = deployment_result.get("success", False) and not config.dry_run
+    # healthy is True/False from post-deploy validation, None when validation was
+    # skipped — only an explicit failure counts as unhealthy.
+    is_healthy = deployment_result.get("healthy") is not False
 
     if deployed and not is_healthy and config.auto_rollback_on_failure:
         previous_revision = deployment_result.get("previous_revision")
@@ -73,7 +74,8 @@ def deployment_pipeline_flow(config: DeploymentFlowConfig | None = None) -> dict
         logger.info("Deployment rolled back (health check failed)")
     elif deployed and is_healthy:
         logger.info(
-            f"Deployment successful: url={deployment_result.get('url')}, healthy={is_healthy}"
+            f"Deployment successful: url={deployment_result.get('service_url')}, "
+            f"healthy={is_healthy}"
         )
     elif config.dry_run:
         logger.info("Dry run complete")
@@ -113,6 +115,6 @@ if __name__ == "__main__":
     print("\n" + "=" * 80)
     print("DEPLOYMENT RESULT")
     print("=" * 80)
-    print(f"Deployed: {result.get('deployed', False)}")
-    print(f"URL: {result.get('url', 'N/A')}")
+    print(f"Deployed: {result.get('success', False) and not args.dry_run}")
+    print(f"URL: {result.get('service_url', 'N/A')}")
     print("=" * 80)

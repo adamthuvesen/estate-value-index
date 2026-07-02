@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from unittest.mock import MagicMock
 
 from estate_value_index.pipelines.core import complete_pipeline as pipeline
@@ -102,14 +103,15 @@ def test_deployment_stage_uses_training_uri_or_bucket_fallback(monkeypatch):
 
     def fake_deploy_to_cloud_run_task(**kwargs):
         calls.update(kwargs)
-        return {"deployed": True, "url": "https://example.test"}
+        return {"success": True, "service_url": "https://example.test", "revision": "rev-2"}
 
     monkeypatch.setattr(pipeline, "get_gcs_bucket", lambda: "model-bucket")
     monkeypatch.setattr(pipeline, "deploy_to_cloud_run_task", fake_deploy_to_cloud_run_task)
     results = {"stages": {}}
+    logger = MagicMock()
 
     pipeline._run_deployment_stage(
-        MagicMock(),
+        logger,
         results,
         {"steps": {"download_artifacts": {}}},
         deploy_to_prod=True,
@@ -124,6 +126,67 @@ def test_deployment_stage_uses_training_uri_or_bucket_fallback(monkeypatch):
         "validate": False,
     }
     assert results["stages"]["deployment"] == {
-        "deployed": True,
-        "url": "https://example.test",
+        "success": True,
+        "service_url": "https://example.test",
+        "revision": "rev-2",
     }
+    # `deployed=` has one source of truth (the pipeline summary); the stage log
+    # reports the real DeploymentResult fields instead.
+    stage_logs = [str(call.args[0]) for call in logger.info.call_args_list]
+    assert not any("deployed=" in message for message in stage_logs)
+    assert any(
+        "url=https://example.test" in message and "revision=rev-2" in message
+        for message in stage_logs
+    )
+
+
+def test_deployment_succeeded_reads_the_recorded_stage():
+    assert pipeline._deployment_succeeded({"stages": {}}) is False
+    assert (
+        pipeline._deployment_succeeded(
+            {"stages": {"deployment": {"skipped": True, "reasons": ["dry_run=True"]}}}
+        )
+        is False
+    )
+    assert (
+        pipeline._deployment_succeeded(
+            {"stages": {"deployment": {"success": True, "service_url": "u", "revision": "r"}}}
+        )
+        is True
+    )
+
+
+def test_pipeline_summary_reports_deployed_from_deployment_stage():
+    logger = MagicMock()
+    results = {
+        "stages": {"deployment": {"success": True, "service_url": "u", "revision": "r"}},
+    }
+
+    pipeline._record_pipeline_success(
+        logger,
+        results,
+        start_time=datetime.now(),
+        validation_passed=True,
+        mae=250_000,
+    )
+
+    summary = logger.info.call_args[0][0]
+    assert "deployed=True" in summary
+
+
+def test_pipeline_summary_reports_deployed_false_when_stage_skipped():
+    logger = MagicMock()
+    results = {
+        "stages": {"deployment": {"skipped": True, "reasons": ["deploy_to_prod=False"]}},
+    }
+
+    pipeline._record_pipeline_success(
+        logger,
+        results,
+        start_time=datetime.now(),
+        validation_passed=True,
+        mae=250_000,
+    )
+
+    summary = logger.info.call_args[0][0]
+    assert "deployed=False" in summary
