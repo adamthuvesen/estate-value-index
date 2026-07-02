@@ -303,13 +303,15 @@ class TestValidateDeployment:
             "estate_value_index.pipelines.tasks.deployment._revision_ready",
             return_value=False,
         )
-        mocker.patch("time.sleep")
+        sleep = mocker.patch("time.sleep")
         logger = MagicMock()
 
         _validate_deployment(logger, "app", "europe-north1", "my-project", None)
 
         warnings = [str(call.args[0]) for call in logger.warning.call_args_list]
         assert any("latest revision not ready" in m for m in warnings)
+        # Sleeps only between attempts, never after the final failed one.
+        assert sleep.call_count == 2
 
     @pytest.mark.unit
     def test_public_ingress_probes_health_endpoint(self, mocker: Any) -> None:
@@ -331,6 +333,27 @@ class TestValidateDeployment:
 
         revision_ready.assert_not_called()
         health_check.assert_called_once_with("https://app-abc.run.app/api/health")
+
+    @pytest.mark.unit
+    def test_public_ingress_probe_failure_is_warning_only(self, mocker: Any) -> None:
+        mocker.patch(
+            "estate_value_index.pipelines.tasks.deployment._get_service_ingress",
+            return_value="all",
+        )
+        health_check = mocker.patch(
+            "estate_value_index.pipelines.tasks.deployment.health_check_task",
+            return_value={"healthy": False},
+        )
+        mocker.patch("time.sleep")
+        logger = MagicMock()
+
+        _validate_deployment(
+            logger, "app", "europe-north1", "my-project", "https://app-abc.run.app"
+        )
+
+        assert health_check.call_count == 3
+        warnings = [str(call.args[0]) for call in logger.warning.call_args_list]
+        assert any("did not pass after 3 attempts" in m for m in warnings)
 
     @pytest.mark.unit
     def test_deploy_task_routes_validation_through_validate_deployment(

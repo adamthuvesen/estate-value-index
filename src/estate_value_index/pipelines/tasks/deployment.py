@@ -153,11 +153,12 @@ def _validate_deployment(
 
     if ingress != "all":
         logger.info("External health check skipped: internal ingress, platform readiness used")
-        for _ in range(3):
+        for attempt in range(3):
+            if attempt:
+                time.sleep(10)
             if _revision_ready(service_name, region, project_id):
                 logger.info("Platform readiness check passed")
                 return
-            time.sleep(10)
         logger.warning("Platform readiness check failed: latest revision not ready")
         return
 
