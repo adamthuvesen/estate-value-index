@@ -246,6 +246,21 @@ def _insert_feature_batches(
         )
 
 
+def _create_empty_staging_table(client: Any, project_id: str, target: FeatureUploadTarget) -> None:
+    if target.staging_table_id is None:
+        return
+
+    create_sql = (
+        f"CREATE TABLE "
+        f"{safe_table_ref(project_id, target.dataset_id, target.staging_table_id, quote=True)} "
+        f"AS SELECT * FROM "
+        f"{safe_table_ref(project_id, target.dataset_id, target.table_id, quote=True)} "
+        "WHERE FALSE"
+    )
+    logger.info("Creating empty staging table %s", target.staging_id)
+    client.query(create_sql).result()
+
+
 def _table_row_count(client: Any, project_id: str, dataset_id: str, table_id: str) -> int:
     count_query = (
         "SELECT COUNT(*) as count "
@@ -298,6 +313,7 @@ def _upload_feature_rows(
     batch_size: int,
 ) -> int:
     try:
+        _create_empty_staging_table(client, project_id, target)
         _insert_feature_batches(client, target.upload_target, rows, batch_size)
         row_count = _verify_and_publish_features(client, project_id, target, len(rows))
         logger.info("BigQuery table has %d rows", row_count)

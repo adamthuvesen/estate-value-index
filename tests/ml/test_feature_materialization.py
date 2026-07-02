@@ -93,8 +93,12 @@ def test_truncate_path_swaps_staging_to_production_on_success(monkeypatch, fake_
         for target in insert_targets
     ), insert_targets
 
-    # CREATE OR REPLACE was issued.
+    # Staging table was created before inserts, then production was swapped.
     queries = [call.args[0] for call in client.query.call_args_list]
+    create_staging = [q for q in queries if "CREATE TABLE" in q.upper() and "WHERE FALSE" in q]
+    assert create_staging, queries
+    assert client.query.call_args_list[0].args[0] == create_staging[0]
+    assert client.query.call_args_list[0].args[0].find("_staging_") > -1
     create_or_replace = [q for q in queries if "CREATE OR REPLACE TABLE" in q.upper()]
     assert create_or_replace, queries
     # No raw TRUNCATE TABLE issued against production.
