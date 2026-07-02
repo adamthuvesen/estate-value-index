@@ -1,6 +1,6 @@
 # AGENTS.md
 
-**estate-value-index** is a Swedish real estate ML system: **Scrapy** → **BigQuery** → **LightGBM** → **Next.js** + **FastAPI**. Python 3.11+ with **uv**; Node 20+ for `web/`.
+**estate-value-index** is a Swedish real estate ML system: authorized listing ingestion → **BigQuery** → **LightGBM** → **Next.js** + **FastAPI**. Python 3.11+ with **uv**; Node 20+ for `web/`.
 
 User-level guidance (tone, principles, git etiquette) lives in `~/.claude/CLAUDE.md` and `~/dotfiles/agents/AGENTS.md` and is *not* duplicated here. This file is for project-specific facts.
 

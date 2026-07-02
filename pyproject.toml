@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "estate-value-index"
 version = "1.0.0"
-description = "Swedish real estate ML system: Scrapy → BigQuery → LightGBM → Next.js"
+description = "Swedish real estate ML system: authorized listings → BigQuery → LightGBM → Next.js"
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}
@@ -23,7 +23,7 @@ classifiers = [
 
 # Core dependencies (production runtime)
 dependencies = [
-    # Web scraping
+    # Ingestion adapters
     "scrapy>=2.11.0",
     "requests>=2.31.0",
     "fake-useragent>=1.4.0",

@@ -1,22 +1,22 @@
 # Architecture
 
-This repo predicts Swedish real estate values from Booli-style listing data. The main flow is:
+This repo predicts Swedish real estate values from authorized listing data. The main flow is:
 
 ```text
-Scrapy -> BigQuery raw listings -> engineered features -> LightGBM artifacts
+Permissioned listing source -> BigQuery raw listings -> engineered features -> LightGBM artifacts
   -> Next.js API/routes + FastAPI prediction service
 ```
 
 The public repo intentionally excludes real listing data, geocodes, trained
 models, model metrics, and property-level prediction artifacts. Use
 `tests/fixtures/` for synthetic shapes and provide private artifacts through
-your own BigQuery, GCS, or local environment.
+your own lawful data source, BigQuery, GCS, or local environment.
 
 ## Stack
 
 | Layer | Tech |
 | ----- | ---- |
-| Ingestion | Scrapy |
+| Ingestion | Authorized API/export inputs, Scrapy adapter for parser development |
 | Warehouse | BigQuery |
 | Training | LightGBM, optional Optuna |
 | API | FastAPI + Next.js 15 |
