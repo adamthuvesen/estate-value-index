@@ -13,6 +13,7 @@ from typing import Final
 
 from prefect import task
 
+from estate_value_index.pipelines.constants import DEFAULT_MAE_THRESHOLD
 from estate_value_index.pipelines.types import (
     MaterializationResult,
     ValidationResult,
@@ -446,7 +447,7 @@ def download_model_artifacts_task(
 @task(name="validate-model-performance", retries=0, timeout_seconds=60)
 def validate_model_performance_task(
     metrics_path: Path,
-    max_mae: float = 255000,
+    max_mae: float = DEFAULT_MAE_THRESHOLD,
     max_rmse: float | None = None,
 ) -> ValidationResult:
     """Validate model performance against thresholds.

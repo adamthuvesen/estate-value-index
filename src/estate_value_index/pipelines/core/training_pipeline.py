@@ -23,6 +23,7 @@ from pathlib import Path
 from prefect import flow, get_run_logger
 
 from estate_value_index.ml.training_workflow import TrainingConfig, run_training
+from estate_value_index.pipelines.constants import DEFAULT_MAE_THRESHOLD
 
 # Import training tasks from new focused modules
 from estate_value_index.pipelines.tasks import (
@@ -125,6 +126,7 @@ def _run_local_training(config: TrainingFlowConfig, results: dict, logger: Logge
         )
         results["steps"]["validation"] = validation_results
         results["validation_passed"] = validation_results["validation_passed"]
+        results["validation_mae_passed"] = validation_results["validation_passed"]
         results["metrics"] = {
             "mae": validation_results["mae"],
             "rmse": validation_results.get("rmse"),
@@ -409,6 +411,7 @@ def _validate_and_promote_stage(
     if not metrics_path.exists():
         logger.warning(f"Metrics file not found: {metrics_path}")
         results["validation_passed"] = False
+        results["validation_mae_passed"] = False
         return
 
     validation_results = validate_model_performance_task(
@@ -416,6 +419,8 @@ def _validate_and_promote_stage(
     )
     results["steps"]["validation"] = validation_results
     results["validation_passed"] = validation_results["validation_passed"]
+    # ml-pipeline.yml reads this key; without it the workflow defaulted to True.
+    results["validation_mae_passed"] = validation_results["validation_passed"]
     results["metrics"] = {
         "mae": validation_results["mae"],
         "rmse": validation_results.get("rmse"),
@@ -455,6 +460,13 @@ def _validate_and_promote_stage(
 
 def _generate_enrichment_stage(config: TrainingFlowConfig, results: dict, logger: Logger) -> None:
     """Stage 7: generate and upload enrichment data for the web app (non-critical)."""
+    if not results.get("validation_passed", False):
+        # Promotion is validation-gated, so the production-named model files
+        # this stage reads do not exist after a failed validation.
+        logger.info("STEP 7: Skipping enrichment generation (validation failed)")
+        results["steps"]["enrichment"] = {"skipped": True, "reason": "validation_failed"}
+        return
+
     logger.info("STEP 7: Generating enrichment data for web app")
     logger.info("-" * 80)
 
@@ -691,7 +703,7 @@ def production_vertex_training_flow(rebuild: bool = False, register: bool = True
         register_to_vertex=register,
         stream_logs=True,
         use_vertex=True,
-        max_mae=255000,  # Strict threshold matching current best
+        max_mae=DEFAULT_MAE_THRESHOLD,
     )
     return vertex_training_flow(config)
 
