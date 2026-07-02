@@ -202,18 +202,20 @@ def _submit_training_job_stage(
     )
     results["steps"]["submit_job"] = submission_results
 
+    # Seed the prefix only from the submission output. The configured prefix is the
+    # production name (e.g. price_prediction_model), not the trainer's run-specific
+    # artifact prefix (vertex-lgbm-{run_id}); seeding it here would stop the monitor
+    # stage from resolving the real prefix and break the artifact download.
     state = _VertexJobState(
         job_id=submission_results.get("job_id"),
         run_id=submission_results.get("run_id"),
         model_uri=submission_results.get("model_uri"),
-        resolved_model_prefix=results["configuration"]["model_prefix"],
+        resolved_model_prefix=submission_results.get("model_prefix"),
         submission_results=submission_results,
     )
 
-    submitted_prefix = submission_results.get("model_prefix")
-    if submitted_prefix:
-        state.resolved_model_prefix = submitted_prefix
-        results["configuration"]["model_prefix"] = submitted_prefix
+    if state.resolved_model_prefix:
+        results["configuration"]["model_prefix"] = state.resolved_model_prefix
 
     if not state.job_id and not config.dry_run:
         logger.warning("Job ID not found - cannot monitor job")
@@ -342,6 +344,12 @@ def _download_artifacts_stage(
         results["success"] = False
         results["error"] = "Model URI missing"
         return True
+
+    if not state.resolved_model_prefix:
+        logger.warning(
+            f"Model prefix unresolved - falling back to configured prefix {config.model_prefix!r}"
+        )
+        state.resolved_model_prefix = config.model_prefix
 
     download_results = download_model_artifacts_task(
         model_uri=state.model_uri,
