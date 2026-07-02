@@ -371,28 +371,45 @@ class TestGenerateEnrichmentStage:
 
     @pytest.mark.unit
     def test_runs_when_validation_passed(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Value analysis must run before area statistics: area statistics reads
+        the value_analysis.json file that value analysis writes. Upload runs last."""
         called: list[str] = []
+        kwargs_by_task: dict[str, dict] = {}
+
+        def _record(name: str, result: dict):
+            def task(**kwargs):
+                called.append(name)
+                kwargs_by_task[name] = kwargs
+                return result
+
+            return task
+
         monkeypatch.setattr(
             pipeline_tasks,
             "generate_area_statistics_task",
-            lambda **kwargs: called.append("area_stats") or {"records_generated": 1},
+            _record("area_stats", {"records_generated": 1}),
         )
         monkeypatch.setattr(
             pipeline_tasks,
             "generate_value_analysis_task",
-            lambda **kwargs: called.append("value_analysis") or {"records_generated": 1},
+            _record("value_analysis", {"records_generated": 1}),
         )
         monkeypatch.setattr(
             pipeline_tasks,
             "upload_enrichment_to_gcs_task",
-            lambda **kwargs: called.append("upload") or {"uploaded_files": 1},
+            _record("upload", {"uploaded_files": 1}),
         )
         monkeypatch.setattr(training_pipeline, "get_gcs_bucket", lambda: "test-bucket")
         results: dict = {"validation_passed": True, "steps": {}}
 
         _generate_enrichment_stage(TrainingFlowConfig(), results, MagicMock())
 
-        assert called == ["area_stats", "value_analysis", "upload"]
+        assert called == ["value_analysis", "area_stats", "upload"]
+        # Area statistics must read the exact file value analysis just wrote.
+        assert (
+            kwargs_by_task["area_stats"]["value_analysis_path"]
+            == kwargs_by_task["value_analysis"]["output_file"]
+        )
         assert "enrichment" not in results["steps"]
 
 
