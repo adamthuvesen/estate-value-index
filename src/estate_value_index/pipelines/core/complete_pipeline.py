@@ -287,8 +287,8 @@ def _run_deployment_stage(
         results["stages"]["deployment"] = deploy_result
         logger.info(
             "Stage 4 complete: "
-            f"deployed={deploy_result.get('deployed', False)}, "
-            f"url={deploy_result.get('url', 'N/A')}"
+            f"url={deploy_result.get('service_url') or 'N/A'}, "
+            f"revision={deploy_result.get('revision') or 'N/A'}"
         )
     except ImportError:
         logger.warning("Deployment tasks not available - skipping")
@@ -304,12 +304,17 @@ def _completed_stage_count(results: dict[str, Any]) -> int:
     )
 
 
+def _deployment_succeeded(results: dict[str, Any]) -> bool:
+    """Single source of truth for `deployed=`: the recorded deployment stage result."""
+    deployment = results["stages"].get("deployment", {})
+    return bool(deployment.get("success")) and not deployment.get("skipped")
+
+
 def _record_pipeline_success(
     logger: Any,
     results: dict[str, Any],
     *,
     start_time: datetime,
-    deploy_to_prod: bool,
     validation_passed: bool,
     mae: int,
 ) -> dict[str, Any]:
@@ -322,7 +327,7 @@ def _record_pipeline_success(
     results["duration_minutes"] = round(duration / 60, 2)
 
     stages_done = _completed_stage_count(results)
-    deployed = deploy_to_prod and validation_passed
+    deployed = _deployment_succeeded(results)
     logger.info(
         f"Pipeline complete: {duration / 60:.1f}min, {stages_done} stages, "
         f"MAE={mae:,.0f}, validation={'passed' if validation_passed else 'failed'}, "
@@ -427,7 +432,6 @@ def complete_pipeline_flow(
             logger,
             results,
             start_time=start_time,
-            deploy_to_prod=deploy_to_prod,
             validation_passed=validation_passed,
             mae=mae,
         )
