@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import subprocess
 from unittest.mock import MagicMock
+
+import pytest
 
 from estate_value_index.pipelines.core import data_pipeline
 
@@ -89,3 +92,34 @@ def test_sync_stage_records_failure_without_raising():
     )
 
     assert result == {"error": "sync failed", "success": False}
+
+
+def test_run_scrapy_spider_fails_when_booli_returns_403_in_log_file(tmp_path, monkeypatch):
+    output_file = tmp_path / "blocked.jsonl"
+    log_file = tmp_path / "booli.log"
+    monkeypatch.setenv("BOOLI_LOG_FILE", str(log_file))
+
+    def fake_run(cmd, **kwargs):
+        output_file.write_text("", encoding="utf-8")
+        log_file.write_text(
+            "WARNING: 403 Forbidden for URL: https://www.booli.se/sok/slutpriser\n",
+            encoding="utf-8",
+        )
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(data_pipeline.subprocess, "run", fake_run)
+
+    with pytest.raises(RuntimeError, match="Booli scrape blocked with HTTP 403"):
+        data_pipeline.run_scrapy_spider.fn(max_pages=1, output_file=output_file)
+
+
+def test_run_scrapy_spider_allows_empty_output_without_block_signal(tmp_path, monkeypatch):
+    output_file = tmp_path / "empty.jsonl"
+
+    def fake_run(cmd, **kwargs):
+        output_file.write_text("", encoding="utf-8")
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(data_pipeline.subprocess, "run", fake_run)
+
+    assert data_pipeline.run_scrapy_spider.fn(max_pages=1, output_file=output_file) == output_file

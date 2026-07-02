@@ -1,18 +1,18 @@
 # Estate Value Index
 
-Predicts sale prices for Swedish residential listings, end to end: scrape listings,
-land them in BigQuery, engineer features, train LightGBM, and serve predictions from a
-FastAPI + Next.js container on Cloud Run.
+Predicts sale prices for Swedish residential listings, end to end: ingest authorized
+listing data, land it in BigQuery, engineer features, train LightGBM, and serve
+predictions from a FastAPI + Next.js container on Cloud Run.
 
 It exists as a working reference for the whole path — ingestion through serving — rather
 than a model in a notebook. The interesting parts are the seams where real systems break:
 temporal leakage in training, train/serve skew at inference, and untrusted input reaching
 SQL and the file system.
 
-The public repo ships the code, not the private data. Real listings, geocodes, trained
-models, private datasets, and production metrics are intentionally excluded. The files
-under `tests/fixtures/` are synthetic examples. Bring your own BigQuery, GCS, and `.env`
-for production-like runs.
+The public repo ships code and synthetic fixtures only, not scraped listings or a
+redistributable Booli dataset. Real listings, geocodes, trained models, private datasets,
+and production metrics are intentionally excluded. Bring your own lawful data access,
+BigQuery, GCS, and `.env` for production-like runs.
 
 ## Engineering decisions
 
@@ -52,7 +52,7 @@ after retrains rather than assumed stable.
 
 | Layer | Tech |
 | ----- | ---- |
-| Ingestion | Scrapy |
+| Ingestion | Authorized API/export inputs, Scrapy adapter for parser development |
 | Warehouse | BigQuery |
 | ML | pandas, scikit-learn, LightGBM, optional Optuna |
 | API | FastAPI |
@@ -64,7 +64,7 @@ after retrains rather than assumed stable.
 ## How it fits together
 
 ```text
-Scrapy → BigQuery raw listings → engineered features → LightGBM artifacts
+Authorized listing source → BigQuery raw listings → engineered features → LightGBM artifacts
   → FastAPI /predict + Next.js API routes (one Cloud Run container)
 ```
 
@@ -147,6 +147,14 @@ or production performance.
 
 The web app alone: `cd web && npm run dev`.
 
+## Data Access
+
+This project is a modeling and systems prototype, not a data product. Before running
+ingestion against any third-party site or API, make sure you have the right to access the
+data, follow the source's terms, and do not bypass access controls. Prefer signed APIs,
+licensed exports, or other permissioned sources for real training data. The included
+fixtures are synthetic and are the only data intended for public redistribution.
+
 ## Common tasks
 
 ```bash
@@ -163,7 +171,7 @@ uv run python -m estate_value_index.pipelines.core.complete_pipeline --dry-run  
 uv run python -m estate_value_index.pipelines.core.complete_pipeline --retrain    # retrain existing data
 uv run python -m estate_value_index.pipelines.core.complete_pipeline --retrain --deploy
 
-# Ingest listings
+# Ingest authorized listings
 uv run python -m estate_value_index.cli.crawl_booli --max-pages 10
 
 # Deploy to Cloud Run

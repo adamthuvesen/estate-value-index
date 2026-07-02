@@ -25,6 +25,28 @@ def _require_env(name: str) -> str:
     return value
 
 
+def _runtime_service_account(project_id: str) -> str:
+    return os.getenv(
+        "CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT",
+        os.getenv(
+            "RUNTIME_SERVICE_ACCOUNT",
+            f"evi-cloud-run-runtime@{project_id}.iam.gserviceaccount.com",
+        ),
+    )
+
+
+def _cloud_run_env_vars(gcs_bucket: str) -> str:
+    return ",".join(
+        [
+            "GCS_ENABLED=true",
+            f"GCS_BUCKET={gcs_bucket}",
+            "NODE_ENV=production",
+            "PREDICTION_API_URL=http://127.0.0.1:8000",
+            "TRUST_PROXY_HEADERS=true",
+        ]
+    )
+
+
 def _describe_service(
     service_name: str,
     region: str,
@@ -84,6 +106,27 @@ def _get_service_url(
     return _describe_service(service_name, region, "status.url", project_id)
 
 
+def _assert_runtime_service_account_exists(runtime_service_account: str) -> None:
+    result = subprocess.run(
+        [
+            "gcloud",
+            "iam",
+            "service-accounts",
+            "describe",
+            runtime_service_account,
+        ],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            "Cloud Run runtime service account not found: "
+            f"{runtime_service_account}. Create it with scripts/setup_gcp.sh or set "
+            "CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT to a GCS-read-only runtime account."
+        )
+
+
 # --- Tasks ---
 
 
@@ -131,7 +174,10 @@ def deploy_to_cloud_run_task(
             revision=None,
         )
 
+    gcs_bucket = get_gcs_bucket()
+    runtime_service_account = _runtime_service_account(project_id)
     current_revision = _get_current_revision(service_name, region, project_id)
+    _assert_runtime_service_account_exists(runtime_service_account)
 
     deploy_cmd = [
         "gcloud",
@@ -144,6 +190,8 @@ def deploy_to_cloud_run_task(
         region,
         "--platform",
         "managed",
+        "--service-account",
+        runtime_service_account,
         "--allow-unauthenticated",
         "--project",
         project_id,
@@ -159,6 +207,10 @@ def deploy_to_cloud_run_task(
         "0",
         "--max-instances",
         "2",
+        "--ingress",
+        "internal",
+        "--set-env-vars",
+        _cloud_run_env_vars(gcs_bucket),
         "--quiet",
     ]
 

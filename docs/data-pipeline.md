@@ -1,18 +1,18 @@
 # Data pipeline
 
-The data path is listing ingestion output into BigQuery raw listings, engineered feature materialization, then model training or serving artifacts.
+The data path is authorized listing ingestion output into BigQuery raw listings, engineered feature materialization, then model training or serving artifacts. The public repo contains code and synthetic fixtures only, not redistributable scraped listing data.
 
 ## Main flow
 
 ```text
-Booli -> spider -> JSONL + upload path -> process_listings -> booli_raw.listings
+Permissioned listing source -> JSONL + upload path -> process_listings -> booli_raw.listings
   -> materialize_features -> booli_features.engineered_features
   -> train_model.py / pipeline -> web/models/* -> Next /api/* -> FastAPI /predict
 ```
 
 ## Where to work
 
-- Spider and extraction logic: `src/estate_value_index/ingestion/booli/`
+- Booli ingestion adapters and extraction logic: `src/estate_value_index/ingestion/booli/`
 - Ingestion utilities and loaders: `src/estate_value_index/ingestion/`
 - Pipeline orchestration: `src/estate_value_index/pipelines/core/complete_pipeline.py`
 - Pipeline tasks: `src/estate_value_index/pipelines/tasks/`
@@ -35,6 +35,19 @@ GCS_BUCKET=your-gcs-bucket
 ```
 
 Optional knobs (examples): `GCS_ENABLED`, `MAX_MAE_THRESHOLD`, `DATA_SOURCE`, `MODEL_PREFIX`, `MODEL_OUTPUT_DIR`, `DEBUG`, `TRUST_PROXY_HEADERS`.
+
+Optional signed Booli API credentials for local/private catch-up runs:
+
+```bash
+BOOLI_API_CALLER_ID=your-booli-caller-id
+BOOLI_API_PRIVATE_KEY=your-booli-private-key
+BACKFILL_SOURCE=api
+```
+
+Use the signed API source for catch-up/backfill when credentials are available.
+The public HTML spider exists for parser development and local experiments only. Do
+not use it to bypass access controls or source terms; use permissioned API or export
+access for real training data. The API path writes the same raw-listing JSONL schema.
 
 Precedence: environment → `config/pipeline_config.yaml` → code defaults.
 

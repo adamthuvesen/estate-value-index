@@ -8,7 +8,7 @@ This directory contains CI/CD workflows for the Estate Value Index project.
 |----------|--------|---------|---------|
 | **ci.yml** | Enabled | Push, PR | Run tests and linting |
 | **deploy.yml** | Manual | `workflow_dispatch` | Deploy web app to Cloud Run |
-| **ml-pipeline.yml** | Manual | `workflow_dispatch` | Run retraining / Vertex AI pipeline |
+| **ml-pipeline.yml** | Enabled | Weekly cron, `workflow_dispatch` | Run retraining / Vertex AI pipeline |
 | **ml-monitoring.yml** | Manual | `workflow_dispatch` | Run drift detection |
 
 ---
@@ -77,15 +77,26 @@ gh workflow run deploy.yml -f environment=production  # protected environment
 ## 🧠 ML Pipeline
 
 **File:** `ml-pipeline.yml`
-**Triggers:** Manual only (`workflow_dispatch`)
+**Triggers:** Weekly Sunday 03:10 UTC (`schedule`) and manual (`workflow_dispatch`)
 
 ### What it does:
 
 1. Sets up Python environment
 2. Authenticates to Google Cloud (if Vertex AI mode)
-3. Runs training job (Vertex AI or local)
-4. Uploads model artifacts
-5. Reports training metrics
+3. Optionally runs ingestion from an authorized listing source
+4. Runs training job (Vertex AI or local)
+5. Uploads/promotes model artifacts
+6. Deploys to Cloud Run when validation passes
+7. Reports training metrics
+
+Scheduled production runs intentionally do not scrape from GitHub Actions. They use these fixed defaults:
+
+- `environment=production`
+- `mode=retrain`
+- `skip_scraping=true`
+- `tune=true`
+- `rebuild_container=false`
+- `deploy=true`
 
 ### Usage:
 
@@ -106,8 +117,37 @@ gh workflow run ml-pipeline.yml -f environment=staging -f mode=local -f tune=fal
 |-----------|---------|---------|-------------|
 | `environment` | staging, production | staging | GitHub environment containing cloud vars/secrets |
 | `mode` | retrain, full, vertex, local | retrain | Pipeline mode |
+| `max_pages` | positive integer | 5 | Maximum source pages in full mode |
+| `config_file` | path | all-locations config | Listing-source config |
 | `tune` | true, false | true | Enable hyperparameter tuning |
 | `deploy` | true, false | false | Deploy to Cloud Run after training |
+
+---
+
+## 🧯 Local Catch-up Backfill
+
+Backfill is local/private only, not a public GitHub Actions workflow.
+
+### What it does:
+
+1. Runs the primary catch-up window from `2025-12-22` through today with weekly windows
+2. Uses conservative source-access defaults: `max_pages=20`, `concurrent=1`, `delay=1.0`
+3. Retries each ingestion window twice and fails if validation drops below 50%
+4. Falls back to `2026-04-27` through today with `max_pages=10`, `delay=2.0`
+5. Processes `all_dedup.jsonl`, uploads through the BigQuery MERGE path, materializes features with truncate, syncs back to local/GCS, then retrains and deploys
+
+The script defaults to `DRY_RUN=true`, which prints the planned windows and makes no cloud changes.
+Run it only with data access you are allowed to use; the public repo does not ship or
+redistribute scraped listing data.
+
+Local GCP scripts guard against the wrong human account. They expect
+`a.thuvesen@gmail.com` and refuse `adam.thuvesen@mentimeter.com`.
+
+```bash
+DRY_RUN=true bash scripts/run_catchup_backfill.sh
+DRY_RUN=false bash scripts/run_catchup_backfill.sh
+bash scripts/plan_cloud_cleanup.sh --dry-run
+```
 
 ### Costs:
 
@@ -149,7 +189,7 @@ Create these environment-scoped secrets:
 ### Required GCP permissions:
 
 - `deploy.yml`: Cloud Run Admin, Storage Object Viewer, Artifact Registry Reader/Writer or Container Registry permissions.
-- `ml-pipeline.yml`: BigQuery Data Editor, Vertex AI User, Storage Admin for model upload.
+- `ml-pipeline.yml`: BigQuery Data Editor, Vertex AI User, Storage Admin for model upload, Cloud Run Admin, and `iam.serviceAccountUser` on `evi-cloud-run-runtime@<project>.iam.gserviceaccount.com`.
 - `ml-monitoring.yml`: BigQuery Data Viewer, Storage Object Admin for monitoring reports.
 
 ---

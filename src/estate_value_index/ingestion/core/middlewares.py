@@ -27,6 +27,10 @@ class BooliSpiderMiddleware:
     def process_spider_output(self, response, result, spider):
         yield from result
 
+    async def process_spider_output_async(self, response, result, spider):
+        async for item in result:
+            yield item
+
     def process_spider_exception(self, response, exception, spider):
         spider.logger.error(f"Spider exception: {exception} for URL: {response.url}")
 

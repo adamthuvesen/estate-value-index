@@ -2,6 +2,7 @@
 """Prefect flow for automated Booli scraping and data upload to GCS."""
 
 import json
+import os
 import subprocess
 import sys
 from datetime import datetime
@@ -12,6 +13,28 @@ from prefect import flow, get_run_logger, task
 
 from estate_value_index.pipelines.utils import get_task_logger
 from estate_value_index.utils.gcs import GCSClient, is_gcs_enabled
+
+
+def _blocked_status_from_scrapy_output(output: str) -> str | None:
+    block_markers = {
+        "403": ("403 Forbidden", "<403"),
+        "429": ("429 Too Many Requests", "<429", "429 retries exhausted"),
+    }
+    for status, markers in block_markers.items():
+        if any(marker in output for marker in markers):
+            return status
+    return None
+
+
+def _read_new_scrapy_log(log_file: Path, start_offset: int) -> str:
+    if not log_file.exists():
+        return ""
+    try:
+        with log_file.open("rb") as file:
+            file.seek(start_offset)
+            return file.read().decode("utf-8", errors="replace")
+    except OSError:
+        return ""
 
 
 @task(name="run-scrapy-spider", retries=1, retry_delay_seconds=60)
@@ -46,6 +69,8 @@ def run_scrapy_spider(
     )
 
     Path("logs/ingestion").mkdir(parents=True, exist_ok=True)
+    scrapy_log_file = Path(os.getenv("BOOLI_LOG_FILE", "logs/ingestion/booli.log"))
+    scrapy_log_start = scrapy_log_file.stat().st_size if scrapy_log_file.exists() else 0
 
     if output_file is None:
         output_dir = Path("data/raw/booli")
@@ -90,6 +115,21 @@ def run_scrapy_spider(
     if result.returncode != 0:
         logger.error(f"Scrapy failed: {result.stderr}")
         raise RuntimeError(f"Scrapy spider failed with code {result.returncode}")
+
+    blocked_status = _blocked_status_from_scrapy_output(
+        "\n".join(
+            part
+            for part in (
+                result.stdout,
+                result.stderr,
+                _read_new_scrapy_log(scrapy_log_file, scrapy_log_start),
+            )
+            if part
+        )
+    )
+    if blocked_status is not None:
+        logger.error("Booli scrape blocked with HTTP %s", blocked_status)
+        raise RuntimeError(f"Booli scrape blocked with HTTP {blocked_status}")
 
     if not output_file.exists():
         raise FileNotFoundError(f"Output file not created: {output_file}")

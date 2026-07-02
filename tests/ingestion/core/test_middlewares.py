@@ -9,6 +9,8 @@ error response as success).
 
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 
 scrapy = pytest.importorskip("scrapy")
@@ -20,6 +22,7 @@ from scrapy.utils.test import get_crawler
 from estate_value_index.ingestion.core import middlewares as mw_module
 from estate_value_index.ingestion.core.middlewares import (
     BooliDownloaderMiddleware,
+    BooliSpiderMiddleware,
     SmartRetryMiddleware,
 )
 
@@ -95,3 +98,16 @@ def test_smart_retry_exhausted_raises_ignore_request(capture_deferlater):
     _, scheduled = capture_deferlater[0]
     with pytest.raises(IgnoreRequest):
         scheduled()
+
+
+def test_booli_spider_middleware_supports_async_output():
+    middleware = BooliSpiderMiddleware()
+
+    async def source():
+        yield "first"
+        yield "second"
+
+    async def collect():
+        return [item async for item in middleware.process_spider_output_async(None, source(), None)]
+
+    assert asyncio.run(collect()) == ["first", "second"]

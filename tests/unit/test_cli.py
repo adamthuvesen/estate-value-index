@@ -1,6 +1,7 @@
 """CLI smoke tests for estate_value_index.cli module."""
 
 import json
+import os
 import subprocess
 import sys
 
@@ -153,6 +154,7 @@ def test_monitor_costs_gcs_only_requires_bucket():
             "--gcs-only",
         ],
         capture_output=True,
+        env={**os.environ, "GCS_BUCKET": ""},
         text=True,
     )
     assert result.returncode != 0

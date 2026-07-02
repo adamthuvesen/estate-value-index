@@ -23,7 +23,7 @@ The app serves predictions through FastAPI and a Next.js frontend/API layer in o
 ## Deploy/runtime notes
 
 - The container runs Next.js and FastAPI together.
-- The public Cloud Run service runs under a dedicated least-privilege runtime service account (`evi-cloud-run-runtime@…`, created by `scripts/setup_gcp.sh`), not the default compute SA. It has bucket-scoped GCS object-read and nothing else — no BigQuery, no project Editor — because the request path only reads model/enrichment artifacts. `deploy_cloud_run.sh` attaches it via `--service-account` and refuses to deploy if it is missing, so the service can never silently fall back to the broad default identity.
+- The Cloud Run service uses internal ingress and runs under a dedicated least-privilege runtime service account (`evi-cloud-run-runtime@…`, created by `scripts/setup_gcp.sh`), not the default compute SA. It has bucket-scoped GCS object-read and nothing else — no BigQuery, no project Editor — because the request path only reads model/enrichment artifacts. Deploy paths attach it via `--service-account` and refuse to deploy if it is missing, so the service can never silently fall back to the broad default identity.
 - Models are not committed or baked into the image; `scripts/startup.sh` can sync required artifacts from your configured GCS bucket.
 - `GCS_ENABLED` often differs between dev, CI, and production.
 - Rate limiting is in-process unless a shared backend is added.
