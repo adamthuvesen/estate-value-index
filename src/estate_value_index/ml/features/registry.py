@@ -166,11 +166,11 @@ def handle_missing_values(
                 fill_val = mode_val
                 categorical_fill_values[col] = str(fill_val)
 
-            filled_train = X_train[col].fillna(fill_val)
-            X_train.loc[:, col] = filled_train.infer_objects(copy=False).astype("category")
+            filled_train = X_train[col].astype("object").fillna(fill_val)
+            X_train[col] = filled_train.infer_objects(copy=False).astype("category")
             if col in X_test.columns:
-                filled_test = X_test[col].fillna(fill_val)
-                X_test.loc[:, col] = filled_test.infer_objects(copy=False).astype("category")
+                filled_test = X_test[col].astype("object").fillna(fill_val)
+                X_test[col] = filled_test.infer_objects(copy=False).astype("category")
 
     return X_train, X_test, numeric_fill_values, categorical_fill_values
 
