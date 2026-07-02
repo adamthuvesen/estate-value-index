@@ -23,8 +23,8 @@ COPY src/ src/
 COPY train_model.py train_model.py
 
 # Install Python dependencies with uv (faster than pip)
-# Uses ml and vertex extras for training environment
-RUN uv pip install --system ".[ml,vertex]"
+# Uses ml, monitoring, and vertex extras for the training environment.
+RUN uv pip install --system ".[ml,monitoring,vertex]"
 
 # Default environment configuration (can be overridden in the job spec)
 ENV GCS_ENABLED=true \
