@@ -1,10 +1,10 @@
-"""Feature materialization must use staging-then-swap when ``truncate=True``.
+"""Feature materialization must use staging-then-publish when ``truncate=True``.
 
 The previous flow truncated the production table BEFORE inserting rows,
 so any partial batch insert left the table empty/half-populated. The new
-flow uploads to a uuid-suffixed staging table, raises on any batch error,
-asserts row counts match, then `CREATE OR REPLACE`s production from
-staging — and always drops staging in `finally`.
+flow uploads to a uuid-suffixed staging table, raises on any batch error, asserts
+row counts match, then replaces rows in the existing production table without
+changing table metadata, and always drops staging in `finally`.
 """
 
 from __future__ import annotations
@@ -93,14 +93,19 @@ def test_truncate_path_swaps_staging_to_production_on_success(monkeypatch, fake_
         for target in insert_targets
     ), insert_targets
 
-    # Staging table was created before inserts, then production was swapped.
+    # Staging table was created before inserts, then production rows were replaced.
     queries = [call.args[0] for call in client.query.call_args_list]
     create_staging = [q for q in queries if "CREATE TABLE" in q.upper() and "WHERE FALSE" in q]
     assert create_staging, queries
     assert client.query.call_args_list[0].args[0] == create_staging[0]
     assert client.query.call_args_list[0].args[0].find("_staging_") > -1
-    create_or_replace = [q for q in queries if "CREATE OR REPLACE TABLE" in q.upper()]
-    assert create_or_replace, queries
+    publish_queries = [q for q in queries if "BEGIN TRANSACTION" in q.upper()]
+    assert publish_queries, queries
+    publish_query = publish_queries[0].upper()
+    assert "DELETE FROM" in publish_query
+    assert "INSERT INTO" in publish_query
+    assert "COMMIT TRANSACTION" in publish_query
+    assert "CREATE OR REPLACE TABLE" not in publish_query
     # No raw TRUNCATE TABLE issued against production.
     assert not any("TRUNCATE TABLE" in q.upper() for q in queries)
 
@@ -125,6 +130,7 @@ def test_truncate_path_raises_on_batch_error_and_skips_swap(monkeypatch, fake_en
 
     queries = [call.args[0] for call in client.query.call_args_list]
     assert not any("CREATE OR REPLACE TABLE" in q.upper() for q in queries)
+    assert not any("DELETE FROM" in q.upper() for q in queries)
     # Staging still cleaned up.
     assert client.delete_table.called
 
@@ -145,4 +151,5 @@ def test_truncate_path_raises_on_row_count_mismatch(monkeypatch, fake_env):
 
     queries = [call.args[0] for call in client.query.call_args_list]
     assert not any("CREATE OR REPLACE TABLE" in q.upper() for q in queries)
+    assert not any("DELETE FROM" in q.upper() for q in queries)
     assert client.delete_table.called
