@@ -43,7 +43,8 @@ def deployment_pipeline_flow(config: DeploymentFlowConfig | None = None) -> dict
         dry_run=config.dry_run,
     )
 
-    deployed = deployment_result.get("success", False)
+    # A dry run returns success=True without deploying anything; never report it as deployed.
+    deployed = deployment_result.get("success", False) and not config.dry_run
     health_check = deployment_result.get("health_check", {})
     # Assume healthy if no health check was run
     is_healthy = health_check.get("healthy", False) if health_check else True
@@ -114,6 +115,6 @@ if __name__ == "__main__":
     print("\n" + "=" * 80)
     print("DEPLOYMENT RESULT")
     print("=" * 80)
-    print(f"Deployed: {result.get('success', False)}")
+    print(f"Deployed: {result.get('success', False) and not args.dry_run}")
     print(f"URL: {result.get('service_url', 'N/A')}")
     print("=" * 80)
