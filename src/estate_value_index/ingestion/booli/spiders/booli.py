@@ -145,6 +145,10 @@ class BooliSpider(BooliExtractionMixins, scrapy.Spider):
             headers=self._default_http_headers(),
         )
 
+    async def start(self):
+        for request in self.start_requests():
+            yield request
+
     def parse_search_results(self, response):
         """Parse search results page and extract listing URLs"""
         current_page = response.meta.get("page", 1)

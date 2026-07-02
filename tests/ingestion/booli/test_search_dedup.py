@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections import defaultdict
 from types import SimpleNamespace
 
@@ -79,3 +80,16 @@ def test_second_call_yields_no_listing_requests_and_increments_dedup_stat():
 
     final_dedup = spider.crawler.stats.get_value("booli/dedup_skipped", 0)
     assert final_dedup - initial_dedup == 2
+
+
+def test_start_yields_initial_search_request():
+    spider = _make_spider()
+
+    async def collect_start_requests():
+        return [request async for request in spider.start()]
+
+    requests = asyncio.run(collect_start_requests())
+
+    assert len(requests) == 1
+    assert requests[0].url.startswith("https://www.booli.se/sok/slutpriser?")
+    assert requests[0].meta == {"page": 1, "booli_slot": "search"}
