@@ -477,23 +477,11 @@ def _generate_enrichment_stage(config: TrainingFlowConfig, results: dict, logger
             upload_enrichment_to_gcs_task,
         )
 
-        # Generate area statistics
-        area_stats_result = generate_area_statistics_task(
-            output_file=Path("data/derived/area_statistics.json"),
-            data_source="bigquery",
-            feature_context_path=Path(config.local_model_dir)
-            / f"{config.model_prefix}_feature_context.json",
-            value_analysis_path=Path("data/derived/value_analysis.json"),
-            raw_listings_path=Path("data/raw/booli/booli_listings_prod.json"),
-        )
-        results["steps"]["area_statistics"] = area_stats_result
-        logger.info(
-            f"Generated statistics for {area_stats_result.get('records_generated', 0)} areas"
-        )
-
-        # Generate value analysis (property predictions)
+        # Generate value analysis (property predictions) first: area statistics
+        # reads its output file, so it must exist before that task runs.
+        value_analysis_path = Path("data/derived/value_analysis.json")
         value_analysis_result = generate_value_analysis_task(
-            output_file=Path("data/derived/value_analysis.json"),
+            output_file=value_analysis_path,
             data_file=Path("data/raw/booli/booli_listings_prod.json"),
             model_type="lgbm",
             apply_training_filters=False,
@@ -501,6 +489,20 @@ def _generate_enrichment_stage(config: TrainingFlowConfig, results: dict, logger
         results["steps"]["value_analysis"] = value_analysis_result
         logger.info(
             f"Generated value analysis for {value_analysis_result.get('records_generated', 0)} properties"
+        )
+
+        # Generate area statistics from the value analysis just written
+        area_stats_result = generate_area_statistics_task(
+            output_file=Path("data/derived/area_statistics.json"),
+            data_source="bigquery",
+            feature_context_path=Path(config.local_model_dir)
+            / f"{config.model_prefix}_feature_context.json",
+            value_analysis_path=value_analysis_path,
+            raw_listings_path=Path("data/raw/booli/booli_listings_prod.json"),
+        )
+        results["steps"]["area_statistics"] = area_stats_result
+        logger.info(
+            f"Generated statistics for {area_stats_result.get('records_generated', 0)} areas"
         )
 
         # Upload enrichment data to GCS (for Cloud Run to access)
