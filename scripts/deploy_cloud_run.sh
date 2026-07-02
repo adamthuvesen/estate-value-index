@@ -5,6 +5,10 @@
 set -euo pipefail
 IFS=$'\n\t'
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/gcp_account.sh
+source "${SCRIPT_DIR}/lib/gcp_account.sh"
+
 # Configuration
 PROJECT_ID="${GCP_PROJECT_ID:-}"
 REGION="${GCP_REGION:-europe-north1}"
@@ -43,6 +47,8 @@ if ! command -v gcloud &> /dev/null; then
     echo "ERROR: gcloud CLI not found" >&2
     exit 1
 fi
+
+require_personal_gcloud_account
 
 # Set project
 gcloud config set project "$PROJECT_ID"
@@ -87,6 +93,7 @@ gcloud run deploy "$SERVICE_NAME" \
   --cpu 2 \
   --timeout 900s \
   --port 8080 \
+  --ingress internal \
   --set-env-vars "GCS_ENABLED=true,GCS_BUCKET=${GCS_BUCKET},NODE_ENV=production,PREDICTION_API_URL=http://127.0.0.1:8000,TRUST_PROXY_HEADERS=true" \
   --no-cpu-throttling \
   --cpu-boost

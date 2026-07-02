@@ -14,6 +14,8 @@ name: ML Pipeline
 #   GCS_BUCKET
 
 on:
+  schedule:
+    - cron: "10 3 * * 0"
   workflow_dispatch:
     inputs:
       environment:
@@ -39,6 +41,11 @@ on:
         required: false
         default: '5'
         type: string
+      config_file:
+        description: 'Booli scraper config file'
+        required: false
+        default: 'src/estate_value_index/ingestion/config/booli_all_locations.json'
+        type: string
       tune:
         description: 'Enable hyperparameter tuning'
         required: false
@@ -59,7 +66,7 @@ jobs:
     name: Run ML Pipeline
     runs-on: ubuntu-latest
     timeout-minutes: 120  # 2 hours for full pipeline
-    environment: ${{ inputs.environment }}
+    environment: ${{ github.event_name == 'schedule' && 'production' || inputs.environment }}
     env:
       GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
       BIGQUERY_PROJECT_ID: ${{ vars.BIGQUERY_PROJECT_ID || vars.GCP_PROJECT_ID }}
@@ -123,17 +130,28 @@ jobs:
       - name: Set pipeline parameters
         id: params
         run: |
-          MODE="${{ inputs.mode }}"
-          TUNE="${{ inputs.tune }}"
-          REBUILD="${{ inputs.rebuild_container }}"
-          DEPLOY="${{ inputs.deploy }}"
-          MAX_PAGES="${{ inputs.max_pages }}"
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            MODE="retrain"
+            TUNE="true"
+            REBUILD="false"
+            DEPLOY="true"
+            MAX_PAGES="5"
+            CONFIG_FILE="src/estate_value_index/ingestion/config/booli_all_locations.json"
+          else
+            MODE="${{ inputs.mode }}"
+            TUNE="${{ inputs.tune }}"
+            REBUILD="${{ inputs.rebuild_container }}"
+            DEPLOY="${{ inputs.deploy }}"
+            MAX_PAGES="${{ inputs.max_pages }}"
+            CONFIG_FILE="${{ inputs.config_file }}"
+          fi
 
           echo "mode=$MODE" >> $GITHUB_OUTPUT
           echo "tune=$TUNE" >> $GITHUB_OUTPUT
           echo "rebuild=$REBUILD" >> $GITHUB_OUTPUT
           echo "deploy=$DEPLOY" >> $GITHUB_OUTPUT
           echo "max_pages=$MAX_PAGES" >> $GITHUB_OUTPUT
+          echo "config_file=$CONFIG_FILE" >> $GITHUB_OUTPUT
 
           echo "Pipeline Configuration:"
           echo "  Mode: $MODE"
@@ -141,6 +159,7 @@ jobs:
           echo "  Rebuild container: $REBUILD"
           echo "  Deploy: $DEPLOY"
           echo "  Max pages: $MAX_PAGES"
+          echo "  Config file: $CONFIG_FILE"
 
       - name: Run ML Pipeline
         id: pipeline
@@ -159,6 +178,7 @@ jobs:
           rebuild = '${{ steps.params.outputs.rebuild }}'.lower() == 'true'
           deploy = '${{ steps.params.outputs.deploy }}'.lower() == 'true'
           max_pages = int('${{ steps.params.outputs.max_pages }}')
+          config_file = '${{ steps.params.outputs.config_file }}'
 
           # Configure based on mode
           if mode == 'retrain':
@@ -178,10 +198,11 @@ jobs:
               sys.exit(1)
 
           # Run pipeline
-          print(f'🚀 Running pipeline: mode={mode}, tune={tune}, deploy={deploy}')
+          print(f'🚀 Running pipeline: mode={mode}, tune={tune}, deploy={deploy}, config_file={config_file}')
 
           result = complete_pipeline_flow(
               max_pages=max_pages,
+              config_file=config_file,
               skip_scraping=skip_scraping,
               tune=tune,
               use_vertex=use_vertex,
@@ -257,6 +278,7 @@ jobs:
           echo "Run: ${{ github.run_number }}"
           echo "Trigger: ${{ github.event_name }}"
           echo "Mode: ${{ steps.params.outputs.mode }}"
+          echo "Config file: ${{ steps.params.outputs.config_file }}"
 
           # Check if it was a validation failure vs other failure
           if [ -f validation_status.txt ] && grep -q "VALIDATION_FAILED" validation_status.txt; then
@@ -272,6 +294,7 @@ jobs:
           echo "Mode: ${{ steps.params.outputs.mode }}"
           echo "Hyperparameter Tuning: ${{ steps.params.outputs.tune }}"
           echo "Deploy: ${{ steps.params.outputs.deploy }}"
+          echo "Config file: ${{ steps.params.outputs.config_file }}"
           echo "Commit SHA: ${{ github.sha }}"
 
           if [ -f "web/models/price_prediction_model_metrics_lgbm.json" ]; then

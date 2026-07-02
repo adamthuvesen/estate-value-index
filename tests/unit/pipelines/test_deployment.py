@@ -9,8 +9,10 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from estate_value_index.pipelines.tasks.deployment import (
+    _cloud_run_env_vars,
     _get_current_revision,
     _get_service_url,
+    _runtime_service_account,
     deploy_to_cloud_run_task,
     health_check_task,
     log_metrics_task,
@@ -58,6 +60,78 @@ class TestCloudConfigValidation:
             match="BIGQUERY_PROJECT_ID environment variable is required",
         ):
             monitor_pipeline_health_task.fn()
+
+
+class TestCloudRunDeployCommand:
+    @pytest.mark.unit
+    def test_default_runtime_service_account_uses_project_id(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv("CLOUD_RUN_RUNTIME_SERVICE_ACCOUNT", raising=False)
+        monkeypatch.delenv("RUNTIME_SERVICE_ACCOUNT", raising=False)
+
+        assert (
+            _runtime_service_account("estate-value-index")
+            == "evi-cloud-run-runtime@estate-value-index.iam.gserviceaccount.com"
+        )
+
+    @pytest.mark.unit
+    def test_cloud_run_env_vars_include_required_runtime_config(self) -> None:
+        env_vars = _cloud_run_env_vars("estate-value-index-data-production")
+
+        assert "GCS_ENABLED=true" in env_vars
+        assert "GCS_BUCKET=estate-value-index-data-production" in env_vars
+        assert "NODE_ENV=production" in env_vars
+        assert "PREDICTION_API_URL=http://127.0.0.1:8000" in env_vars
+        assert "TRUST_PROXY_HEADERS=true" in env_vars
+
+    @pytest.mark.unit
+    def test_deploy_uses_dedicated_runtime_sa_and_internal_ingress(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        mocker: Any,
+    ) -> None:
+        monkeypatch.setenv("GCP_PROJECT_ID", "estate-value-index")
+        monkeypatch.setenv("GCS_BUCKET", "estate-value-index-data-production")
+        mocker.patch(
+            "estate_value_index.pipelines.tasks.deployment._get_current_revision",
+            side_effect=["old-revision", "new-revision"],
+        )
+        mocker.patch(
+            "estate_value_index.pipelines.tasks.deployment._get_service_url", return_value=None
+        )
+        mocker.patch("time.sleep")
+
+        calls: list[list[str]] = []
+
+        def fake_run(cmd: list[str], **_: Any) -> MagicMock:
+            calls.append(cmd)
+            result = MagicMock()
+            result.returncode = 0
+            result.stdout = ""
+            result.stderr = ""
+            return result
+
+        mocker.patch("subprocess.run", side_effect=fake_run)
+
+        result = deploy_to_cloud_run_task.fn(
+            model_artifacts_gcs_uri="gs://estate-value-index-data-production/models",
+            enrichment_gcs_uri="gs://estate-value-index-data-production/derived",
+            validate=False,
+        )
+
+        deploy_cmd = next(cmd for cmd in calls if cmd[:3] == ["gcloud", "run", "deploy"])
+        assert result["success"] is True
+        assert deploy_cmd[deploy_cmd.index("--service-account") + 1] == (
+            "evi-cloud-run-runtime@estate-value-index.iam.gserviceaccount.com"
+        )
+        assert deploy_cmd[deploy_cmd.index("--ingress") + 1] == "internal"
+        env_vars = deploy_cmd[deploy_cmd.index("--set-env-vars") + 1]
+        assert "GCS_ENABLED=true" in env_vars
+        assert "GCS_BUCKET=estate-value-index-data-production" in env_vars
+        assert "NODE_ENV=production" in env_vars
+        assert "PREDICTION_API_URL=http://127.0.0.1:8000" in env_vars
+        assert "TRUST_PROXY_HEADERS=true" in env_vars
 
 
 class TestGetCurrentRevision:
