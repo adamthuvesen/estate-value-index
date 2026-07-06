@@ -186,6 +186,7 @@ export default function AreasPage() {
         <Stat
           value={data?.metadata.generated_at ? new Date(data.metadata.generated_at).toLocaleDateString("sv-SE") : "—"}
           label="Updated"
+          small
         />
       </dl>
 
@@ -280,10 +281,16 @@ function PageShell({ children, totalAreas }: { children: React.ReactNode; totalA
   );
 }
 
-function Stat({ value, label }: { value: string; label: string }) {
+function Stat({ value, label, small = false }: { value: string; label: string; small?: boolean }) {
   return (
-    <div className="flex flex-1 flex-col items-center px-5 py-4">
-      <dd className="num text-2xl font-semibold text-tactical-text">{value}</dd>
+    <div className="flex flex-1 flex-col items-center px-4 py-4">
+      <dd
+        className={`num whitespace-nowrap font-semibold text-tactical-text ${
+          small ? "text-base" : "text-2xl"
+        }`}
+      >
+        {value}
+      </dd>
       <dt className="mt-1 text-[12px] text-tactical-muted">{label}</dt>
     </div>
   );
