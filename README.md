@@ -31,7 +31,7 @@ These are the choices that shaped the system, and the failure modes they guard a
   `scripts/startup.sh` refuses to boot if a required download fails or a sidecar is missing,
   so a corrupted or partial sync fails loud instead of serving garbage.
 - **Models live in GCS, not the image.** Training output is git-ignored and never baked into the
-  container; `startup.sh` syncs artifacts from GCS at boot when `GCS_ENABLED=true`. The image
+  container; `scripts/startup.sh` syncs artifacts from GCS at boot when `GCS_ENABLED=true`. The image
   stays generic and models version independently of deploys.
 - **BigQuery SQL is parameterized or operator-only.** Dynamic SQL goes through
   `utils/bigquery_safety.py` (structured Filter API, bound parameters); ad hoc string
@@ -139,13 +139,14 @@ or production performance.
 ## Run locally
 
 ```bash
-./start.sh                  # FastAPI :8000 + Next.js :3000
+uv run uvicorn api_server:app --host 0.0.0.0 --port 8000
+cd web && npm run dev
 ```
 
 - Web app: http://localhost:3000
 - API docs: http://localhost:8000/docs
 
-The web app alone: `cd web && npm run dev`.
+Set `PREDICTION_API_URL` if the FastAPI service is not on `http://localhost:8000`.
 
 ## Data Access
 
@@ -172,7 +173,7 @@ uv run python -m estate_value_index.pipelines.core.complete_pipeline --retrain  
 uv run python -m estate_value_index.pipelines.core.complete_pipeline --retrain --deploy
 
 # Ingest authorized listings
-uv run python -m estate_value_index.cli.crawl_booli --max-pages 10
+uv run python -m estate_value_index.cli crawl --max-pages 10
 
 # Deploy to Cloud Run
 ./scripts/deploy_cloud_run.sh

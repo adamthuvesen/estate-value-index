@@ -8,12 +8,6 @@ const nextConfig: NextConfig = {
   compiler: {
     removeConsole: process.env.NODE_ENV === "production",
   },
-
-  experimental: {
-    turbo: {
-      // Leave Turbopack enabled without custom aliases that reference removed dependencies
-    },
-  },
 };
 
 export default nextConfig;

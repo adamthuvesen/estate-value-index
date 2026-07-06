@@ -26,7 +26,6 @@ User-level guidance (tone, principles, git etiquette) lives in `~/.claude/CLAUDE
 
 - Commit to **main** directly (use a branch/PR)
 - Hand-edit **web/models/** (training outputs)
-- Use deprecated scripts: `clean_areas.py`, `merge_listings.py`, `impute_days_on_market.py`
 - Use **localStorage** / **sessionStorage** in **web** artifacts
 - **Trust** ad hoc strings in BigQuery SQL; use operator-only / parameterized patterns (see [src/estate_value_index/utils/bigquery_safety.py](src/estate_value_index/utils/bigquery_safety.py), [docs/data-pipeline.md](docs/data-pipeline.md))
 

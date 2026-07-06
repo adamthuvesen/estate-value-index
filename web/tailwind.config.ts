@@ -27,7 +27,6 @@ const config: Config = {
           neutral: "#606060",       // Neutral gray for non-critical buttons
           "neutral-hover": "#707070", // Neutral hover state
         },
-        // Legacy color variables for compatibility
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
         card: {

@@ -8,7 +8,7 @@ Training uses engineered listing features and LightGBM. Keep training, feature c
 - Training workflow modules: `src/estate_value_index/ml/training_workflow/`
 - Feature engineering: `src/estate_value_index/ml/features/`
 - Data loading and preprocessing: `src/estate_value_index/ml/data_loader.py`, `src/estate_value_index/ml/preprocessing.py`
-- Model serving compatibility: `api_server.py`
+- Model serving: `api_server.py`
 - Feature subsets and recommended features: `config/feature_subsets.yaml`, `config/recommended_features.json`
 
 ## Training contract
@@ -26,7 +26,6 @@ Training uses engineered listing features and LightGBM. Keep training, feature c
 - `web/models/` is generated output, ignored by git, and should not be hand-edited.
 - Runtime model sync can come from GCS through `scripts/startup.sh`.
 - Model integrity uses `.sha256` sidecars; do not bypass those checks casually.
-- Pickled legacy compatibility lives in `api_server.py`; be careful when renaming serving classes or import paths.
 
 ## Checks to run
 

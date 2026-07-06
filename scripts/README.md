@@ -23,7 +23,3 @@ These are not imported by the pipeline; run from the repo root with `uv run` or 
 
 GCP cost monitoring is a CLI command, not a script here:
 `uv run python -m estate_value_index.cli costs` (thin wrapper → `estate_value_index.ops.cost_monitoring`).
-
-## Deprecated names (removed)
-
-Legacy entrypoints `clean_areas.py`, `merge_listings.py`, `impute_days_on_market.py` no longer exist; they are mentioned in agent docs only as **do not use**.

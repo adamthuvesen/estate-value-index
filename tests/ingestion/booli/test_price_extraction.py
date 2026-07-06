@@ -1,9 +1,4 @@
-"""Sold-price regex must require a sale-context prefix AND a Swedish currency suffix.
-
-The previous bare ``r'blev.*?(\\d+\\s*\\d+)'`` and ``r'var.*?(\\d+\\s*\\d+)'``
-patterns matched broker bios and area descriptions, injecting false sold
-prices into training data.
-"""
+"""Sold-price regex must require a sale-context prefix and Swedish currency suffix."""
 
 from __future__ import annotations
 

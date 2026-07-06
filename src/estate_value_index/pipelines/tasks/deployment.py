@@ -56,11 +56,8 @@ def _describe_service(
 ) -> str | None:
     """Run `gcloud run services describe ... --format value(<field>)` and return the value.
 
-    Single helper for every read-only service describe — the previous file had
-    two byte-identical functions that differed only in the format field. The
-    bare ``except`` matches the previous swallow-everything behaviour: this
-    runs at deployment time where any gcloud/subprocess failure should fall
-    back to "no info" rather than crash the pipeline.
+    This runs at deployment time where any gcloud/subprocess failure should
+    fall back to "no info" rather than crash the pipeline.
     """
     try:
         cmd = [

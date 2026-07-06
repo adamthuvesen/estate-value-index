@@ -317,10 +317,6 @@ def sync_cache_to_bigquery(
     ``geocoded_at`` is newer than the existing one). The staging table is
     dropped in a ``finally`` block.
 
-    The previous implementation used WRITE_TRUNCATE against the production
-    table directly, which silently nuked accumulated geocodes whenever the
-    local CSV was partial.
-
     Args:
         cache_path: Path to the local CSV cache
         project_id: GCP project ID (defaults to env var)
