@@ -37,6 +37,10 @@ export interface PredictionPayload {
 export interface PredictionResult {
   listing_id: string;
   predicted_price: number;
+  rounded_predicted_price: number;
+  price_range_min: number;
+  price_range_max: number;
+  price_range_step: number;
   input_data: PredictionPayload;
   confidence: string;
   timestamp: string;

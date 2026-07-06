@@ -49,10 +49,22 @@ type FastAPIResponse = {
 
 const API_BASE_URL = process.env.PREDICTION_API_URL || 'http://localhost:8000';
 const API_TIMEOUT = 30000; // 30 seconds
+const PRICE_RANGE_STEP = 100_000;
 
 function parseOptionalBoolean(value: unknown): boolean | null {
   if (value === '' || value === null || value === undefined) return null;
   return coerceBool(value);
+}
+
+function predictionRange(predictedPrice: number, modelId: string) {
+  const roundToStep = modelId === 'no_list' ? Math.ceil : Math.round;
+  const roundedPrediction = roundToStep(predictedPrice / PRICE_RANGE_STEP) * PRICE_RANGE_STEP;
+  return {
+    rounded_predicted_price: roundedPrediction,
+    price_range_min: Math.max(0, roundedPrediction - PRICE_RANGE_STEP),
+    price_range_max: roundedPrediction + PRICE_RANGE_STEP,
+    price_range_step: PRICE_RANGE_STEP,
+  };
 }
 
 // Lock to the Node runtime so localhost `fetch` to the FastAPI sidecar works.
@@ -127,10 +139,12 @@ export async function POST(request: NextRequest) {
       }
 
       const prediction = (await response.json()) as FastAPIResponse;
+      const predictedPrice = Math.round(prediction.predicted_price);
 
       return NextResponse.json({
         listing_id: listing_id || 'unknown',
-        predicted_price: Math.round(prediction.predicted_price),
+        predicted_price: predictedPrice,
+        ...predictionRange(predictedPrice, prediction.model_id),
         model_used: prediction.model_used,
         model_id: prediction.model_id,
         model_type: prediction.model_type,

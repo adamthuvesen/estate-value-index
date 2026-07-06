@@ -278,10 +278,10 @@ export function usePrediction({
   const modelLabel = modelLabels[resolvedModelKey] ?? modelLabels[formData.model] ?? "Auto";
 
   const listingPriceValue = Number(formData.listing_price || 0);
-  const predictedPriceValue = prediction?.predicted_price ?? null;
+  const displayedEstimateValue = prediction?.rounded_predicted_price ?? prediction?.predicted_price ?? null;
   const anchorPrice = prediction?.input_data.listing_price ?? listingPriceValue;
-  const priceDifference = predictedPriceValue !== null && anchorPrice > 0
-    ? predictedPriceValue - anchorPrice
+  const priceDifference = displayedEstimateValue !== null && anchorPrice > 0
+    ? displayedEstimateValue - anchorPrice
     : null;
   const differencePercent = priceDifference !== null && anchorPrice > 0
     ? (priceDifference / anchorPrice) * 100

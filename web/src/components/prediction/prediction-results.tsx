@@ -28,9 +28,13 @@ export function PredictionResults({
           <div className="mt-4 space-y-5">
             <div>
               <p className="num text-[34px] font-semibold leading-none tracking-tight text-tactical-text">
-                {currencyFormatter.format(prediction.predicted_price)}
+                {formatDisplayPrice(currencyFormatter, prediction.rounded_predicted_price)}
               </p>
-              <p className="mt-2 text-[13px] text-tactical-muted">Model estimate of market value</p>
+              <p className="mt-2 text-[13px] text-tactical-muted">Estimated range around rounded model estimate</p>
+              <p className="num mt-1 text-[13px] font-medium text-tactical-text">
+                {formatDisplayPrice(currencyFormatter, prediction.price_range_min)} -{" "}
+                {formatDisplayPrice(currencyFormatter, prediction.price_range_max)}
+              </p>
             </div>
 
             {priceDifference !== null && (
@@ -103,6 +107,10 @@ export function PredictionResults({
       </div>
     </aside>
   );
+}
+
+function formatDisplayPrice(formatter: Intl.NumberFormat, value: number): string {
+  return formatter.format(value).replace(/\u00a0/g, " ");
 }
 
 function Row({ label, children, last = false }: { label: string; children: React.ReactNode; last?: boolean }) {
