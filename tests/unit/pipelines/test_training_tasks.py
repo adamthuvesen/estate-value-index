@@ -13,6 +13,7 @@ from estate_value_index.pipelines.tasks.training import (
     _get_job_state,
     _parse_vertex_job_output,
     download_model_artifacts_task,
+    promote_model_to_production_task,
     validate_model_performance_task,
 )
 
@@ -270,3 +271,29 @@ class TestDownloadModelArtifacts:
                 model_uri="gs://bucket/models/empty",
                 local_dir=temp_model_dir,
             )
+
+
+class TestPromoteModelToProduction:
+    @pytest.mark.unit
+    def test_promotes_sha256_sidecar_with_joblib(self, mocker: Any) -> None:
+        """The .sha256 sidecar must be promoted alongside the joblib, else the
+        API server refuses the model on an integrity mismatch (no-models 503)."""
+        mocker.patch(
+            "estate_value_index.pipelines.tasks.training.get_gcs_bucket",
+            return_value="test-bucket",
+        )
+        copied: list[list[str]] = []
+        mocker.patch(
+            "estate_value_index.pipelines.tasks.training.run_command",
+            side_effect=lambda cmd, *a, **k: copied.append(cmd),
+        )
+
+        promote_model_to_production_task.fn(
+            "gs://test-bucket/vertex-ai/models/20260706-160501"
+        )
+
+        dests = [cmd[-1] for cmd in copied if "cp" in cmd]
+        assert any(d.endswith("price_prediction_model_lgbm.joblib") for d in dests)
+        assert any(
+            d.endswith("price_prediction_model_lgbm.joblib.sha256") for d in dests
+        ), "sidecar must be promoted alongside the joblib"

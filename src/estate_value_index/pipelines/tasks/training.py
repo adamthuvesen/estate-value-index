@@ -540,8 +540,12 @@ def promote_model_to_production_task(
     is_macos = platform.system() == "Darwin"
     gsutil_opts = ["-o", "GSUtil:parallel_process_count=1"] if is_macos else []
 
+    # The .sha256 sidecar must be promoted alongside its joblib: the API server
+    # refuses to load a model whose bytes do not match the sidecar, so promoting
+    # the joblib without it leaves a stale sidecar and a no-models 503 loop.
     artifact_types = [
         "lgbm.joblib",
+        "lgbm.joblib.sha256",
         "feature_context.json",
         "metrics_lgbm.json",
         "feature_importance.json",
