@@ -6,6 +6,12 @@ from unittest.mock import Mock, patch
 
 import pytest
 
+from estate_value_index.model_artifacts import (
+    LISTING_MODEL_ID,
+    NO_LIST_MODEL_ID,
+    production_artifact_names,
+)
+
 
 @pytest.mark.integration
 @patch("subprocess.run")
@@ -85,12 +91,9 @@ def test_gcs_artifact_verification(mock_storage_client):
     bucket = client.bucket("estate-value-index-models")
 
     required_artifacts = [
-        "models/price_prediction_model_no_list.joblib",
-        "models/price_prediction_model_no_list_metrics.json",
-        "models/price_prediction_model_no_list_feature_context.json",
-        "models/price_prediction_model_listing.joblib",
-        "models/price_prediction_model_listing_metrics.json",
-        "models/price_prediction_model_listing_feature_context.json",
+        f"models/{filename}"
+        for model_id in (NO_LIST_MODEL_ID, LISTING_MODEL_ID)
+        for filename in production_artifact_names(model_id).files
     ]
 
     for artifact_path in required_artifacts:
@@ -103,12 +106,9 @@ def test_deployment_prerequisites():
     model_dir = Path(__file__).parent.parent / "web" / "models"
 
     required_files = [
-        "price_prediction_model_no_list.joblib",
-        "price_prediction_model_no_list_metrics.json",
-        "price_prediction_model_no_list_feature_context.json",
-        "price_prediction_model_listing.joblib",
-        "price_prediction_model_listing_metrics.json",
-        "price_prediction_model_listing_feature_context.json",
+        filename
+        for model_id in (NO_LIST_MODEL_ID, LISTING_MODEL_ID)
+        for filename in production_artifact_names(model_id).files
     ]
 
     missing_files = [f for f in required_files if not (model_dir / f).exists()]
@@ -147,15 +147,17 @@ def test_deployment_dry_run(mock_subprocess):
 def test_deployment_error_handling():
     def validate_artifacts(artifacts_path):
         required_files = [
-            "models/price_prediction_model_no_list.joblib",
-            "models/price_prediction_model_listing.joblib",
+            f"models/{production_artifact_names(NO_LIST_MODEL_ID).model}",
+            f"models/{production_artifact_names(LISTING_MODEL_ID).model}",
         ]
         for filename in required_files:
             if filename not in str(artifacts_path):
                 return False, f"Missing: {filename}"
         return True, "All artifacts present"
 
-    valid, _ = validate_artifacts("gs://bucket/models/price_prediction_model_no_list.joblib")
+    valid, _ = validate_artifacts(
+        f"gs://bucket/models/{production_artifact_names(NO_LIST_MODEL_ID).model}"
+    )
     assert valid is False
 
 

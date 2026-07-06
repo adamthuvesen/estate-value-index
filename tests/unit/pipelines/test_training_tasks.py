@@ -9,6 +9,11 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from estate_value_index.model_artifacts import (
+    NO_LIST_MODEL_ID,
+    production_artifact_names,
+    required_production_artifact_files,
+)
 from estate_value_index.pipelines.tasks.training import (
     _get_job_state,
     _parse_vertex_job_output,
@@ -239,7 +244,7 @@ class TestDownloadModelArtifacts:
         assert not local_dir.exists()
 
         local_dir.mkdir(parents=True)
-        (local_dir / "price_prediction_model_lgbm.joblib").touch()
+        (local_dir / production_artifact_names(NO_LIST_MODEL_ID).model).touch()
 
         result = download_model_artifacts_task.fn(
             model_uri="gs://bucket/vertex-ai/models/20241201",
@@ -256,9 +261,8 @@ class TestDownloadModelArtifacts:
             return_value=MagicMock(stdout="", stderr=""),
         )
 
-        (temp_model_dir / "price_prediction_model_lgbm.joblib").touch()
-        (temp_model_dir / "price_prediction_model_metrics_lgbm.json").touch()
-        (temp_model_dir / "price_prediction_model_feature_context.json").touch()
+        for filename in required_production_artifact_files():
+            (temp_model_dir / filename).touch()
 
         result = download_model_artifacts_task.fn(
             model_uri="gs://bucket/models/20241201",
@@ -301,7 +305,7 @@ class TestPromoteModelToProduction:
         promote_model_to_production_task.fn("gs://test-bucket/vertex-ai/models/20260706-160501")
 
         dests = [cmd[-1] for cmd in copied if "cp" in cmd]
-        assert any(d.endswith("price_prediction_model_lgbm.joblib") for d in dests)
-        assert any(d.endswith("price_prediction_model_lgbm.joblib.sha256") for d in dests), (
+        assert any(d.endswith(production_artifact_names(NO_LIST_MODEL_ID).model) for d in dests)
+        assert any(d.endswith(production_artifact_names(NO_LIST_MODEL_ID).sidecar) for d in dests), (
             "sidecar must be promoted alongside the joblib"
         )

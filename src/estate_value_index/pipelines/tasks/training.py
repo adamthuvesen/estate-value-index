@@ -13,6 +13,10 @@ from typing import Final
 
 from prefect import task
 
+from estate_value_index.model_artifacts import (
+    DEFAULT_MODEL_PREFIX,
+    required_production_artifact_files,
+)
 from estate_value_index.pipelines.constants import DEFAULT_MEDIAN_APE_THRESHOLD
 from estate_value_index.pipelines.types import (
     MaterializationResult,
@@ -229,10 +233,7 @@ def rebuild_container_task(
 
 @task(name="submit-vertex-training-job", retries=2, retry_delay_seconds=60, timeout_seconds=120)
 def submit_vertex_training_job_task(
-    tune: bool = False,
     machine_type: str = "n1-standard-4",
-    importance_threshold: float | None = None,
-    production_mode: bool = True,
     display_name: str | None = None,
     image_uri: str | None = None,
     dry_run: bool = False,
@@ -240,10 +241,7 @@ def submit_vertex_training_job_task(
     """Submit training job to Vertex AI.
 
     Args:
-        tune: Enable hyperparameter tuning
         machine_type: GCP machine type
-        importance_threshold: Feature importance threshold
-        production_mode: Enable production mode (retrain on all data)
         display_name: Custom job display name
         dry_run: If True, only show command without submitting
 
@@ -251,25 +249,15 @@ def submit_vertex_training_job_task(
         VertexJobResult with job_id, run_id, model_uri
     """
     logger = get_task_logger(__name__)
-    logger.info(f"Submitting Vertex AI job (tune={tune}, machine={machine_type})")
+    logger.info("Submitting Vertex AI production training job (machine=%s)", machine_type)
 
     cmd = ["./scripts/vertex_ai/submit_custom_job.sh", "--machine-type", machine_type]
     if image_uri:
         cmd.extend(["--image-uri", image_uri])
-    if tune:
-        cmd.append("--tune")
     if display_name:
         cmd.extend(["--display-name", display_name])
     if dry_run:
         cmd.append("--dry-run")
-
-    extra_args = []
-    if importance_threshold is not None:
-        extra_args.extend(["--importance-threshold", str(importance_threshold)])
-    if production_mode:
-        extra_args.append("--production-mode")
-    if extra_args:
-        cmd.extend(["--"] + extra_args)
 
     env = os.environ.copy()
     env["GCP_REGION"] = "europe-north1"
@@ -385,7 +373,7 @@ def poll_vertex_job_status_task(
 def download_model_artifacts_task(
     model_uri: str,
     local_dir: Path = Path("web/models"),
-    model_prefix: str = "price_prediction_model",
+    model_prefix: str = DEFAULT_MODEL_PREFIX,
 ) -> dict:
     """Download trained model artifacts from GCS.
 
@@ -415,19 +403,13 @@ def download_model_artifacts_task(
     cmd = ["gsutil"] + gsutil_opts + ["-m", "cp", "-r", f"{model_uri}/*", str(local_dir)]
     run_command(cmd, "GCS download", timeout=300)
 
-    # Verify downloaded files
     artifacts = {}
-    expected_files = [
-        f"{model_prefix}_lgbm.joblib",
-        f"{model_prefix}_metrics_lgbm.json",
-        f"{model_prefix}_feature_context.json",
-        f"{model_prefix}_feature_importance.json",
-    ]
+    expected_files = required_production_artifact_files(model_prefix)
 
     for filename in expected_files:
         file_path = local_dir / filename
         if file_path.exists():
-            key = filename.split("_")[-1].replace(".json", "").replace(".joblib", "")
+            key = file_path.stem.replace(f"{model_prefix}_", "")
             artifacts[key] = str(file_path)
             logger.info(f"Found: {filename}")
 
@@ -511,7 +493,7 @@ def validate_model_performance_task(
 def promote_model_to_production_task(
     model_uri: str,
     gcs_bucket: str | None = None,
-    production_prefix: str = "price_prediction_model",
+    production_prefix: str = DEFAULT_MODEL_PREFIX,
 ) -> dict:
     """Promote validated model artifacts to production names in GCS.
 
@@ -533,38 +515,20 @@ def promote_model_to_production_task(
 
     import platform
 
-    # Extract timestamp from model_uri
-    match = re.search(r"/(\d{8}-\d{6})/?$", model_uri.rstrip("/"))
-    if not match:
-        raise ValueError(f"Could not extract timestamp from model_uri: {model_uri}")
-
-    timestamp = match.group(1)
-    vertex_prefix = f"vertex-lgbm-{timestamp}"
-
     is_macos = platform.system() == "Darwin"
     gsutil_opts = ["-o", "GSUtil:parallel_process_count=1"] if is_macos else []
 
-    # The .sha256 sidecar must be promoted alongside its joblib: the API server
-    # refuses to load a model whose bytes do not match the sidecar, so promoting
-    # the joblib without it leaves a stale sidecar and a no-models 503 loop.
-    artifact_types = [
-        "lgbm.joblib",
-        "lgbm.joblib.sha256",
-        "feature_context.json",
-        "metrics_lgbm.json",
-        "feature_importance.json",
-    ]
     production_path = f"gs://{gcs_bucket}/models"
     promoted_files = []
 
-    for artifact in artifact_types:
-        source = f"{model_uri.rstrip('/')}/{vertex_prefix}_{artifact}"
-        dest = f"{production_path}/{production_prefix}_{artifact}"
+    for filename in required_production_artifact_files(production_prefix):
+        source = f"{model_uri.rstrip('/')}/{filename}"
+        dest = f"{production_path}/{filename}"
 
         cmd = ["gsutil"] + gsutil_opts + ["cp", source, dest]
-        run_command(cmd, f"Copy {artifact}", timeout=60)
+        run_command(cmd, f"Copy {filename}", timeout=60)
         promoted_files.append(dest)
-        logger.info(f"Promoted: {artifact}")
+        logger.info(f"Promoted: {filename}")
 
     logger.info(f"Promoted {len(promoted_files)} artifacts to production")
 

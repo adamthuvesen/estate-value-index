@@ -170,7 +170,7 @@ def monitor_model_drift_task(
             logger.error(
                 f"Baseline data not found at {reference_path_str}. "
                 "Baseline must be created during model training. "
-                "Run train_model.py with GCS_ENABLED=true to create baseline."
+                "Run train-production-models with GCS_ENABLED=true to create baseline."
             )
             return {
                 "success": False,

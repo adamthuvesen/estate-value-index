@@ -10,8 +10,8 @@ intentionally git-ignored.
 
 ## Where to work
 
-- Training entrypoint: `train_model.py`
-- Training workflow modules: `src/estate_value_index/ml/training_workflow/`
+- Production training entrypoint: `uv run python -m estate_value_index.cli train-production-models`
+- Experiment/evaluation workflow modules: `src/estate_value_index/ml/training_workflow/`
 - Feature engineering: `src/estate_value_index/ml/features/`
 - Data loading and preprocessing: `src/estate_value_index/ml/data_loader.py`, `src/estate_value_index/ml/preprocessing.py`
 - Model serving: `api_server.py`

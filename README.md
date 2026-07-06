@@ -176,7 +176,7 @@ fixtures are synthetic and are the only data meant for public redistribution.
 uv run pytest
 cd web && npm test && cd ..
 
-# Train on materialized features; add --tune for Optuna search
+# Train production models locally
 uv run python -m estate_value_index.cli train-production-models --data-source bigquery
 
 # Run the pipeline (see --help for all flags)

@@ -22,7 +22,13 @@ from pathlib import Path
 
 from prefect import flow, get_run_logger
 
-from estate_value_index.ml.training_workflow import TrainingConfig, run_training
+from estate_value_index.cli.train_production_models import main as train_production_models_main
+from estate_value_index.model_artifacts import (
+    DEFAULT_MODEL_PREFIX,
+    NO_LIST_MODEL_ID,
+    production_artifact_names,
+    required_production_artifact_files,
+)
 from estate_value_index.pipelines.constants import DEFAULT_MEDIAN_APE_THRESHOLD
 
 # Import training tasks from new focused modules
@@ -84,33 +90,29 @@ def _run_local_training(config: TrainingFlowConfig, results: dict, logger: Logge
     if not data_file.exists():
         raise FileNotFoundError(f"Training data not found: {data_file}")
 
-    logger.info(
-        "Training with: tune=%s, use_materialized_features=%s, production_mode=%s",
-        config.tune,
-        False,
-        config.production_mode,
-    )
+    logger.info("Training production models with data source json")
     logger.info("Using local data file: %s", data_file)
 
     try:
         stdout_capture = io.StringIO()
         with redirect_stdout(stdout_capture):
-            mae = run_training(
-                TrainingConfig(
-                    hyperparameter_tuning=config.tune,
-                    data_source="json",
-                    use_materialized_features=False,
-                    data_file=str(data_file),
-                    model_dir=None,
-                    metrics_prefix=None,
-                    importance_threshold=config.importance_threshold,
-                    production_mode=config.production_mode,
-                    config_file=None,
-                )
+            exit_code = train_production_models_main(
+                [
+                    "--data-source",
+                    "json",
+                    "--data-file",
+                    str(data_file),
+                    "--model-dir",
+                    config.local_model_dir,
+                    "--model-prefix",
+                    config.model_prefix,
+                ]
             )
+        if exit_code != 0:
+            raise RuntimeError(f"train-production-models exited with code {exit_code}")
 
-        logger.info(f"Training completed with MAE: {mae:,.0f} SEK")
-        training_results = {"success": True, "method": "local_direct", "mae": mae}
+        logger.info("Production model training completed")
+        training_results = {"success": True, "method": "local_production_cli"}
         results["steps"]["local_training"] = training_results
         results["success"] = True
 
@@ -119,7 +121,9 @@ def _run_local_training(config: TrainingFlowConfig, results: dict, logger: Logge
         raise RuntimeError(f"Local training failed: {e}") from e
 
     # Validate local model
-    metrics_file = Path(config.local_model_dir) / f"{config.model_prefix}_metrics_lgbm.json"
+    metrics_file = Path(config.local_model_dir) / production_artifact_names(
+        NO_LIST_MODEL_ID, config.model_prefix
+    ).metrics
     if metrics_file.exists():
         validation_results = validate_model_performance_task(
             metrics_path=metrics_file,
@@ -196,20 +200,15 @@ def _submit_training_job_stage(
     )
 
     submission_results = submit_vertex_training_job_task(
-        tune=config.tune,
         machine_type=config.machine_type,
-        importance_threshold=config.importance_threshold,
-        production_mode=config.production_mode,
         display_name=job_display_name,
         image_uri=(results.get("steps", {}).get("rebuild_container", {}).get("image_uri")),
         dry_run=config.dry_run,
     )
     results["steps"]["submit_job"] = submission_results
 
-    # Seed the prefix only from the submission output. The configured prefix is the
-    # production name (e.g. price_prediction_model), not the trainer's run-specific
-    # artifact prefix (vertex-lgbm-{run_id}); seeding it here would stop the monitor
-    # stage from resolving the real prefix and break the artifact download.
+    # Seed the prefix only from the submission output; the monitor stage can recover
+    # the canonical default from the job spec/env if the submission wrapper omits it.
     state = _VertexJobState(
         job_id=submission_results.get("job_id"),
         run_id=submission_results.get("run_id"),
@@ -297,8 +296,8 @@ def _resolve_artifacts_from_job_info(
         state.run_id = state.model_uri.rstrip("/").split("/")[-1]
         state.submission_results["run_id"] = state.run_id
 
-    if not state.resolved_model_prefix and state.run_id:
-        state.resolved_model_prefix = f"vertex-lgbm-{state.run_id}"
+    if not state.resolved_model_prefix:
+        state.resolved_model_prefix = DEFAULT_MODEL_PREFIX
 
     if state.resolved_model_prefix:
         results["configuration"]["model_prefix"] = state.resolved_model_prefix
@@ -378,21 +377,13 @@ def _promote_model_local_files(
 
     local_dir = Path(config.local_model_dir)
 
-    # Define file types to promote
-    file_types = [
-        "lgbm.joblib",
-        "metrics_lgbm.json",
-        "feature_context.json",
-        "feature_importance.json",
-    ]
-
-    for file_type in file_types:
-        versioned_file = local_dir / f"{state.resolved_model_prefix}_{file_type}"
-        production_file = local_dir / f"{config.model_prefix}_{file_type}"
+    for filename in required_production_artifact_files(config.model_prefix):
+        versioned_file = local_dir / filename
+        production_file = local_dir / filename
 
         # Skip if source and destination are the same file
         if versioned_file == production_file:
-            logger.info(f"  Skipping {file_type}: already at production name")
+            logger.info(f"  Skipping {filename}: already at production name")
             continue
 
         if versioned_file.exists():
@@ -409,7 +400,9 @@ def _validate_and_promote_stage(
     logger.info("STEP 6: Validating model performance")
     logger.info("-" * 80)
 
-    metrics_path = Path(config.local_model_dir) / f"{state.resolved_model_prefix}_metrics_lgbm.json"
+    metrics_path = Path(config.local_model_dir) / production_artifact_names(
+        NO_LIST_MODEL_ID, state.resolved_model_prefix or config.model_prefix
+    ).metrics
     if not metrics_path.exists():
         logger.warning(f"Metrics file not found: {metrics_path}")
         results["validation_passed"] = False
@@ -500,7 +493,7 @@ def _generate_enrichment_stage(config: TrainingFlowConfig, results: dict, logger
             output_file=Path("data/derived/area_statistics.json"),
             data_source="bigquery",
             feature_context_path=Path(config.local_model_dir)
-            / f"{config.model_prefix}_no_list_feature_context.json",
+            / production_artifact_names(NO_LIST_MODEL_ID, config.model_prefix).context,
             value_analysis_path=value_analysis_path,
             raw_listings_path=Path("data/raw/booli/booli_listings_prod.json"),
         )

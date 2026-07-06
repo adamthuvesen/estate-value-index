@@ -6,6 +6,12 @@ from pathlib import Path
 
 import pytest
 
+from estate_value_index.model_artifacts import (
+    LISTING_MODEL_ID,
+    NO_LIST_MODEL_ID,
+    production_artifact_names,
+)
+
 MODEL_REGRESSION_ENV = "RUN_MODEL_REGRESSION"
 
 
@@ -28,7 +34,7 @@ def test_model_performance_regression():
     REGRESSION_THRESHOLD = 0.10
 
     model_dir = _require_model_regression_artifacts()
-    metrics_file = model_dir / "price_prediction_model_no_list_metrics.json"
+    metrics_file = model_dir / production_artifact_names(NO_LIST_MODEL_ID).metrics
 
     if not metrics_file.exists():
         pytest.skip(f"Model metrics file not found: {metrics_file}")
@@ -55,7 +61,7 @@ def test_model_performance_regression():
 @pytest.mark.integration
 def test_model_metrics_exist():
     model_dir = _require_model_regression_artifacts()
-    metrics_file = model_dir / "price_prediction_model_no_list_metrics.json"
+    metrics_file = model_dir / production_artifact_names(NO_LIST_MODEL_ID).metrics
 
     assert metrics_file.exists(), f"Model metrics file not found: {metrics_file}"
 
@@ -76,12 +82,9 @@ def test_model_artifacts_exist():
     model_dir = _require_model_regression_artifacts()
 
     required_files = [
-        "price_prediction_model_no_list.joblib",
-        "price_prediction_model_no_list_metrics.json",
-        "price_prediction_model_no_list_feature_context.json",
-        "price_prediction_model_listing.joblib",
-        "price_prediction_model_listing_metrics.json",
-        "price_prediction_model_listing_feature_context.json",
+        filename
+        for model_id in (NO_LIST_MODEL_ID, LISTING_MODEL_ID)
+        for filename in production_artifact_names(model_id).files
     ]
 
     missing_files = [f for f in required_files if not (model_dir / f).exists()]

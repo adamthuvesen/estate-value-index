@@ -11,6 +11,11 @@ from pathlib import Path
 import requests
 from prefect import task
 
+from estate_value_index.model_artifacts import (
+    LISTING_MODEL_ID,
+    NO_LIST_MODEL_ID,
+    production_artifact_names,
+)
 from estate_value_index.pipelines.types import DeploymentResult, HealthCheckResult
 from estate_value_index.pipelines.utils import get_task_logger
 from estate_value_index.utils.clients import get_bq_client, get_storage_client
@@ -581,8 +586,8 @@ def monitor_pipeline_health_task() -> dict:
     try:
         model_dir = Path("web/models")
         model_files = [
-            model_dir / "price_prediction_model_no_list.joblib",
-            model_dir / "price_prediction_model_listing.joblib",
+            model_dir / production_artifact_names(NO_LIST_MODEL_ID).model,
+            model_dir / production_artifact_names(LISTING_MODEL_ID).model,
         ]
         missing_models = [path.name for path in model_files if not path.exists()]
 

@@ -1,11 +1,12 @@
 """Pipeline constants and defaults."""
 
+from estate_value_index.model_artifacts import DEFAULT_MODEL_PREFIX
+
 # GCP/Cloud Run defaults
 DEFAULT_REGION = "europe-north1"
 DEFAULT_MACHINE_TYPE = "n1-standard-4"
 
 # Model defaults
-DEFAULT_MODEL_PREFIX = "price_prediction_model"
 DEFAULT_MODEL_DIR = "web/models"
 # Single production quality bar, as MdAPE (median absolute % error) — the
 # AVM-standard headline metric, scale-robust unlike an absolute-SEK MAE gate.

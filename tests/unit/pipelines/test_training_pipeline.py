@@ -9,6 +9,11 @@ from unittest.mock import MagicMock
 import pytest
 
 import estate_value_index.pipelines.tasks as pipeline_tasks
+from estate_value_index.model_artifacts import (
+    DEFAULT_MODEL_PREFIX,
+    NO_LIST_MODEL_ID,
+    production_artifact_names,
+)
 from estate_value_index.pipelines.constants import DEFAULT_MEDIAN_APE_THRESHOLD
 from estate_value_index.pipelines.core import training_pipeline
 from estate_value_index.pipelines.core.training_pipeline import (
@@ -36,7 +41,7 @@ class TestArtifactLocationsFromJobInfo:
                                 "--model-dir",
                                 "gs://bucket/vertex-ai/models/20260101-010203",
                                 "--model-prefix",
-                                "vertex-lgbm-20260101-010203",
+                                DEFAULT_MODEL_PREFIX,
                             ]
                         }
                     }
@@ -47,7 +52,7 @@ class TestArtifactLocationsFromJobInfo:
         locations = _artifact_locations_from_job_info(job_info)
 
         assert locations.model_uri == "gs://bucket/vertex-ai/models/20260101-010203"
-        assert locations.model_prefix == "vertex-lgbm-20260101-010203"
+        assert locations.model_prefix == DEFAULT_MODEL_PREFIX
 
     @pytest.mark.unit
     def test_uses_model_artifacts_env_var_as_model_uri_fallback(self) -> None:
@@ -134,17 +139,14 @@ class TestResolveArtifactsFromJobInfo:
         _resolve_artifacts_from_job_info(monitoring_results, state, results, MagicMock())
 
         assert state.run_id == "env-run"
-        assert state.resolved_model_prefix == "vertex-lgbm-env-run"
+        assert state.resolved_model_prefix == DEFAULT_MODEL_PREFIX
 
 
 class TestSubmitTrainingJobStage:
     @pytest.mark.unit
-    def test_does_not_seed_resolved_prefix_from_configured_prefix(
+    def test_keeps_production_prefix_unresolved_when_submission_omits_it(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Regression for run 28585979280: seeding the state with the production
-        prefix blocked the monitor-stage resolver, so the download looked for
-        price_prediction_model_* while GCS held vertex-lgbm-{run_id}_*."""
         submission_results = {
             "success": True,
             "job_id": "projects/p/locations/europe-north1/customJobs/123",
@@ -167,7 +169,7 @@ class TestSubmitTrainingJobStage:
         assert should_return is False
         assert state is not None
         assert state.resolved_model_prefix is None
-        assert results["configuration"]["model_prefix"] == "price_prediction_model"
+        assert results["configuration"]["model_prefix"] == DEFAULT_MODEL_PREFIX
 
     @pytest.mark.unit
     def test_uses_prefix_from_submission_output_when_present(
@@ -178,7 +180,7 @@ class TestSubmitTrainingJobStage:
             "job_id": "projects/p/locations/europe-north1/customJobs/123",
             "run_id": "20260702-112242",
             "model_uri": "gs://bucket/vertex-ai/models/20260702-112242",
-            "model_prefix": "vertex-lgbm-20260702-112242",
+            "model_prefix": DEFAULT_MODEL_PREFIX,
             "output_uri": None,
             "timestamp": "2026-07-02T11:22:42",
         }
@@ -187,7 +189,7 @@ class TestSubmitTrainingJobStage:
             "submit_vertex_training_job_task",
             lambda **kwargs: submission_results,
         )
-        results = {"configuration": {"model_prefix": "price_prediction_model"}, "steps": {}}
+        results = {"configuration": {"model_prefix": DEFAULT_MODEL_PREFIX}, "steps": {}}
 
         state, should_return = _submit_training_job_stage(
             TrainingFlowConfig(), results, MagicMock()
@@ -195,8 +197,8 @@ class TestSubmitTrainingJobStage:
 
         assert should_return is False
         assert state is not None
-        assert state.resolved_model_prefix == "vertex-lgbm-20260702-112242"
-        assert results["configuration"]["model_prefix"] == "vertex-lgbm-20260702-112242"
+        assert state.resolved_model_prefix == DEFAULT_MODEL_PREFIX
+        assert results["configuration"]["model_prefix"] == DEFAULT_MODEL_PREFIX
 
 
 class TestMonitorJobStage:
@@ -204,8 +206,6 @@ class TestMonitorJobStage:
     def test_resolves_run_prefix_when_model_uri_known_but_prefix_missing(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """The production failure path: submission yields a model URI but no
-        prefix, so the monitor stage must still derive vertex-lgbm-{run_id}."""
         monkeypatch.setattr(
             training_pipeline,
             "poll_vertex_job_status_task",
@@ -217,12 +217,12 @@ class TestMonitorJobStage:
             model_uri="gs://bucket/vertex-ai/models/20260702-112242",
             submission_results={},
         )
-        results = {"configuration": {"model_prefix": "price_prediction_model"}, "steps": {}}
+        results = {"configuration": {"model_prefix": DEFAULT_MODEL_PREFIX}, "steps": {}}
 
         _monitor_job_stage(TrainingFlowConfig(), state, results, MagicMock())
 
-        assert state.resolved_model_prefix == "vertex-lgbm-20260702-112242"
-        assert results["configuration"]["model_prefix"] == "vertex-lgbm-20260702-112242"
+        assert state.resolved_model_prefix == DEFAULT_MODEL_PREFIX
+        assert results["configuration"]["model_prefix"] == DEFAULT_MODEL_PREFIX
 
 
 class TestDownloadArtifactsStage:
@@ -237,7 +237,7 @@ class TestDownloadArtifactsStage:
         monkeypatch.setattr(training_pipeline, "download_model_artifacts_task", fake_download)
         state = _VertexJobState(
             model_uri="gs://bucket/vertex-ai/models/20260702-112242",
-            resolved_model_prefix="vertex-lgbm-20260702-112242",
+            resolved_model_prefix=DEFAULT_MODEL_PREFIX,
             submission_results={},
         )
         results = {"steps": {}}
@@ -245,7 +245,7 @@ class TestDownloadArtifactsStage:
         early_return = _download_artifacts_stage(TrainingFlowConfig(), state, results, MagicMock())
 
         assert early_return is False
-        assert captured["model_prefix"] == "vertex-lgbm-20260702-112242"
+        assert captured["model_prefix"] == DEFAULT_MODEL_PREFIX
 
     @pytest.mark.unit
     def test_falls_back_to_configured_prefix_when_unresolved(
@@ -292,8 +292,8 @@ class TestValidateAndPromoteStage:
             lambda **kwargs: self._validation_result(passed=True),
         )
         config = TrainingFlowConfig(local_model_dir=str(tmp_path), dry_run=True)
-        state = _VertexJobState(resolved_model_prefix="vertex-lgbm-20260702-112242")
-        (tmp_path / "vertex-lgbm-20260702-112242_metrics_lgbm.json").write_text("{}")
+        state = _VertexJobState(resolved_model_prefix=DEFAULT_MODEL_PREFIX)
+        (tmp_path / production_artifact_names(NO_LIST_MODEL_ID).metrics).write_text("{}")
         results: dict = {"steps": {}}
 
         _validate_and_promote_stage(config, state, results, MagicMock())
@@ -313,8 +313,8 @@ class TestValidateAndPromoteStage:
             lambda **kwargs: self._validation_result(passed=False),
         )
         config = TrainingFlowConfig(local_model_dir=str(tmp_path), dry_run=True)
-        state = _VertexJobState(resolved_model_prefix="vertex-lgbm-20260702-112242")
-        (tmp_path / "vertex-lgbm-20260702-112242_metrics_lgbm.json").write_text("{}")
+        state = _VertexJobState(resolved_model_prefix=DEFAULT_MODEL_PREFIX)
+        (tmp_path / production_artifact_names(NO_LIST_MODEL_ID).metrics).write_text("{}")
         results: dict = {"steps": {}}
 
         _validate_and_promote_stage(config, state, results, MagicMock())
@@ -327,7 +327,7 @@ class TestValidateAndPromoteStage:
         self, tmp_path: Path
     ) -> None:
         config = TrainingFlowConfig(local_model_dir=str(tmp_path), dry_run=True)
-        state = _VertexJobState(resolved_model_prefix="vertex-lgbm-20260702-112242")
+        state = _VertexJobState(resolved_model_prefix=DEFAULT_MODEL_PREFIX)
         results: dict = {"steps": {}}
 
         _validate_and_promote_stage(config, state, results, MagicMock())

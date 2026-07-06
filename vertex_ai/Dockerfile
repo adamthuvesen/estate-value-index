@@ -20,7 +20,6 @@ WORKDIR /app
 # Copy project files for uv
 COPY pyproject.toml uv.lock ./
 COPY src/ src/
-COPY train_model.py train_model.py
 
 # Install Python dependencies with uv (faster than pip)
 # Uses ml, monitoring, and vertex extras for the training environment.
@@ -30,6 +29,6 @@ RUN uv pip install --system ".[ml,monitoring,vertex]"
 ENV GCS_ENABLED=true \
     GCP_REGION=europe-north1
 
-# The entrypoint runs the training script; pass additional args via Vertex AI job spec
-ENTRYPOINT ["python", "train_model.py"]
-CMD ["--data-source", "bigquery", "--use-features"]
+# The entrypoint runs the same production trainer used for local training.
+ENTRYPOINT ["python", "-m", "estate_value_index.cli", "train-production-models"]
+CMD ["--data-source", "bigquery"]

@@ -37,7 +37,6 @@ ingestion, feature materialization, training, and deployment. The four flows und
 | `pipelines/core/training_pipeline.py` | Feature materialization + Vertex AI training |
 | `pipelines/core/deployment_pipeline.py` | Cloud Run deployment of the prediction service |
 | `uv run python -m estate_value_index.cli <cmd>` | Unified CLI dispatcher (`cli/__main__.py`): `crawl`, `batch`, `backfill`, `process`, `features`, `migrate`, `costs`, `areas`, `value-analysis`, `area-metrics`, `train-production-models` |
-| `train_model.py` | Direct legacy LightGBM training entry for experiments |
 | `api_server.py` | FastAPI prediction service |
 
 ## System boundaries

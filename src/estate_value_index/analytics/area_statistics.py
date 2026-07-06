@@ -20,6 +20,7 @@ from typing import Any
 from estate_value_index.ingestion.processing import load_jsonl_file as load_jsonl
 from estate_value_index.ml.area_names import get_display_name
 from estate_value_index.ml.preprocessing import normalize_area_for_model
+from estate_value_index.model_artifacts import NO_LIST_MODEL_ID, production_artifact_names
 
 logger = logging.getLogger(__name__)
 
@@ -576,7 +577,10 @@ def _resolve_area_statistics_paths(
     project_root = Path(__file__).resolve().parents[3]
     return AreaStatisticsPaths(
         feature_context=feature_context_path
-        or project_root / "web" / "models" / "price_prediction_model_no_list_feature_context.json",
+        or project_root
+        / "web"
+        / "models"
+        / production_artifact_names(NO_LIST_MODEL_ID).context,
         value_analysis=value_analysis_path
         or project_root / "data" / "enrichment" / "value_analysis.json",
         raw_listings=raw_listings_path

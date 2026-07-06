@@ -43,16 +43,13 @@ class TestValueAnalysisTask:
 class TestLocalTrainingTask:
     def test_local_training_no_subprocess(self):
         source = Path("src/estate_value_index/pipelines/core/training_pipeline.py").read_text()
-        assert "from estate_value_index.ml.training_workflow import" in source
-        assert "subprocess.run" not in source or "train_model.py" not in source
+        assert "from estate_value_index.cli.train_production_models import" in source
+        assert "train_model.py" not in source
 
 
 class TestScriptEntrypoints:
-    def test_train_model_script_has_main_guard(self):
-        script_path = Path("train_model.py")
-        assert script_path.exists(), "train_model.py script missing"
-        content = script_path.read_text()
-        assert 'if __name__ == "__main__"' in content or "if __name__ == '__main__'" in content
+    def test_root_train_model_script_removed(self):
+        assert not Path("train_model.py").exists()
 
 
 class TestNoSubprocessRegressions:
@@ -93,9 +90,7 @@ class TestNoSubprocessRegressions:
         from estate_value_index.pipelines.core import training_pipeline
 
         source = inspect.getsource(training_pipeline)
-        assert "subprocess.run" not in source or "train_model.py" not in source, (
-            "Found Python subprocess call in training_pipeline.py"
-        )
+        assert "train_model.py" not in source
 
 
 class TestImportStructure:
@@ -119,7 +114,7 @@ class TestImportStructure:
 
     def test_training_pipeline_imports_training_workflow(self):
         source = Path("src/estate_value_index/pipelines/core/training_pipeline.py").read_text()
-        assert "from estate_value_index.ml.training_workflow import" in source
+        assert "from estate_value_index.cli.train_production_models import" in source
 
 
 class TestUnifiedCliSubcommands:

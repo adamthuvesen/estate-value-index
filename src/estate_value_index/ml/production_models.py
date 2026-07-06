@@ -70,6 +70,12 @@ from estate_value_index.ml import (
 from estate_value_index.ml.features.context import FeatureEngineeringContext
 from estate_value_index.ml.training_workflow.data import load_training_dataframe
 from estate_value_index.ml.training_workflow.runner import _context_payload
+from estate_value_index.model_artifacts import (
+    DEFAULT_MODEL_PREFIX,
+    LISTING_MODEL_ID,
+    NO_LIST_MODEL_ID,
+    production_artifact_names,
+)
 from estate_value_index.utils.gcs import (
     is_gcs_enabled,
     upload_model_artifacts,
@@ -79,9 +85,6 @@ from estate_value_index.utils.settings import get_random_state, get_test_size
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_MODEL_PREFIX = "price_prediction_model"
-NO_LIST_MODEL_ID = "no_list_price"
-LISTING_MODEL_ID = "with_list_price"
 DEFAULT_NO_LIST_FEATURE_SET = "no_list_price_v1"
 DEFAULT_LISTING_FEATURE_SET = "with_list_price_v1"
 ASK_PRICE_COLUMNS = ("listing_price", "price_per_sqm", "relative_area_price", "price_change")
@@ -447,11 +450,11 @@ def persist_production_model(
     model_prefix: str,
     metrics: dict[str, object],
 ) -> dict[str, str]:
-    stem = f"{model_prefix}_{model.model_id}"
-    model_path = model_dir / f"{stem}.joblib"
-    metrics_path = model_dir / f"{stem}_metrics.json"
-    context_path = model_dir / f"{stem}_feature_context.json"
-    importance_path = model_dir / f"{stem}_feature_importance.json"
+    names = production_artifact_names(model.model_id, model_prefix)
+    model_path = model_dir / names.model
+    metrics_path = model_dir / names.metrics
+    context_path = model_dir / names.context
+    importance_path = model_dir / names.importance
 
     joblib.dump(model, model_path)
     sidecar_path = write_sha256_sidecar(model_path)
@@ -466,7 +469,7 @@ def persist_production_model(
     )
 
     if is_gcs_enabled():
-        upload_model_artifacts(model_dir, stem)
+        upload_model_artifacts(model_dir, names.stem)
 
     return {
         "model": str(model_path),

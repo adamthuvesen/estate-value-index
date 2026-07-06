@@ -26,6 +26,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from estate_value_index.ml.preprocessing import normalize_area_for_model
+from estate_value_index.model_artifacts import (
+    DEFAULT_MODEL_PREFIX,
+    LISTING_MODEL_ID,
+    NO_LIST_MODEL_ID,
+    production_model_files,
+    required_production_artifact_files,
+)
 from estate_value_index.utils.settings import (
     get_rate_limit_max_ips,
     get_rate_limit_requests,
@@ -52,15 +59,11 @@ except ImportError:
     GCS_AVAILABLE = False
     logger.warning("GCS utilities not available, running in local mode")
 
-DEFAULT_PREFIX = "price_prediction_model"
 MODELS_DIR = Path("web/models")
 AUTO_MODEL = "auto"
-NO_LIST_MODEL = "no_list_price"
-LISTING_MODEL = "with_list_price"
-PRODUCTION_MODEL_FILES = {
-    NO_LIST_MODEL: f"{DEFAULT_PREFIX}_{NO_LIST_MODEL}.joblib",
-    LISTING_MODEL: f"{DEFAULT_PREFIX}_{LISTING_MODEL}.joblib",
-}
+NO_LIST_MODEL = NO_LIST_MODEL_ID
+LISTING_MODEL = LISTING_MODEL_ID
+PRODUCTION_MODEL_FILES = production_model_files(DEFAULT_MODEL_PREFIX)
 
 MODEL_CACHE: dict[str, dict] = {}
 
@@ -243,14 +246,7 @@ def _download_models_from_gcs(models_dir: Path) -> None:
         models_dir.mkdir(parents=True, exist_ok=True)
 
         required_models = [
-            f"models/{DEFAULT_PREFIX}_{NO_LIST_MODEL}.joblib",
-            f"models/{DEFAULT_PREFIX}_{NO_LIST_MODEL}.joblib.sha256",
-            f"models/{DEFAULT_PREFIX}_{NO_LIST_MODEL}_feature_context.json",
-            f"models/{DEFAULT_PREFIX}_{NO_LIST_MODEL}_metrics.json",
-            f"models/{DEFAULT_PREFIX}_{LISTING_MODEL}.joblib",
-            f"models/{DEFAULT_PREFIX}_{LISTING_MODEL}.joblib.sha256",
-            f"models/{DEFAULT_PREFIX}_{LISTING_MODEL}_feature_context.json",
-            f"models/{DEFAULT_PREFIX}_{LISTING_MODEL}_metrics.json",
+            f"models/{filename}" for filename in required_production_artifact_files(DEFAULT_MODEL_PREFIX)
         ]
 
         logger.info("Downloading %d required model files from GCS", len(required_models))
