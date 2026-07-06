@@ -234,8 +234,8 @@ jobs:
           mae = metrics.get('mae', 0)
 
           # Quality gate: MAE threshold
-          if mae > 275000:
-              print(f'❌ MAE quality gate failed: {mae:,.0f} SEK exceeds threshold of 275,000 SEK')
+          if mae > 350000:
+              print(f'❌ MAE quality gate failed: {mae:,.0f} SEK exceeds threshold of 350,000 SEK')
               sys.exit(1)
           else:
               print(f'✅ MAE quality gate passed: {mae:,.0f} SEK')

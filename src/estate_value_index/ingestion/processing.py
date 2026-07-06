@@ -76,12 +76,16 @@ def _pick_newer(existing: dict, new: dict) -> dict:
     if new_sold is not None and existing_sold is None:
         return new
 
+    # Timestamps mix tz-aware and naive ISO forms (both UTC); drop the offset
+    # so comparing across the two can't raise TypeError.
     try:
-        existing_scraped = datetime.fromisoformat(str(existing.get("scraped_at")))
+        existing_scraped = datetime.fromisoformat(str(existing.get("scraped_at"))).replace(
+            tzinfo=None
+        )
     except (TypeError, ValueError):
         return existing
     try:
-        new_scraped = datetime.fromisoformat(str(new.get("scraped_at")))
+        new_scraped = datetime.fromisoformat(str(new.get("scraped_at"))).replace(tzinfo=None)
     except (TypeError, ValueError):
         return existing
 

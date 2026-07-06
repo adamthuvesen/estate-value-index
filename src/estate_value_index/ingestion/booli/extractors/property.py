@@ -30,9 +30,11 @@ class BooliPropertyMixin:
     def extract_rooms(self, response):
         try:
             page_text = self._get_cached_page_text(response)
-            rooms_match = re.search(r"(\d+)\s+rum", page_text)
+            # "2,5 rum" contains "5 rum"; capture the decimal and floor so
+            # half-rooms don't resolve to 5.
+            rooms_match = re.search(r"(\d+(?:[.,]\d+)?)\s*rum", page_text)
             if rooms_match:
-                return int(rooms_match.group(1))
+                return int(float(rooms_match.group(1).replace(",", ".")))
         except Exception as e:
             self.logger.debug(f"Could not extract rooms: {e}")
         return None
