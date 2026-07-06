@@ -8,9 +8,6 @@ from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
-from evidently import ColumnMapping
-from evidently.metric_preset import DataDriftPreset, RegressionPreset
-from evidently.report import Report
 
 from estate_value_index.monitoring.constants import (
     CRITICAL_CATEGORICAL_FEATURES,
@@ -155,6 +152,12 @@ class ModelMonitor:
         target_column: str,
         prediction_column: str,
     ) -> ColumnMapping:
+        # Imported lazily: the prediction serving path imports this module
+        # transitively (production_models -> runner -> monitoring), but the
+        # runtime image installs only .[ml], not the .[monitoring] extra that
+        # provides evidently. Drift detection is a separate monitoring job.
+        from evidently import ColumnMapping
+
         categorical_cols, numeric_cols = self._critical_columns(current_data)
         column_mapping = ColumnMapping()
         column_mapping.numerical_features = numeric_cols
@@ -172,6 +175,10 @@ class ModelMonitor:
         column_mapping: ColumnMapping,
         has_predictions: bool,
     ) -> Report:
+        # Lazy import: see _column_mapping. Keeps evidently out of the serving path.
+        from evidently.metric_preset import DataDriftPreset, RegressionPreset
+        from evidently.report import Report
+
         metrics: list = [DataDriftPreset()]
         if has_predictions:
             metrics.append(RegressionPreset())
