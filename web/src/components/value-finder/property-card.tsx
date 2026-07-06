@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { formatCurrency, titleCaseArea } from "@/lib/format";
+import { formatSek, titleCaseArea } from "@/lib/format";
 import type { ValueProperty, ValueTier } from "@/lib/value-finder-types";
 
 interface PropertyCardProps {
@@ -129,13 +129,13 @@ export function PropertyCard({ property }: PropertyCardProps) {
         <div className="flex items-baseline justify-between gap-2">
           <span className="text-[12px] text-tactical-muted">Sold</span>
           <span className="num text-[14px] font-semibold text-tactical-text">
-            {formatCurrency(property.sold_price)}
+            {formatSek(property.sold_price)}
           </span>
         </div>
         <div className="mt-1 flex items-baseline justify-between gap-2">
           <span className="text-[12px] text-tactical-muted">Model estimate</span>
           <span className="num text-[13px] font-medium text-tactical-muted">
-            {formatCurrency(property.predicted_price)}
+            {formatSek(property.predicted_price)}
           </span>
         </div>
 
@@ -156,7 +156,7 @@ export function PropertyCard({ property }: PropertyCardProps) {
           <div className="mt-1.5 flex items-baseline justify-between gap-2">
             <span className={`num text-[14px] font-semibold ${tier.text}`}>
               {belowPrediction ? "−" : "+"}
-              {formatCurrency(Math.abs(displayDelta))}
+              {formatSek(Math.abs(displayDelta))}
             </span>
             <span className={`text-[12px] font-medium ${tier.text}`}>
               {Math.abs(displayPercentage).toFixed(1)}% {belowPrediction ? "under estimate" : "over estimate"}
@@ -170,7 +170,7 @@ export function PropertyCard({ property }: PropertyCardProps) {
         <Fact label="Size" value={`${property.living_area} m²`} />
         <Fact label="Rooms" value={`${property.rooms}`} />
         <Fact label="Built" value={property.construction_year ? `${property.construction_year}` : "—"} />
-        <Fact label="Fee" value={`${formatCurrency(property.monthly_fee)}/mo`} />
+        <Fact label="Fee" value={`${formatSek(property.monthly_fee)}/mo`} />
       </dl>
 
       {/* Footer: amenities + link, then meta */}
@@ -246,7 +246,7 @@ function InsufficientDataCard({ property }: PropertyCardProps) {
       <p className="mt-3 rounded-lg border border-tactical-border bg-tactical-elevated/60 px-3 py-2.5 text-[12px] text-tactical-muted">
         {reason} — not ranked. Sold for{" "}
         <span className="num font-medium text-tactical-text">
-          {formatCurrency(property.sold_price)}
+          {formatSek(property.sold_price)}
         </span>
         .
       </p>
@@ -255,7 +255,7 @@ function InsufficientDataCard({ property }: PropertyCardProps) {
         <Fact label="Size" value={sizeLabel} />
         <Fact label="Rooms" value={property.rooms ? `${property.rooms}` : "—"} />
         <Fact label="Built" value={property.construction_year ? `${property.construction_year}` : "—"} />
-        <Fact label="Fee" value={property.monthly_fee ? `${formatCurrency(property.monthly_fee)}/mo` : "—"} />
+        <Fact label="Fee" value={property.monthly_fee ? `${formatSek(property.monthly_fee)}/mo` : "—"} />
       </dl>
 
       <div className="mt-3 flex items-center justify-between gap-2 border-t border-tactical-border pt-2.5">

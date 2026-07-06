@@ -25,7 +25,7 @@ export function formatRawNumber(value: number): string {
   return new Intl.NumberFormat("sv-SE").format(value);
 }
 
-export function formatCurrency(value: number | null | undefined): string {
+export function formatSek(value: number | null | undefined): string {
   if (value === null || value === undefined) return "N/A";
   return new Intl.NumberFormat("sv-SE", {
     style: "currency",
@@ -33,11 +33,6 @@ export function formatCurrency(value: number | null | undefined): string {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(value);
-}
-
-export function formatSek(value: number | null | undefined): string {
-  if (value === null || value === undefined) return "N/A";
-  return `${formatNumber(value)} kr`;
 }
 
 export function formatSekPerSqm(value: number | null | undefined): string {

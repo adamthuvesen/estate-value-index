@@ -1,6 +1,5 @@
 import {
   AREA_DATA_STALE_DAYS,
-  formatCurrency,
   formatDateSv,
   formatNumber,
   formatNumberOrDash,
@@ -10,6 +9,11 @@ import {
   formatShortSek,
   getStaleInfo,
 } from "../format";
+
+// Intl.NumberFormat's sv-SE group separator (and, for currency style, the
+// separator before the unit) is U+00A0 (NBSP), not a regular space — spelled
+// out explicitly so a future edit can't silently swap it for a breaking space.
+const NBSP = " ";
 
 describe("formatNumberOrDash", () => {
   it("returns em-dash for null", () => {
@@ -35,19 +39,21 @@ describe("formatNumberOrDash", () => {
 
 describe("shared Swedish formatters", () => {
   it("formats rounded numbers and SEK values", () => {
-    expect(formatNumber(1234.6)).toBe("1 235");
-    expect(formatSek(1234.4)).toBe("1 234 kr");
-    expect(formatSekPerSqm(98765.4)).toBe("98 765 kr/m²");
+    expect(formatNumber(1234.6)).toBe(`1${NBSP}235`);
+    // formatSek uses Intl's currency style, which puts NBSP both between the
+    // number groups and before the unit — unlike formatSekPerSqm below, which
+    // concatenates " kr/m²" onto a plain formatNumber() and keeps a regular space.
+    expect(formatSek(1234.4)).toBe(`1${NBSP}234${NBSP}kr`);
+    expect(formatSekPerSqm(98765.4)).toBe(`98${NBSP}765 kr/m²`);
   });
 
   it("formats nullable display values", () => {
     expect(formatNumber(null)).toBe("N/A");
-    expect(formatCurrency(undefined)).toBe("N/A");
+    expect(formatSek(undefined)).toBe("N/A");
     expect(formatPercent(null)).toBe("—%");
   });
 
-  it("formats currency, percentages, short values, and dates", () => {
-    expect(formatCurrency(1234)).toBe("1 234 kr");
+  it("formats percentages, short values, and dates", () => {
     expect(formatPercent(12.345)).toBe("12.3%");
     expect(formatShortSek(1_250_000)).toBe("1.3M kr");
     expect(formatShortSek(43_200)).toBe("43k kr");

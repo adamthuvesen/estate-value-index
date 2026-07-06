@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { formatCurrency } from "@/lib/format";
+import { formatSek } from "@/lib/format";
 import {
   VALUE_TIERS,
   type ValueFinderFilters,
@@ -161,7 +161,7 @@ export function FiltersPanel({
 
         <RangeField
           label="Price"
-          value={`${formatCurrency(filters.min_price ?? priceRange.min)} – ${formatCurrency(filters.max_price ?? priceRange.max)}`}
+          value={`${formatSek(filters.min_price ?? priceRange.min)} – ${formatSek(filters.max_price ?? priceRange.max)}`}
           min={priceRange.min}
           max={priceRange.max}
           step={100000}
