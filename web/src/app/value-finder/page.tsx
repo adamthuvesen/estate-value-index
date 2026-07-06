@@ -9,7 +9,7 @@ import { Pagination } from "@/components/value-finder/pagination";
 import type {
   ValueFinderFilters,
   ValueFinderResponse,
-  ValueFinderMetadataResponse,
+  ValueFinderFacetsResponse,
   SortField,
   SortOrder,
   ValueTier,
@@ -20,7 +20,7 @@ function ValueFinderContent() {
   const searchParams = useSearchParams();
 
   const [properties, setProperties] = useState<ValueFinderResponse | null>(null);
-  const [metadata, setMetadata] = useState<ValueFinderMetadataResponse | null>(null);
+  const [metadata, setMetadata] = useState<ValueFinderFacetsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 

@@ -160,7 +160,7 @@ export interface ValueFinderResponse {
   properties: ValueProperty[];
 }
 
-export interface ValueFinderMetadataResponse {
+export interface ValueFinderFacetsResponse {
   available_areas: string[];
   available_municipalities: string[];
   property_types: string[];
