@@ -83,54 +83,61 @@ export function PropertyCard({ property }: PropertyCardProps) {
   const half = (Math.abs(clamped) / BAND) * 50; // width from center, in %
   const fillLeft = belowPrediction ? 50 - half : 50;
 
+  const soldDate = new Date(property.sold_date).toLocaleDateString("en-GB", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+
   return (
-    <article className="tactical-card tactical-card-hover group flex flex-col p-5">
-      {/* Header: address + score */}
+    <article className="tactical-card tactical-card-hover group flex flex-col p-4">
+      {/* Header: address + location + tier, score badge */}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3
-            className="truncate text-[17px] font-semibold leading-tight text-tactical-text"
+            className="truncate text-[15px] font-semibold leading-tight text-tactical-text"
             title={property.address}
           >
             {property.address}
           </h3>
-          <p className="mt-0.5 truncate text-[13px] text-tactical-muted">
-            {titleCaseArea(property.area)} · {titleCaseArea(property.municipality)}
+          <p className="mt-1 flex items-center gap-1.5 truncate text-[12px]">
+            <span className="truncate text-tactical-muted">
+              {titleCaseArea(property.area)} · {titleCaseArea(property.municipality)}
+            </span>
+            <span aria-hidden className="text-tactical-border-emphasis">·</span>
+            <span className={`inline-flex shrink-0 items-center gap-1 font-medium ${tier.text}`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${tier.dot}`} aria-hidden />
+              {tier.label}
+            </span>
           </p>
         </div>
         <div
-          className={`flex h-10 w-10 shrink-0 flex-col items-center justify-center rounded-xl border ${tier.chip}`}
-          title="Value score"
+          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border ${tier.chip}`}
+          title="Value score (1–100)"
         >
-          <span className="num text-[15px] font-semibold leading-none">
+          <span className="num text-[14px] font-semibold leading-none">
             {property.value_score.toFixed(0)}
           </span>
         </div>
       </div>
 
-      {/* Tier */}
-      <div className="mt-2.5 flex items-center gap-1.5">
-        <span className={`h-2 w-2 rounded-full ${tier.dot}`} aria-hidden />
-        <span className={`text-[13px] font-medium ${tier.text}`}>{tier.label}</span>
-      </div>
-
       {/* Fair-value block */}
-      <div className="mt-4 rounded-xl border border-tactical-border bg-tactical-elevated/60 p-4">
+      <div className="mt-3 rounded-lg border border-tactical-border bg-tactical-elevated/60 px-3 py-2.5">
         <div className="flex items-baseline justify-between gap-2">
           <span className="text-[12px] text-tactical-muted">Sold</span>
-          <span className="num text-[15px] font-semibold text-tactical-text">
+          <span className="num text-[14px] font-semibold text-tactical-text">
             {formatCurrency(property.sold_price)}
           </span>
         </div>
-        <div className="mt-1.5 flex items-baseline justify-between gap-2">
+        <div className="mt-1 flex items-baseline justify-between gap-2">
           <span className="text-[12px] text-tactical-muted">Model estimate</span>
-          <span className="num text-[15px] font-medium text-tactical-muted">
+          <span className="num text-[13px] font-medium text-tactical-muted">
             {formatCurrency(property.predicted_price)}
           </span>
         </div>
 
         {/* Gauge */}
-        <div className="mt-3.5">
+        <div className="mt-2.5">
           <div className="value-gauge">
             {/* center reference (model estimate) */}
             <span
@@ -143,8 +150,8 @@ export function PropertyCard({ property }: PropertyCardProps) {
               aria-hidden
             />
           </div>
-          <div className="mt-2 flex items-baseline justify-between gap-2">
-            <span className={`num text-[15px] font-semibold ${tier.text}`}>
+          <div className="mt-1.5 flex items-baseline justify-between gap-2">
+            <span className={`num text-[14px] font-semibold ${tier.text}`}>
               {belowPrediction ? "−" : "+"}
               {formatCurrency(Math.abs(displayDelta))}
             </span>
@@ -156,58 +163,44 @@ export function PropertyCard({ property }: PropertyCardProps) {
       </div>
 
       {/* Facts */}
-      <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2.5">
+      <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 sm:grid-cols-4">
         <Fact label="Size" value={`${property.living_area} m²`} />
         <Fact label="Rooms" value={`${property.rooms}`} />
         <Fact label="Built" value={property.construction_year ? `${property.construction_year}` : "—"} />
         <Fact label="Fee" value={`${formatCurrency(property.monthly_fee)}/mo`} />
       </dl>
 
-      {/* Amenity chips */}
-      <div className="mt-3.5 flex flex-wrap gap-1.5">
-        {property.floor !== null && <Chip>Floor {property.floor}</Chip>}
-        {property.elevator && <Chip icon>Elevator</Chip>}
-        {property.balcony && <Chip icon>Balcony</Chip>}
-      </div>
-
-      {/* Meta */}
-      <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-tactical-border pt-3 text-[12px] text-tactical-dimmed">
-        <span>
-          Sold{" "}
-          {new Date(property.sold_date).toLocaleDateString("en-GB", {
-            year: "numeric",
-            month: "short",
-            day: "numeric",
-          })}
-        </span>
-        {property.days_on_market !== null && (
-          <>
-            <span aria-hidden>·</span>
-            <span>
-              {property.days_on_market} {property.days_on_market === 1 ? "day" : "days"} on market
-            </span>
-          </>
+      {/* Footer: amenities + link, then meta */}
+      <div className="mt-3 flex items-center justify-between gap-2 border-t border-tactical-border pt-2.5">
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+          {property.floor !== null && <Chip>Floor {property.floor}</Chip>}
+          {property.elevator && <Chip icon>Elevator</Chip>}
+          {property.balcony && <Chip icon>Balcony</Chip>}
+        </div>
+        {property.url && (
+          <Link
+            href={property.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="tactical-focus-ring inline-flex shrink-0 items-center gap-1 text-[12px] font-medium text-tactical-muted transition-colors hover:text-tactical-accent"
+          >
+            Booli
+            <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+              />
+            </svg>
+          </Link>
         )}
       </div>
-
-      {property.url && (
-        <Link
-          href={property.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="tactical-btn tactical-focus-ring mt-4 w-full text-[13px]"
-        >
-          View on Booli
-          <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-            />
-          </svg>
-        </Link>
-      )}
+      <p className="mt-2 text-[11px] text-tactical-dimmed">
+        Sold {soldDate}
+        {property.days_on_market !== null &&
+          ` · ${property.days_on_market} ${property.days_on_market === 1 ? "day" : "days"} on market`}
+      </p>
     </article>
   );
 }
@@ -215,17 +208,17 @@ export function PropertyCard({ property }: PropertyCardProps) {
 function Fact({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-col">
-      <dt className="text-[11px] uppercase tracking-tactical-wide text-tactical-dimmed">{label}</dt>
-      <dd className="num text-[13px] font-medium text-tactical-text">{value}</dd>
+      <dt className="text-[10px] uppercase tracking-tactical-wide text-tactical-dimmed">{label}</dt>
+      <dd className="num mt-0.5 whitespace-nowrap text-[13px] font-medium text-tactical-text">{value}</dd>
     </div>
   );
 }
 
 function Chip({ children, icon = false }: { children: React.ReactNode; icon?: boolean }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-pill border border-tactical-border bg-tactical-surface px-2.5 py-1 text-[12px] font-medium text-tactical-muted">
+    <span className="inline-flex items-center gap-1 rounded-pill border border-tactical-border bg-tactical-surface px-2 py-0.5 text-[11px] font-medium text-tactical-muted">
       {icon && (
-        <svg className="h-3 w-3 text-val-exc" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="h-2.5 w-2.5 text-val-exc" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
         </svg>
       )}
