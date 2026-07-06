@@ -1,57 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server';
-import {
-  extractListingId,
-  parseBooliListingFromHtml,
-} from '@/lib/booli-listing-parser';
+import { extractListingId, type ParsedBooliListing } from '@/lib/booli-listing-parser';
 import { validateBooliUrl } from '@/lib/booli-url';
+import { getValueAnalysisData } from '@/lib/value-analysis-cache';
+import type { ValueProperty } from '@/lib/value-finder-types';
 
 export const runtime = 'nodejs';
 
-const UPSTREAM_TIMEOUT_MS = 10_000;
-const MAX_RESPONSE_BYTES = 5 * 1024 * 1024;
+// Booli sits behind Cloudflare, which serves a 403 challenge to any plain
+// server-side fetch — and hardest of all from a datacenter IP like Cloud Run's.
+// Live-scraping the page can't work here. Instead we prefill from our own
+// analyzed dataset when we have the listing, and tell the user to fill in the
+// fields by hand when we don't.
 
-class ResponseTooLargeError extends Error {
-  constructor() {
-    super('response too large');
-    this.name = 'ResponseTooLargeError';
-  }
-}
-
-async function readBodyWithCap(response: Response, maxBytes: number): Promise<string> {
-  const reader = response.body?.getReader();
-  if (!reader) {
-    return response.text();
-  }
-
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      if (!value) continue;
-      total += value.byteLength;
-      if (total > maxBytes) {
-        await reader.cancel();
-        throw new ResponseTooLargeError();
-      }
-      chunks.push(value);
-    }
-  } finally {
-    try {
-      reader.releaseLock();
-    } catch {
-      /* lock already released */
-    }
-  }
-
-  const combined = new Uint8Array(total);
-  let offset = 0;
-  for (const chunk of chunks) {
-    combined.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return new TextDecoder('utf-8').decode(combined);
+function toPrefill(property: ValueProperty, sourceUrl: string): ParsedBooliListing {
+  return {
+    listing_id: property.listing_id,
+    listing_price: property.listing_price,
+    living_area: property.living_area ?? null,
+    rooms: property.rooms ?? null,
+    monthly_fee: property.monthly_fee ?? null,
+    construction_year: property.construction_year,
+    days_on_market: property.days_on_market,
+    property_type: property.property_type || 'Lägenhet',
+    municipality: property.municipality || 'Stockholm',
+    area: property.area ?? null,
+    floor: property.floor,
+    elevator: property.elevator,
+    balcony: property.balcony,
+    source_url: property.url ?? sourceUrl,
+  };
 }
 
 export async function POST(request: NextRequest) {
@@ -82,64 +59,34 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const upstreamUrl = validated.toString();
-    const controller = new AbortController();
-    const timeout = setTimeout(
-      () => controller.abort(new Error('upstream timeout')),
-      UPSTREAM_TIMEOUT_MS
-    );
-
-    let response: Response;
-    let html: string;
+    let data;
     try {
-      response = await fetch(upstreamUrl, {
-        headers: {
-          'User-Agent':
-            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:128.0) Gecko/20100101 Firefox/128.0',
-          Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          'Accept-Language': 'sv-SE,sv;q=0.9,en-US;q=0.8,en;q=0.7',
+      data = await getValueAnalysisData();
+    } catch (loadErr) {
+      console.error('Listing prefill: dataset load failed', loadErr);
+      return NextResponse.json(
+        { error: 'Listing data is unavailable right now. Enter the details manually below.' },
+        { status: 503 }
+      );
+    }
+
+    const match = data.properties.find((property) => property.listing_id === listingId);
+    if (!match) {
+      return NextResponse.json(
+        {
+          error:
+            'This listing isn’t in our dataset, and Booli blocks automated fetches. Enter the details manually below.',
         },
-        cache: 'no-store',
-        signal: controller.signal,
-      });
-
-      if (!response.ok) {
-        return NextResponse.json(
-          { error: `Failed to load listing (status ${response.status})` },
-          { status: 502 }
-        );
-      }
-
-      html = await readBodyWithCap(response, MAX_RESPONSE_BYTES);
-    } catch (fetchErr) {
-      if (fetchErr instanceof ResponseTooLargeError) {
-        return NextResponse.json(
-          { error: 'Upstream response too large (>5MB cap)' },
-          { status: 502 }
-        );
-      }
-      const isAbort =
-        (fetchErr instanceof Error && fetchErr.name === 'AbortError') ||
-        controller.signal.aborted;
-      if (isAbort) {
-        return NextResponse.json(
-          { error: 'Upstream timeout while fetching listing' },
-          { status: 504 }
-        );
-      }
-      throw fetchErr;
-    } finally {
-      clearTimeout(timeout);
+        { status: 404 }
+      );
     }
 
-    const parsed = parseBooliListingFromHtml(html, listingId, upstreamUrl);
-    if ('error' in parsed) {
-      return NextResponse.json({ error: parsed.error }, { status: 502 });
-    }
-
-    return NextResponse.json(parsed);
+    return NextResponse.json(toPrefill(match, validated.toString()));
   } catch (err) {
     console.error('Listing fetch error', err);
-    return NextResponse.json({ error: 'Unexpected error while fetching listing data' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Unexpected error while looking up listing data' },
+      { status: 500 }
+    );
   }
 }
