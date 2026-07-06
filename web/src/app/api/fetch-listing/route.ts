@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { extractListingId, type ParsedBooliListing } from '@/lib/booli-listing-parser';
 import { validateBooliUrl } from '@/lib/booli-url';
+import { titleCaseArea } from '@/lib/format';
 import { getValueAnalysisData } from '@/lib/value-analysis-cache';
 import type { ValueProperty } from '@/lib/value-finder-types';
 
@@ -23,7 +24,11 @@ function toPrefill(property: ValueProperty, sourceUrl: string): ParsedBooliListi
     days_on_market: property.days_on_market,
     property_type: property.property_type || 'Lägenhet',
     municipality: property.municipality || 'Stockholm',
-    area: property.area ?? null,
+    // The dataset's area field is an ASCII slug (e.g. "bromma_alsten"); title-case
+    // it here so the predictor's Area dropdown doesn't show a raw slug next to
+    // properly-cased options. normalize_area_for_model re-derives the slug
+    // server-side before scoring, so the display transform is cosmetic-only.
+    area: property.area ? titleCaseArea(property.area) : null,
     floor: property.floor,
     elevator: property.elevator,
     balcony: property.balcony,

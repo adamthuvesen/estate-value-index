@@ -60,6 +60,21 @@ export function formatShortSek(value: number | null | undefined): string {
   return `${formatShortThousands(value)} kr`;
 }
 
+/**
+ * Turn a lowercase area/municipality slug (e.g. `"bromma_alsten"`, sourced
+ * from the dataset's ASCII-normalized area key) into a presentable label
+ * (`"Bromma Alsten"`). Slugs never carry diacritics, so this can't recover
+ * exact Swedish spelling — it's a display approximation, not a name lookup.
+ */
+export function titleCaseArea(value: string): string {
+  return value
+    .toLowerCase()
+    .split(/[\s_-]+/)
+    .filter(Boolean)
+    .map((part) => part[0].toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
 export function formatDateSv(date: Date | string): string {
   const parsedDate = typeof date === "string" ? new Date(date) : date;
   return parsedDate.toLocaleDateString("sv-SE");

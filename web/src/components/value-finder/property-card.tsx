@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, titleCaseArea } from "@/lib/format";
 import type { ValueProperty, ValueTier } from "@/lib/value-finder-types";
 
 interface PropertyCardProps {
@@ -60,14 +60,6 @@ const TIER_STYLES: Record<ValueTier, TierStyle> = {
 };
 
 const FALLBACK_TIER: TierStyle = TIER_STYLES["Fair Value"];
-
-function titleCaseArea(value: string): string {
-  return value
-    .toLowerCase()
-    .split(/([\s-])/)
-    .map((part) => (part.length > 1 ? part[0].toUpperCase() + part.slice(1) : part))
-    .join("");
-}
 
 // Human labels for the core fields a value score depends on. Missing any of
 // these suppresses the row from ranking (see value_analysis.py CORE_RANK_FIELDS).
