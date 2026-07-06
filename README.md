@@ -1,29 +1,29 @@
 # Estate Value Index
 
-Predicts sale prices for Swedish residential listings, end to end: ingest authorized
+This repo predicts sale prices for Swedish residential listings, end to end: ingest authorized
 listing data, land it in BigQuery, engineer features, train LightGBM, and serve
 predictions from a FastAPI + Next.js container on Cloud Run.
 
-It exists as a working reference for the whole path — ingestion through serving — rather
-than a model in a notebook. The interesting parts are the seams where real systems break:
+It is a working reference for the whole path, from ingestion to serving, rather
+than a model in a notebook. The brittle parts are the ones real systems trip over:
 temporal leakage in training, train/serve skew at inference, and untrusted input reaching
-SQL and the file system.
+SQL or the file system.
 
 The public repo ships code and synthetic fixtures only, not scraped listings or a
 redistributable Booli dataset. Real listings, geocodes, trained models, private datasets,
-and production metrics are intentionally excluded. Bring your own lawful data access,
+and production metrics are left out. Bring your own lawful data access,
 BigQuery, GCS, and `.env` for production-like runs.
 
 ## Engineering decisions
 
-These are the choices that shaped the system, and the failure modes they guard against.
+These choices shaped the system and the failure modes it checks for.
 
 - **Chronological splits, never random.** Production evaluation splits on `sold_date`; a naive
   random row split leaks future prices into training and flatters the metric. Area and
   time aggregates are built so they can't peek at rows from the future either. `MAX_MAE_THRESHOLD`
   is re-baselined against honest temporal MAE, not a shuffled holdout. See
   `tests/ml/test_temporal_leakage.py`.
-- **Inference feature context matches training.** Train/serve skew is the quiet killer, so area
+- **Inference feature context matches training.** Train/serve skew is a common failure mode, so area
   normalization (`normalize_area_for_model()` for Booli's `Property - Area - City` strings) and
   the pandas `category` + LightGBM categorical contract are shared between the trainer and
   `api_server.py` rather than reimplemented per side.
@@ -31,19 +31,19 @@ These are the choices that shaped the system, and the failure modes they guard a
   `scripts/startup.sh` refuses to boot if a required download fails or a sidecar is missing,
   so a corrupted or partial sync fails loud instead of serving garbage.
 - **Models live in GCS, not the image.** Training output is git-ignored and never baked into the
-  container; `startup.sh` syncs artifacts from GCS at boot when `GCS_ENABLED=true`. The image
+  container; `scripts/startup.sh` syncs artifacts from GCS at boot when `GCS_ENABLED=true`. The image
   stays generic and models version independently of deploys.
 - **BigQuery SQL is parameterized or operator-only.** Dynamic SQL goes through
   `utils/bigquery_safety.py` (structured Filter API, bound parameters); ad hoc string
   fragments are treated as trusted operator input only, never user data.
   `tests/ml/test_filter_api_contract.py` and `tests/utils/test_no_unsafe_sql.py` keep call sites honest.
 - **The runtime service account can only read its bucket.** Cloud Run runs under a dedicated
-  least-privilege SA with bucket-scoped GCS object-read and nothing else — no BigQuery, no
-  project Editor — because the request path only reads artifacts. `deploy_cloud_run.sh` attaches
-  it and refuses to deploy if it's missing, so the service can't silently fall back to the broad
-  default identity.
-- **One-way dependency layering.** Imports flow `cli`/`pipelines` → domain (`ml`, `ingestion`,
-  `analytics`) → `utils`. `utils/` imports no domain code; orchestration calls down, never up.
+  least-privilege SA with bucket-scoped GCS object-read and nothing else: no BigQuery and no
+  project Editor. The request path only reads artifacts. `deploy_cloud_run.sh` attaches the
+  service account and refuses to deploy if it's missing, so the service can't silently fall back
+  to the broad default identity.
+- **One-way dependency layering.** Imports flow `cli`/`pipelines` -> domain (`ml`, `ingestion`,
+  `analytics`) -> `utils`. `utils/` imports no domain code; orchestration calls down, never up.
 
 Some engineered signals are heuristic and hand-tuned, so feature importances get re-checked
 after retrains rather than assumed stable.
@@ -64,8 +64,8 @@ after retrains rather than assumed stable.
 ## How it fits together
 
 ```text
-Authorized listing source → BigQuery raw listings → engineered features → LightGBM artifacts
-  → FastAPI /predict + Next.js API routes (one Cloud Run container)
+Authorized listing source -> BigQuery raw listings -> engineered features -> LightGBM artifacts
+  -> FastAPI /predict + Next.js API routes (one Cloud Run container)
 ```
 
 The composed path is `pipelines/core/complete_pipeline.py`, which chains ingestion, feature
@@ -103,8 +103,8 @@ BIGQUERY_TABLE_FEATURES=engineered_features
 GCS_BUCKET=your-gcs-bucket
 ```
 
-Config precedence is environment variables → [config/pipeline_config.yaml](config/pipeline_config.yaml)
-→ code defaults. Inspect resolved settings with
+Config precedence is environment variables -> [config/pipeline_config.yaml](config/pipeline_config.yaml)
+-> code defaults. Inspect resolved settings with
 `uv run python -m estate_value_index.utils.settings`.
 
 ## Public demo
@@ -138,22 +138,30 @@ or production performance.
 
 ## Run locally
 
+Terminal 1:
+
 ```bash
-./start.sh                  # FastAPI :8000 + Next.js :3000
+uv run uvicorn api_server:app --host 0.0.0.0 --port 8000
+```
+
+Terminal 2:
+
+```bash
+cd web && npm run dev
 ```
 
 - Web app: http://localhost:3000
 - API docs: http://localhost:8000/docs
 
-The web app alone: `cd web && npm run dev`.
+Set `PREDICTION_API_URL` if the FastAPI service is not on `http://localhost:8000`.
 
 ## Data Access
 
-This project is a modeling and systems prototype, not a data product. Before running
+This project is a modeling and systems prototype. It does not ship a dataset. Before running
 ingestion against any third-party site or API, make sure you have the right to access the
 data, follow the source's terms, and do not bypass access controls. Prefer signed APIs,
 licensed exports, or other permissioned sources for real training data. The included
-fixtures are synthetic and are the only data intended for public redistribution.
+fixtures are synthetic and are the only data meant for public redistribution.
 
 ## Common tasks
 
@@ -172,7 +180,7 @@ uv run python -m estate_value_index.pipelines.core.complete_pipeline --retrain  
 uv run python -m estate_value_index.pipelines.core.complete_pipeline --retrain --deploy
 
 # Ingest authorized listings
-uv run python -m estate_value_index.cli.crawl_booli --max-pages 10
+uv run python -m estate_value_index.cli crawl --max-pages 10
 
 # Deploy to Cloud Run
 ./scripts/deploy_cloud_run.sh
@@ -198,4 +206,4 @@ Deeper docs: [data-pipeline.md](docs/data-pipeline.md),
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).

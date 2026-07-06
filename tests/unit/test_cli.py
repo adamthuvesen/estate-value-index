@@ -162,9 +162,8 @@ def test_monitor_costs_gcs_only_requires_bucket():
     assert "bucket" in output or "required" in output
 
 
-def test_backward_compatibility_module_entrypoint():
-    """Verify backward compatibility: direct module entrypoints still work."""
-    # Test that old-style entrypoints still work
+def test_direct_module_entrypoint():
+    """Verify direct module entrypoints work."""
     result = subprocess.run(
         [
             sys.executable,

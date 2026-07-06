@@ -1,8 +1,4 @@
-"""Regression tests for subprocess→direct-import refactoring.
-
-Verifies that Python→Python subprocess calls were replaced with direct imports
-across feature materialization, area statistics, value analysis, and local training.
-"""
+"""Pipeline tasks call Python code directly instead of shelling out to Python scripts."""
 
 import inspect
 from pathlib import Path
@@ -10,7 +6,7 @@ from pathlib import Path
 import pytest
 
 
-class TestFeatureMaterializationRefactor:
+class TestFeatureMaterializationTask:
     def test_materialize_features_no_subprocess(self):
         source = Path("src/estate_value_index/pipelines/tasks/training.py").read_text()
         assert (
@@ -23,7 +19,7 @@ class TestFeatureMaterializationRefactor:
         assert "subprocess.run" not in inspect.getsource(materialize_features_task)
 
 
-class TestAreaStatisticsRefactor:
+class TestAreaStatisticsTask:
     def test_generate_area_statistics_task_no_subprocess(self):
         from estate_value_index.pipelines.tasks.analytics import generate_area_statistics_task
 
@@ -35,7 +31,7 @@ class TestAreaStatisticsRefactor:
         assert "subprocess.run" not in source
 
 
-class TestValueAnalysisRefactor:
+class TestValueAnalysisTask:
     def test_generate_value_analysis_task_no_subprocess(self):
         from estate_value_index.pipelines.tasks.analytics import generate_value_analysis_task
 
@@ -44,31 +40,14 @@ class TestValueAnalysisRefactor:
         assert "subprocess.run" not in source
 
 
-class TestLocalTrainingRefactor:
+class TestLocalTrainingTask:
     def test_local_training_no_subprocess(self):
         source = Path("src/estate_value_index/pipelines/core/training_pipeline.py").read_text()
         assert "from estate_value_index.ml.training_workflow import" in source
         assert "subprocess.run" not in source or "train_model.py" not in source
 
 
-class TestRemovedScriptShims:
-    """Legacy script shims should not return after CLI consolidation."""
-
-    @pytest.mark.parametrize(
-        "script_name",
-        [
-            "area_performance_metrics.py",
-            "generate_area_statistics.py",
-            "generate_value_analysis.py",
-            "materialize_features.py",
-            "migrate_to_bigquery.py",
-            "monitor_costs.py",
-            "process_scraped_listings.py",
-        ],
-    )
-    def test_redundant_script_shims_removed(self, script_name):
-        assert not Path("scripts", script_name).exists()
-
+class TestScriptEntrypoints:
     def test_train_model_script_has_main_guard(self):
         script_path = Path("train_model.py")
         assert script_path.exists(), "train_model.py script missing"

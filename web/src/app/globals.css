@@ -2,293 +2,203 @@
 @tailwind components;
 @tailwind utilities;
 
-@custom-variant dark (&:is(.dark *));
+/* ============================================================
+   Nordic Ledger — light, Scandinavian-calm design system
+   Color is rationed: neutrals for chrome, the diverging
+   value scale is the only place saturated hues carry meaning.
+   ============================================================ */
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-inter);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
-  --color-border: var(--border);
-  --color-destructive: var(--destructive);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
-  --color-card: var(--card);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-}
-
-/* Tactical theme - always dark */
 :root {
-  --radius: 0.125rem; /* Minimal radius for tactical aesthetic */
+  --radius: 9px;
 
-  /* Tactical color variables */
-  --background: #0a0a0a;
-  --foreground: #e0e0e0;
-  --card: #0f0f0f;
-  --card-foreground: #e0e0e0;
-  --popover: #0f0f0f;
-  --popover-foreground: #e0e0e0;
-  --primary: #ff3333;
-  --primary-foreground: #0a0a0a;
-  --secondary: #121212;
-  --secondary-foreground: #e0e0e0;
-  --muted: #2a2a2a;
-  --muted-foreground: #808080;
-  --accent: #ff3333;
-  --accent-foreground: #0a0a0a;
-  --destructive: #ff3333;
-  --border: #2a2a2a;
-  --input: #0f0f0f;
-  --ring: #ff3333;
+  --background: #FBFBFA;
+  --foreground: #16171A;
+  --card: #FFFFFF;
+  --card-foreground: #16171A;
+  --popover: #FFFFFF;
+  --popover-foreground: #16171A;
+  --primary: #16171A;
+  --primary-foreground: #FFFFFF;
+  --secondary: #F4F4F2;
+  --secondary-foreground: #16171A;
+  --muted: #F1F2F1;
+  --muted-foreground: #63666E;
+  --accent: #0B62FF;
+  --accent-foreground: #FFFFFF;
+  --destructive: #C0392B;
+  --border: #E9E9E4;
+  --input: #FFFFFF;
+  --ring: #0B62FF;
 
-  /* Tactical chart colors */
-  --chart-1: #ff3333;
-  --chart-2: #808080;
-  --chart-3: #00ff88;
-  --chart-4: #ff4444;
-  --chart-5: #505050;
+  /* Chart palette — legible on white */
+  --chart-1: #0B62FF; /* brand blue */
+  --chart-2: #157F4B; /* value green */
+  --chart-3: #C2681C; /* amber */
+  --chart-4: #C0392B; /* clay red */
+  --chart-5: #8A8D95; /* neutral */
 
-  /* Sidebar (if used) */
-  --sidebar: #0f0f0f;
-  --sidebar-foreground: #e0e0e0;
-  --sidebar-primary: #ff3333;
-  --sidebar-primary-foreground: #0a0a0a;
-  --sidebar-accent: #121212;
-  --sidebar-accent-foreground: #e0e0e0;
-  --sidebar-border: #2a2a2a;
-  --sidebar-ring: #ff3333;
-}
-
-/* Remove dark mode variants - tactical theme is always dark */
-.dark {
-  --background: #0a0a0a;
-  --foreground: #e0e0e0;
-  --card: #0f0f0f;
-  --card-foreground: #e0e0e0;
-  --popover: #0f0f0f;
-  --popover-foreground: #e0e0e0;
-  --primary: #ff3333;
-  --primary-foreground: #0a0a0a;
-  --secondary: #121212;
-  --secondary-foreground: #e0e0e0;
-  --muted: #2a2a2a;
-  --muted-foreground: #808080;
-  --accent: #ff3333;
-  --accent-foreground: #0a0a0a;
-  --destructive: #ff3333;
-  --border: #2a2a2a;
-  --input: #0f0f0f;
-  --ring: #ff3333;
-  --chart-1: #ff3333;
-  --chart-2: #808080;
-  --chart-3: #00ff88;
-  --chart-4: #ff4444;
-  --chart-5: #505050;
-  --sidebar: #0f0f0f;
-  --sidebar-foreground: #e0e0e0;
-  --sidebar-primary: #ff3333;
-  --sidebar-primary-foreground: #0a0a0a;
-  --sidebar-accent: #121212;
-  --sidebar-accent-foreground: #e0e0e0;
-  --sidebar-border: #2a2a2a;
-  --sidebar-ring: #ff3333;
+  --sidebar: #FFFFFF;
+  --sidebar-foreground: #16171A;
+  --sidebar-primary: #16171A;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #F4F4F2;
+  --sidebar-accent-foreground: #16171A;
+  --sidebar-border: #E9E9E4;
+  --sidebar-ring: #0B62FF;
 }
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    border-color: var(--border);
+  }
+  html {
+    scroll-behavior: smooth;
   }
   body {
-    @apply bg-tactical-bg text-tactical-text font-mono;
+    @apply bg-tactical-bg text-tactical-text font-sans;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  /* Tabular, aligned numerals wherever we use mono for data */
+  .font-mono {
+    font-feature-settings: "tnum" 1, "zero" 1, "cv02" 1;
   }
 
   ::selection {
-    background: var(--primary);
-    color: var(--primary-foreground);
+    background: rgba(11, 98, 255, 0.14);
+    color: #16171A;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }
 
 @layer components {
-  /* Tactical Card Component */
+  /* ---------- Card ---------- */
   .tactical-card {
-    @apply bg-tactical-surface border border-tactical-border relative;
+    @apply bg-tactical-surface border border-tactical-border rounded-tactical relative;
+    @apply shadow-elev-1 transition-all duration-tactical ease-tactical;
+  }
+
+  .tactical-card-hover {
     @apply transition-all duration-tactical ease-tactical;
+    @apply hover:-translate-y-0.5 hover:shadow-elev-2 hover:border-tactical-border-emphasis;
   }
 
-  .tactical-card-corner-tl::before {
-    content: '';
-    @apply absolute top-[-1px] left-[-1px] w-5 h-5;
-    @apply border-t-2 border-l-2 border-tactical-accent;
-  }
-
-  .tactical-card-corner-tr::after {
-    content: '';
-    @apply absolute top-[-1px] right-[-1px] w-5 h-5;
-    @apply border-t-2 border-r-2 border-tactical-accent;
-  }
-
-  .tactical-card-corner-bl::before {
-    content: '';
-    @apply absolute bottom-[-1px] left-[-1px] w-5 h-5;
-    @apply border-b-2 border-l-2 border-tactical-accent;
-  }
-
-  .tactical-card-corner-br::after {
-    content: '';
-    @apply absolute bottom-[-1px] right-[-1px] w-5 h-5;
-    @apply border-b-2 border-r-2 border-tactical-accent;
-  }
-
-  /* All corners at once */
-  .tactical-corners {
+  /* Corner accents are a tactical relic — neutralized to no-ops so any
+     remaining usages don't paint crosshairs on the calm layout. */
+  .tactical-corners,
+  .tactical-card-corner-tl,
+  .tactical-card-corner-tr,
+  .tactical-card-corner-bl,
+  .tactical-card-corner-br {
     @apply relative;
   }
 
-  .tactical-corners::before {
-    content: '';
-    @apply absolute top-[-1px] left-[-1px] w-5 h-5;
-    @apply border-t-2 border-l-2 border-tactical-accent;
-  }
-
-  .tactical-corners::after {
-    content: '';
-    @apply absolute top-[-1px] right-[-1px] w-5 h-5;
-    @apply border-t-2 border-r-2 border-tactical-accent;
-  }
-
-  /* Tactical Button */
+  /* ---------- Buttons ---------- */
   .tactical-btn {
-    @apply bg-tactical-elevated border border-tactical-border;
-    @apply px-4 py-2 rounded-tactical uppercase text-xs font-semibold tracking-tactical-wide;
+    @apply inline-flex items-center justify-center gap-2 bg-tactical-surface border border-tactical-border text-tactical-text;
+    @apply px-4 py-2.5 rounded-sm text-sm font-medium;
     @apply transition-all duration-tactical ease-tactical;
-    @apply hover:border-tactical-accent hover:shadow-[0_0_20px_rgba(255,51,51,0.3)];
-    @apply active:bg-tactical-border;
-    @apply disabled:opacity-30 disabled:cursor-not-allowed;
+    @apply hover:bg-tactical-elevated hover:border-tactical-border-emphasis;
+    @apply active:scale-[0.98];
+    @apply disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100;
   }
 
+  /* Primary = ink black, Apple/Vercel style */
   .tactical-btn-primary {
-    @apply tactical-btn border-tactical-accent text-tactical-accent;
-    @apply hover:bg-tactical-accent hover:text-tactical-bg;
-  }
-
-  /* Tactical Input */
-  .tactical-input {
-    @apply bg-tactical-surface border border-tactical-border;
-    @apply px-3 py-2 rounded-tactical font-mono text-sm;
-    @apply text-tactical-text placeholder:text-tactical-dimmed;
+    @apply inline-flex items-center justify-center gap-2 bg-tactical-text text-white border border-tactical-text;
+    @apply px-4 py-2.5 rounded-sm text-sm font-medium;
     @apply transition-all duration-tactical ease-tactical;
-    @apply focus:border-tactical-accent focus:shadow-[0_0_15px_rgba(255,51,51,0.2)];
-    @apply focus:outline-none;
+    @apply hover:bg-[#2B2C31] hover:border-[#2B2C31];
+    @apply active:scale-[0.98];
+    @apply disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100;
   }
 
-  /* Status Badge */
+  .tactical-btn-neutral {
+    @apply tactical-btn text-tactical-muted;
+    @apply hover:text-tactical-text;
+  }
+
+  /* ---------- Input ---------- */
+  .tactical-input {
+    @apply bg-tactical-surface border border-tactical-border rounded-sm;
+    @apply px-3 py-2 text-sm text-tactical-text placeholder:text-tactical-dimmed;
+    @apply transition-all duration-tactical ease-tactical;
+    @apply focus:border-tactical-accent focus:shadow-focus focus:outline-none;
+  }
+
+  /* ---------- Badges ---------- */
   .tactical-badge {
-    @apply inline-flex items-center justify-center;
-    @apply px-2 py-1 rounded-tactical border;
-    @apply text-[10px] font-bold uppercase tracking-tactical-wide;
+    @apply inline-flex items-center justify-center gap-1;
+    @apply px-2.5 py-0.5 rounded-pill border;
+    @apply text-[11px] font-semibold tracking-tactical-wide;
   }
 
   .tactical-badge-active {
-    @apply tactical-badge border-tactical-success text-tactical-success;
-    @apply animate-glow-pulse;
+    @apply tactical-badge border-transparent bg-tactical-accent text-white;
   }
 
   .tactical-badge-inactive {
-    @apply tactical-badge border-tactical-border text-tactical-muted;
+    @apply tactical-badge border-tactical-border text-tactical-muted bg-tactical-surface;
   }
 
   .tactical-badge-alert {
-    @apply tactical-badge border-tactical-accent text-tactical-accent;
+    @apply tactical-badge border-val-high-line bg-val-high-tint text-val-high;
   }
 
-  /* Tactical Glow Effect */
-  .tactical-glow {
-    @apply shadow-[0_0_20px_rgba(255,51,51,0.3)];
-  }
-
-  .tactical-glow-success {
-    @apply shadow-[0_0_20px_rgba(0,255,136,0.3)];
-  }
-
-  /* Tactical Dashed Border */
-  .tactical-border-dashed {
-    border-style: dashed;
-    border-width: 1px;
-    @apply border-tactical-border;
-  }
-
-  /* Tactical Label (uppercase small header) */
+  /* ---------- Label / eyebrow ---------- */
   .tactical-label {
-    @apply text-[11px] font-semibold uppercase tracking-tactical-wide;
-    @apply text-tactical-muted;
+    @apply text-[11px] font-semibold uppercase tracking-tactical-wide text-tactical-dimmed font-mono;
   }
 
-  /* Neutral Tactical Button */
-  .tactical-btn-neutral {
-    @apply tactical-btn border-tactical-neutral text-tactical-muted;
-    @apply hover:bg-tactical-neutral hover:text-tactical-text hover:border-tactical-neutral-hover;
-  }
-
-  /* Tactical Focus Ring */
+  /* ---------- Focus ring ---------- */
   .tactical-focus-ring {
-    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tactical-accent focus-visible:ring-offset-2 focus-visible:ring-offset-tactical-bg;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tactical-accent/50 focus-visible:ring-offset-2 focus-visible:ring-offset-tactical-bg rounded-sm;
   }
 
-  /* Card Hover Lift Effect */
-  .tactical-card-hover {
-    @apply hover:-translate-y-0.5 hover:shadow-[0_4px_20px_rgba(0,0,0,0.3)];
-    @apply transition-all duration-tactical ease-tactical;
-  }
-
-  /* Section Separator */
+  /* ---------- Section separator ---------- */
   .tactical-section-separator {
     @apply border-t border-tactical-border my-12;
   }
 
-  /* Enhanced Headers */
+  /* ---------- Headers (now sentence-case, real hierarchy) ---------- */
   .tactical-header-xl {
-    @apply text-5xl md:text-6xl font-bold tracking-tactical text-tactical-text font-mono uppercase;
+    @apply text-4xl md:text-5xl font-semibold tracking-tactical text-tactical-text;
   }
-
   .tactical-header-lg {
-    @apply text-3xl md:text-4xl font-bold tracking-tactical text-tactical-text font-mono uppercase;
+    @apply text-2xl md:text-3xl font-semibold tracking-tactical text-tactical-text;
   }
-
   .tactical-header-md {
-    @apply text-2xl md:text-3xl font-bold tracking-tactical text-tactical-text font-mono uppercase;
+    @apply text-xl md:text-2xl font-semibold tracking-tactical text-tactical-text;
+  }
+  .tactical-header-sm {
+    @apply text-lg md:text-xl font-semibold tracking-tactical text-tactical-text;
   }
 
-  .tactical-header-sm {
-    @apply text-xl md:text-2xl font-bold tracking-tactical text-tactical-text font-mono uppercase;
+  /* ---------- Data typography ---------- */
+  .num {
+    @apply font-mono tabular-nums;
+  }
+
+  /* ---------- Fair-value gauge (signature element) ---------- */
+  .value-gauge {
+    @apply relative h-1.5 w-full rounded-pill bg-tactical-elevated overflow-hidden;
+  }
+  .value-gauge-fill {
+    @apply absolute inset-y-0 left-0 rounded-pill origin-left;
+    animation: gauge-grow 0.7s cubic-bezier(0.22, 0.61, 0.36, 1) both;
   }
 }
 
@@ -299,146 +209,115 @@
   .prose-muted {
     color: var(--muted-foreground);
   }
-
-  /* Animation utilities */
   .animate-fade-in {
-    animation: fade-in-up 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    animation: fade-in 0.4s ease-out both;
   }
-
-  /* Terminal text effects */
   .terminal-text {
-    @apply font-mono text-sm leading-relaxed tracking-tactical;
+    @apply font-mono text-sm leading-relaxed;
   }
-
-  /* Tactical spacing */
   .tactical-section-gap {
     @apply space-y-6;
   }
 }
 
-/* Tactical checkbox styling */
+/* ---------- Checkbox ---------- */
 input[type="checkbox"] {
-  @apply appearance-none w-4 h-4 border border-tactical-border bg-tactical-surface rounded-tactical;
-  @apply checked:bg-tactical-accent checked:border-tactical-accent;
-  @apply focus:ring-2 focus:ring-tactical-accent focus:ring-opacity-50;
-  @apply cursor-pointer transition-all duration-tactical;
+  @apply appearance-none w-[18px] h-[18px] border border-tactical-border-emphasis bg-tactical-surface rounded-[5px];
+  @apply cursor-pointer transition-all duration-150;
+  flex-shrink: 0;
 }
-
+input[type="checkbox"]:hover {
+  @apply border-tactical-accent;
+}
 input[type="checkbox"]:checked {
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 16 16' fill='%230a0a0a' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M12.207 4.793a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-2-2a1 1 0 011.414-1.414L6.5 9.086l4.293-4.293a1 1 0 011.414 0z'/%3E%3C/svg%3E");
+  @apply bg-tactical-accent border-tactical-accent;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 16 16' fill='%23ffffff' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M12.207 4.793a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-2-2a1 1 0 011.414-1.414L6.5 9.086l4.293-4.293a1 1 0 011.414 0z'/%3E%3C/svg%3E");
+}
+input[type="checkbox"]:focus-visible {
+  @apply outline-none ring-2 ring-tactical-accent/40 ring-offset-1;
 }
 
-/* Tactical range input styling */
+/* ---------- Range slider ---------- */
 input[type="range"] {
-  @apply h-1 appearance-none bg-tactical-border rounded-tactical cursor-pointer;
+  @apply h-1.5 appearance-none bg-tactical-elevated rounded-pill cursor-pointer;
 }
-
 input[type="range"]::-webkit-slider-thumb {
-  @apply appearance-none w-3 h-3 bg-tactical-accent rounded-tactical cursor-pointer;
-  @apply transition-all duration-tactical;
-  box-shadow: 0 0 10px rgba(255, 51, 51, 0.3);
+  @apply appearance-none w-[18px] h-[18px] bg-tactical-surface rounded-full cursor-pointer;
+  border: 1.5px solid #16171A;
+  box-shadow: 0 1px 3px rgba(16, 17, 20, 0.18);
+  transition: box-shadow 150ms ease, transform 150ms ease;
 }
-
 input[type="range"]::-webkit-slider-thumb:hover {
-  box-shadow: 0 0 20px rgba(255, 51, 51, 0.5);
+  transform: scale(1.1);
 }
-
 input[type="range"]::-moz-range-thumb {
-  @apply appearance-none w-3 h-3 bg-tactical-accent rounded-tactical cursor-pointer border-0;
-  @apply transition-all duration-tactical;
-  box-shadow: 0 0 10px rgba(255, 51, 51, 0.3);
+  @apply appearance-none w-[18px] h-[18px] bg-tactical-surface rounded-full cursor-pointer;
+  border: 1.5px solid #16171A;
+  box-shadow: 0 1px 3px rgba(16, 17, 20, 0.18);
 }
-
-input[type="range"]::-moz-range-thumb:hover {
-  box-shadow: 0 0 20px rgba(255, 51, 51, 0.5);
-}
-
 input[type="range"]::-webkit-slider-runnable-track {
-  @apply h-1 bg-tactical-border rounded-tactical;
+  @apply h-1.5 bg-tactical-elevated rounded-pill;
 }
-
 input[type="range"]::-moz-range-track {
-  @apply h-1 bg-tactical-border rounded-tactical;
+  @apply h-1.5 bg-tactical-elevated rounded-pill;
 }
-
 input[type="range"]:focus {
   outline: none;
 }
-
-input[type="range"]:focus::-webkit-slider-thumb {
-  @apply ring-2 ring-tactical-accent ring-opacity-50;
+input[type="range"]:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 4px rgba(11, 98, 255, 0.18);
 }
-
-input[type="range"]:focus::-moz-range-thumb {
-  @apply ring-2 ring-tactical-accent ring-opacity-50;
-}
-
 input[type="range"]:disabled {
-  @apply opacity-30 cursor-not-allowed;
+  @apply opacity-40 cursor-not-allowed;
 }
 
-input[type="range"]:disabled::-webkit-slider-thumb {
-  @apply cursor-not-allowed;
+/* ---------- Select ---------- */
+select {
+  @apply bg-tactical-surface text-tactical-text;
 }
 
-input[type="range"]:disabled::-moz-range-thumb {
-  @apply cursor-not-allowed;
-}
-
-/* Tactical Scrollbar Styling */
+/* ---------- Scrollbar ---------- */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #2a2a2a #0f0f0f;
+  scrollbar-color: #D7D7D1 transparent;
 }
-
 *::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
 }
-
 *::-webkit-scrollbar-track {
-  background: #0f0f0f;
-  border-radius: 2px;
+  background: transparent;
 }
-
 *::-webkit-scrollbar-thumb {
-  background: #2a2a2a;
-  border-radius: 2px;
-  border: 1px solid #404040;
+  background: #DDDDD8;
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
 }
-
 *::-webkit-scrollbar-thumb:hover {
-  background: #404040;
+  background: #C4C4BE;
+  background-clip: content-box;
 }
 
-/* Recharts Hover State Fix - Remove ugly light gray hover overlay */
+/* ---------- Recharts (light) ---------- */
+.recharts-cartesian-grid line {
+  stroke: #EDEDE9;
+}
+.recharts-text {
+  fill: #63666E;
+}
 .recharts-sector:hover,
 .recharts-bar-rectangle:hover,
 .recharts-rectangle:hover {
-  filter: brightness(1.2) !important;
+  filter: brightness(0.94) !important;
   opacity: 1 !important;
 }
-
 .recharts-layer {
   outline: none !important;
 }
-
-/* Remove Recharts default hover background (light gray rectangle) */
-.recharts-bar .recharts-rectangle.recharts-tooltip-cursor {
-  fill: transparent !important;
-  opacity: 0 !important;
-}
-
 .recharts-tooltip-cursor {
-  fill: transparent !important;
-  opacity: 0 !important;
+  fill: rgba(16, 17, 20, 0.04) !important;
 }
-
-/* Enhance hover effect instead of overlay */
-.recharts-active-shape {
-  filter: brightness(1.2) !important;
-}
-
 .recharts-tooltip-wrapper {
   outline: none !important;
 }

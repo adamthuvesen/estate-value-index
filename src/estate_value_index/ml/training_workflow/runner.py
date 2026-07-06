@@ -128,8 +128,7 @@ def _load_and_split(config: TrainingConfig) -> SplitData:
         df = df_or_engineered
         df_filtered = filter_valid_listings(df, min_price=3000000, drop_na_features=False)
         logger.info("After filtering: %d listings", len(df_filtered))
-        # The temporal split needs sold_date as datetime; previously this was
-        # done by feature engineering, which now runs after the split.
+        # The temporal split needs sold_date as datetime before feature engineering.
         df_filtered = df_filtered.copy()
         df_filtered["sold_date"] = pd.to_datetime(df_filtered["sold_date"], errors="coerce")
         if df_filtered["sold_date"].isna().any():

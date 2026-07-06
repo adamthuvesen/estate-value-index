@@ -333,8 +333,7 @@ def trigger_retraining_on_drift_task(
     logger.info("Triggering retraining due to drift")
 
     # Trigger complete pipeline with retrain flag. Kwargs must match
-    # `complete_pipeline_flow`'s signature; previously this used
-    # `quick/production/retrain/deploy` which raised TypeError at runtime.
+    # `complete_pipeline_flow`'s signature.
     from estate_value_index.pipelines.core.complete_pipeline import complete_pipeline_flow
 
     flow_run = complete_pipeline_flow.with_options(

@@ -4,10 +4,8 @@ from __future__ import annotations
 
 import re
 
-# Patterns require both a known sale-context prefix AND a Swedish currency
-# suffix (kr/SEK) on the numeric group. The previous bare "blev"/"var"
-# patterns matched broker-bio sentences like "han blev född 1985", injecting
-# false sold prices into the training data.
+# Patterns require both a known sale-context prefix and a Swedish currency
+# suffix (kr/SEK) on the numeric group.
 SOLD_PRICE_PATTERNS = (
     r"(?:Slutpris(?:et)?|sista budet)\s+(?:blev|var|gick för|såldes för)?\s*([\d\s]+?)\s*(?:kr|SEK)\b",
     r"(?:såldes för|gick för)\s+([\d\s]+?)\s*(?:kr|SEK)\b",

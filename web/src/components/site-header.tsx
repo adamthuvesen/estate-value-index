@@ -1,31 +1,63 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 import { siteConfig } from "@/config/site";
 
+function isActive(pathname: string, href: string): boolean {
+  if (href === "/") return pathname === "/";
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
 export function SiteHeader() {
+  const pathname = usePathname() ?? "/";
+
   return (
-    <header className="border-b border-tactical-border bg-tactical-surface/95 sticky top-0 z-40 backdrop-blur-sm">
+    <header className="sticky top-0 z-40 border-b border-tactical-border bg-tactical-bg/80 backdrop-blur-md">
       <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6">
-        <div className="flex items-center gap-6">
-          <Link href="/" className="flex items-center gap-3 font-bold">
-            <div className="w-2 h-2 bg-tactical-accent animate-glow-pulse" aria-hidden />
-            <span className="text-tactical-text text-sm tracking-tactical-wide uppercase">{siteConfig.name}</span>
+        <div className="flex items-center gap-8">
+          <Link href="/" className="group flex items-center gap-2.5">
+            <span
+              className="flex h-6 w-6 items-center justify-center rounded-[7px] bg-tactical-text text-white"
+              aria-hidden
+            >
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+                <path d="M2 7.2 8 2.5l6 4.7V14H10v-3.6H6V14H2V7.2Z" fill="currentColor" />
+              </svg>
+            </span>
+            <span className="text-[15px] font-semibold tracking-tight text-tactical-text">
+              {siteConfig.name}
+            </span>
           </Link>
           {siteConfig.navItems.length > 0 && (
-            <nav className="hidden md:flex items-center gap-1">
-              {siteConfig.navItems.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className="tactical-label px-3 py-2 transition-all duration-tactical hover:text-tactical-accent hover:bg-tactical-elevated"
-                >
-                  {item.label.toUpperCase()}
-                </Link>
-              ))}
+            <nav className="hidden items-center gap-1 md:flex">
+              {siteConfig.navItems.map((item) => {
+                const active = isActive(pathname, item.href);
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    aria-current={active ? "page" : undefined}
+                    className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors duration-tactical ${
+                      active
+                        ? "bg-tactical-elevated text-tactical-text"
+                        : "text-tactical-muted hover:text-tactical-text hover:bg-tactical-elevated/60"
+                    }`}
+                  >
+                    {item.label}
+                  </Link>
+                );
+              })}
             </nav>
           )}
         </div>
-        <span className="tactical-label hidden sm:inline">STOCKHOLM INTEL</span>
+        <div className="flex items-center gap-2 text-tactical-dimmed">
+          <span className="hidden h-1.5 w-1.5 rounded-full bg-val-exc sm:inline-block" aria-hidden />
+          <span className="hidden text-xs font-medium tracking-tight text-tactical-muted sm:inline">
+            Stockholm
+          </span>
+        </div>
       </div>
     </header>
   );

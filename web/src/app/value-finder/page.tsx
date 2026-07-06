@@ -156,55 +156,44 @@ function ValueFinderContent() {
 
   return (
     <div className="min-h-screen bg-tactical-bg">
-      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-        <div className="tactical-card p-6 sm:p-8 lg:p-10 tactical-corners relative">
-          <div className="mb-8">
-            <div className="text-center space-y-3">
-              <p className="tactical-label">CLASSIFIED // ESTATE VALUE INDEX</p>
-              <h1 className="text-4xl font-bold tracking-tactical text-tactical-text sm:text-5xl font-mono">
-                PROPERTY VALUE FINDER
-              </h1>
-              <p className="mx-auto mt-4 max-w-2xl text-sm text-tactical-muted font-mono leading-relaxed">
-                DISCOVER PROPERTIES IN STOCKHOLM BASED ON AI MODEL PREDICTIONS //
-                FILTER BY VALUE TIER TO IDENTIFY OPTIMAL ACQUISITION TARGETS
-              </p>
-            </div>
+      <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
+        {/* Hero */}
+        <header className="mx-auto max-w-2xl text-center animate-fade-in-up">
+          <p className="font-mono text-[12px] font-semibold uppercase tracking-tactical-wide text-tactical-accent">
+            Value Finder
+          </p>
+          <h1 className="mt-3 text-4xl font-semibold leading-[1.06] tracking-tight text-tactical-text sm:text-[46px]">
+            Find undervalued
+            <br className="hidden sm:block" /> Stockholm homes
+          </h1>
+          <p className="mx-auto mt-4 max-w-xl text-[15px] leading-relaxed text-tactical-muted">
+            Every recent sale, scored against the model&rsquo;s estimate. Filter by value tier to surface
+            the widest gaps between price paid and predicted worth.
+          </p>
 
-            {metadata && (
-              <div className="mx-auto mt-10 max-w-3xl">
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                  <div className="tactical-card p-5 border-tactical-border-emphasis">
-                    <dt className="tactical-label mb-2">PROPERTIES ANALYZED</dt>
-                    <dd className="text-3xl font-bold tracking-tactical text-tactical-text font-mono">
-                      {metadata.statistics.total_properties.toLocaleString("en-US")}
-                    </dd>
-                  </div>
-                  <div className="tactical-card p-5 border-tactical-border-emphasis">
-                    <dt className="tactical-label mb-2">AVG VALUE SCORE</dt>
-                    <dd className="text-3xl font-bold tracking-tactical text-tactical-text font-mono">
-                      {metadata.statistics.value_score.mean.toFixed(1)}
-                    </dd>
-                  </div>
-                  <div className="tactical-card p-5 border-tactical-border-emphasis">
-                    <dt className="tactical-label mb-2">AREAS COVERED</dt>
-                    <dd className="text-3xl font-bold tracking-tactical text-tactical-text font-mono">
-                      {metadata.statistics.area_statistics.total_areas}
-                    </dd>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {error && (
-            <div className="mb-6 tactical-card p-4 border-tactical-accent">
-              <p className="tactical-label text-tactical-accent mb-2">ERROR</p>
-              <p className="text-xs font-mono text-tactical-accent tracking-tactical">{error.toUpperCase()}</p>
-            </div>
+          {metadata && (
+            <dl className="mx-auto mt-8 flex max-w-md items-stretch justify-center divide-x divide-tactical-border rounded-2xl border border-tactical-border bg-tactical-surface shadow-elev-1">
+              <Stat
+                value={metadata.statistics.total_properties.toLocaleString("en-US")}
+                label="Properties"
+              />
+              <Stat value={metadata.statistics.value_score.mean.toFixed(1)} label="Avg score" />
+              <Stat
+                value={String(metadata.statistics.area_statistics.total_areas)}
+                label="Areas"
+              />
+            </dl>
           )}
+        </header>
 
-          <div className="flex flex-col gap-6 lg:flex-row">
-          <aside className="lg:w-80">
+        {error && (
+          <div className="mx-auto mt-8 max-w-2xl rounded-xl border border-val-high-line bg-val-high-tint p-4">
+            <p className="text-[13px] font-medium text-val-high">{error}</p>
+          </div>
+        )}
+
+        <div className="mt-10 flex flex-col gap-6 lg:mt-12 lg:flex-row lg:gap-8">
+          <aside className="lg:w-[300px] lg:shrink-0">
             {metadata && (
               <div>
                 <FiltersPanel
@@ -223,7 +212,7 @@ function ValueFinderContent() {
             )}
           </aside>
 
-          <main className="flex-1">
+          <main className="min-w-0 flex-1">
             {properties && (
               <SortControls
                 sortField={currentFilters.sort || "value_score"}
@@ -236,18 +225,18 @@ function ValueFinderContent() {
               />
             )}
 
-             {isLoading && (
-               <div className="mt-6 flex items-center justify-center py-12">
-                 <div className="text-center">
-                   <div className="mb-4 inline-block h-12 w-12 animate-spin rounded-tactical border-4 border-tactical-border border-t-tactical-accent"></div>
-                   <p className="tactical-label text-tactical-muted">LOADING PROPERTIES...</p>
-                 </div>
-               </div>
-             )}
+            {isLoading && (
+              <div className="flex items-center justify-center py-24">
+                <div className="flex flex-col items-center gap-3">
+                  <div className="h-8 w-8 animate-spin rounded-full border-2 border-tactical-border border-t-tactical-text" />
+                  <p className="text-[13px] text-tactical-muted">Loading properties…</p>
+                </div>
+              </div>
+            )}
 
             {!isLoading && properties && properties.properties.length > 0 && (
               <>
-                <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2">
+                <div className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-2">
                   {properties.properties.map((property) => (
                     <PropertyCard key={property.listing_id} property={property} />
                   ))}
@@ -265,36 +254,33 @@ function ValueFinderContent() {
             )}
 
             {!isLoading && properties && properties.properties.length === 0 && (
-              <div className="mt-12 text-center">
-                <svg
-                  className="mx-auto h-24 w-24 text-tactical-border"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={1.5}
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                  />
-                </svg>
-                <h3 className="mt-4 text-lg font-bold text-tactical-text font-mono tracking-tactical">NO RESULTS FOUND</h3>
-                <p className="mt-2 text-xs text-tactical-muted font-mono">
-                  ADJUST FILTER PARAMETERS TO EXPAND SEARCH RESULTS
+              <div className="mt-6 rounded-2xl border border-tactical-border bg-tactical-surface px-6 py-16 text-center shadow-elev-1">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-tactical-elevated">
+                  <svg className="h-6 w-6 text-tactical-dimmed" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+                <h3 className="mt-4 text-lg font-semibold text-tactical-text">No matches</h3>
+                <p className="mx-auto mt-1.5 max-w-sm text-[14px] text-tactical-muted">
+                  Nothing fits these filters. Try widening the range or clearing a tier.
                 </p>
-                 <button
-                   onClick={handleClearFilters}
-                   className="mt-4 tactical-btn-primary"
-                 >
-                   CLEAR ALL FILTERS
-                 </button>
+                <button onClick={handleClearFilters} className="tactical-btn-primary mx-auto mt-5">
+                  Clear all filters
+                </button>
               </div>
             )}
           </main>
-          </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function Stat({ value, label }: { value: string; label: string }) {
+  return (
+    <div className="flex flex-1 flex-col items-center px-5 py-4">
+      <dd className="num text-2xl font-semibold text-tactical-text">{value}</dd>
+      <dt className="mt-1 text-[12px] text-tactical-muted">{label}</dt>
     </div>
   );
 }
@@ -303,9 +289,9 @@ export default function ValueFinderPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen bg-tactical-bg flex items-center justify-center">
-        <div className="text-center">
-          <div className="mb-4 inline-block h-12 w-12 animate-spin rounded-tactical border-4 border-tactical-border border-t-tactical-accent"></div>
-          <p className="tactical-label text-tactical-muted">LOADING...</p>
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-tactical-border border-t-tactical-text" />
+          <p className="text-[13px] text-tactical-muted">Loading…</p>
         </div>
       </div>
     }>

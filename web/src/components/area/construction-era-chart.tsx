@@ -9,11 +9,11 @@ interface ConstructionEraChartProps {
 }
 
 const ERA_COLORS: Record<string, string> = {
-  "Pre-1900": "#ff4444",
-  "1900-1950": "#ff3333",
-  "1950-1980": "#808080",
-  "1980-2000": "#00cc6a",
-  "2000+": "#00ff88",
+  "Pre-1900": "#0B62FF",
+  "1900-1950": "#0B62FF",
+  "1950-1980": "#0B62FF",
+  "1980-2000": "#0B62FF",
+  "2000+": "#0B62FF",
 };
 
 const ERA_ORDER = ["Pre-1900", "1900-1950", "1950-1980", "1980-2000", "2000+"];
@@ -21,8 +21,8 @@ const ERA_ORDER = ["Pre-1900", "1900-1950", "1950-1980", "1980-2000", "2000+"];
 export function ConstructionEraChart({ construction_era }: ConstructionEraChartProps) {
   if (!construction_era.median_year || Object.keys(construction_era.era_distribution).length === 0) {
     return (
-      <div className="flex items-center justify-center rounded-tactical bg-tactical-elevated border border-tactical-border p-8">
-        <p className="text-xs font-mono text-tactical-muted uppercase">No construction era data available</p>
+      <div className="flex items-center justify-center rounded-xl border border-tactical-border bg-tactical-elevated p-8">
+        <p className="text-[13px] text-tactical-muted">No construction era data available.</p>
       </div>
     );
   }
@@ -31,7 +31,7 @@ export function ConstructionEraChart({ construction_era }: ConstructionEraChartP
     .map((era) => ({
       era,
       count: construction_era.era_distribution[era],
-      color: ERA_COLORS[era] || "#64748b",
+      color: ERA_COLORS[era] || "#0B62FF",
     }))
     .sort((a, b) => ERA_ORDER.indexOf(a.era) - ERA_ORDER.indexOf(b.era));
 
@@ -40,51 +40,53 @@ export function ConstructionEraChart({ construction_era }: ConstructionEraChartP
   return (
     <div>
       <div className="mb-4">
-        <h3 className="text-lg font-semibold tracking-tactical text-tactical-text font-mono uppercase">Building Age Distribution</h3>
-        <p className="text-xs text-tactical-muted font-mono tracking-tactical">PROPERTIES BY CONSTRUCTION ERA</p>
+        <h3 className="text-[17px] font-semibold tracking-tight text-tactical-text">Building age distribution</h3>
+        <p className="text-[13px] text-tactical-muted">Properties by construction era</p>
       </div>
 
       <div className="mb-6 grid gap-4 sm:grid-cols-4">
-        <div className="rounded-tactical bg-tactical-elevated border border-tactical-border p-4">
-          <p className="tactical-label">Median Built Year</p>
-          <p className="mt-2 text-2xl font-bold text-tactical-text font-mono">{construction_era.median_year}</p>
+        <div className="rounded-xl border border-tactical-border bg-tactical-elevated p-4">
+          <p className="text-[11px] font-semibold uppercase tracking-tactical-wide text-tactical-dimmed">Median built year</p>
+          <p className="num mt-2 text-2xl font-semibold text-tactical-text">{construction_era.median_year}</p>
         </div>
-        <div className="rounded-tactical bg-tactical-elevated border border-tactical-border p-4">
-          <p className="tactical-label">Average Age</p>
-          <p className="mt-2 text-2xl font-bold text-tactical-text font-mono">
-            {construction_era.avg_age ? `${construction_era.avg_age} YRS` : "N/A"}
+        <div className="rounded-xl border border-tactical-border bg-tactical-elevated p-4">
+          <p className="text-[11px] font-semibold uppercase tracking-tactical-wide text-tactical-dimmed">Average age</p>
+          <p className="num mt-2 text-2xl font-semibold text-tactical-text">
+            {construction_era.avg_age ? `${construction_era.avg_age} yrs` : "—"}
           </p>
         </div>
-        <div className="rounded-tactical bg-tactical-elevated border border-tactical-border p-4">
-          <p className="tactical-label">Oldest Building</p>
-          <p className="mt-2 text-2xl font-bold text-tactical-text font-mono">{construction_era.oldest || "N/A"}</p>
+        <div className="rounded-xl border border-tactical-border bg-tactical-elevated p-4">
+          <p className="text-[11px] font-semibold uppercase tracking-tactical-wide text-tactical-dimmed">Oldest building</p>
+          <p className="num mt-2 text-2xl font-semibold text-tactical-text">{construction_era.oldest || "—"}</p>
         </div>
-        <div className="rounded-tactical bg-tactical-elevated border border-tactical-border p-4">
-          <p className="tactical-label">Newest Building</p>
-          <p className="mt-2 text-2xl font-bold text-tactical-text font-mono">{construction_era.newest || "N/A"}</p>
+        <div className="rounded-xl border border-tactical-border bg-tactical-elevated p-4">
+          <p className="text-[11px] font-semibold uppercase tracking-tactical-wide text-tactical-dimmed">Newest building</p>
+          <p className="num mt-2 text-2xl font-semibold text-tactical-text">{construction_era.newest || "—"}</p>
         </div>
       </div>
 
       <ResponsiveContainer width="100%" height={280}>
         <BarChart data={data} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
-          <XAxis dataKey="era" stroke="#808080" style={{ fontSize: "10px", fontFamily: "JetBrains Mono, monospace" }} angle={-15} textAnchor="end" height={60} />
-          <YAxis stroke="#808080" style={{ fontSize: "10px", fontFamily: "JetBrains Mono, monospace" }} width={50} />
+          <CartesianGrid strokeDasharray="3 3" stroke="#EDEDE9" />
+          <XAxis dataKey="era" stroke="#E9E9E4" tick={{ fill: "#63666E", fontSize: 11 }} angle={-15} textAnchor="end" height={60} />
+          <YAxis stroke="#E9E9E4" tick={{ fill: "#63666E", fontSize: 11 }} width={50} />
           <Tooltip
+            cursor={{ fill: "rgba(11,98,255,0.06)" }}
             contentStyle={{
-              backgroundColor: "#0f0f0f",
-              border: "1px solid #404040",
-              borderRadius: "4px",
-              boxShadow: "0 0 15px rgba(255,51,51,0.2)",
-              fontFamily: "JetBrains Mono, monospace",
+              backgroundColor: "#FFFFFF",
+              border: "1px solid #E9E9E4",
+              borderRadius: "10px",
+              boxShadow: "0 4px 14px rgba(16,17,20,0.08)",
+              color: "#16171A",
             }}
             formatter={(value: number) => [
-              `${formatRawNumber(value)} PROPERTIES (${((value / total) * 100).toFixed(1)}%)`,
-              "COUNT",
+              `${formatRawNumber(value)} properties (${((value / total) * 100).toFixed(1)}%)`,
+              "Count",
             ]}
-            labelStyle={{ fontWeight: 600, color: "#e0e0e0", fontSize: "10px", textTransform: "uppercase" }}
+            labelStyle={{ fontWeight: 600, color: "#63666E", fontSize: 12 }}
+            itemStyle={{ color: "#16171A", fontSize: 13 }}
           />
-          <Bar dataKey="count" radius={[8, 8, 0, 0]}>
+          <Bar dataKey="count" radius={[6, 6, 0, 0]}>
             {data.map((entry, index) => (
               <Cell key={`cell-${index}`} fill={entry.color} />
             ))}
@@ -94,14 +96,14 @@ export function ConstructionEraChart({ construction_era }: ConstructionEraChartP
 
       <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {data.map((item) => (
-          <div key={item.era} className="flex items-center justify-between rounded-tactical border border-tactical-border bg-tactical-elevated p-3 hover:border-tactical-border-emphasis transition-colors duration-tactical">
+          <div key={item.era} className="flex items-center justify-between rounded-xl border border-tactical-border bg-tactical-elevated p-3 transition-colors hover:border-tactical-border-emphasis">
             <div className="flex items-center gap-3">
-              <div className="h-4 w-4 rounded" style={{ backgroundColor: item.color }}></div>
-              <span className="text-xs font-mono font-medium text-tactical-text">{item.era}</span>
+              <div className="h-3 w-3 rounded-full" style={{ backgroundColor: item.color }}></div>
+              <span className="text-[13px] font-medium text-tactical-text">{item.era}</span>
             </div>
             <div className="text-right">
-              <span className="text-lg font-bold text-tactical-text font-mono">{formatRawNumber(item.count)}</span>
-              <span className="ml-1 text-xs text-tactical-muted font-mono">({((item.count / total) * 100).toFixed(1)}%)</span>
+              <span className="num text-[15px] font-semibold text-tactical-text">{formatRawNumber(item.count)}</span>
+              <span className="num ml-1 text-[12px] text-tactical-muted">({((item.count / total) * 100).toFixed(1)}%)</span>
             </div>
           </div>
         ))}

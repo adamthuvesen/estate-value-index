@@ -1,4 +1,4 @@
-"""Test get_categorical_indices uses isinstance, not deprecated helper."""
+"""Tests for categorical feature index discovery."""
 
 from __future__ import annotations
 

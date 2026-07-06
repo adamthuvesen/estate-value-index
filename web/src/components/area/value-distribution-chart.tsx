@@ -8,12 +8,12 @@ interface ValueDistributionChartProps {
 }
 
 const VALUE_TIER_COLORS: Record<ValueTier, string> = {
-  "Excellent Value": "#00ff88",
-  "Great Value": "#00ff88",
-  "Good Value": "#e0e0e0",
-  "Fair Value": "#a0a0a0",
-  Overvalued: "#ff4444",
-  "Highly Overvalued": "#ff3333",
+  "Excellent Value": "#157F4B",
+  "Great Value": "#2E8B57",
+  "Good Value": "#4F8A6B",
+  "Fair Value": "#6B7280",
+  Overvalued: "#C2681C",
+  "Highly Overvalued": "#C0392B",
 };
 
 export function ValueDistributionChart({ value_tier_distribution }: ValueDistributionChartProps) {
@@ -27,8 +27,8 @@ export function ValueDistributionChart({ value_tier_distribution }: ValueDistrib
 
   if (data.length === 0) {
     return (
-      <div className="flex items-center justify-center rounded-tactical bg-tactical-elevated border border-tactical-border p-8">
-        <p className="text-xs font-mono text-tactical-muted uppercase">No value tier data available</p>
+      <div className="flex items-center justify-center rounded-xl border border-tactical-border bg-tactical-elevated p-8">
+        <p className="text-[13px] text-tactical-muted">No value tier data available.</p>
       </div>
     );
   }
@@ -38,8 +38,8 @@ export function ValueDistributionChart({ value_tier_distribution }: ValueDistrib
   return (
     <div>
       <div className="mb-4">
-        <h3 className="text-lg font-semibold tracking-tactical text-tactical-text font-mono uppercase">Value Distribution</h3>
-        <p className="text-xs text-tactical-muted font-mono tracking-tactical">PROPERTY VALUE TIER BREAKDOWN</p>
+        <h3 className="text-[17px] font-semibold tracking-tight text-tactical-text">Value distribution</h3>
+        <p className="text-[13px] text-tactical-muted">Property value tier breakdown</p>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -61,19 +61,18 @@ export function ValueDistributionChart({ value_tier_distribution }: ValueDistrib
               </Pie>
               <Tooltip
                 contentStyle={{
-                  backgroundColor: "#0f0f0f",
-                  border: "1px solid #404040",
-                  borderRadius: "4px",
-                  boxShadow: "0 0 15px rgba(255,51,51,0.2)",
-                  fontFamily: "JetBrains Mono, monospace",
-                  color: "#e0e0e0",
+                  backgroundColor: "#FFFFFF",
+                  border: "1px solid #E9E9E4",
+                  borderRadius: "10px",
+                  boxShadow: "0 4px 14px rgba(16,17,20,0.08)",
+                  color: "#16171A",
                 }}
                 formatter={(value: number) => [
-                  `${value} PROPERTIES (${((value / total) * 100).toFixed(1)}%)`,
-                  "COUNT",
+                  `${value} properties (${((value / total) * 100).toFixed(1)}%)`,
+                  "Count",
                 ]}
-                labelStyle={{ fontWeight: 600, color: "#e0e0e0", fontSize: "10px", textTransform: "uppercase" }}
-                itemStyle={{ color: "#e0e0e0", fontSize: "10px", textTransform: "uppercase" }}
+                labelStyle={{ fontWeight: 600, color: "#63666E", fontSize: 12 }}
+                itemStyle={{ color: "#16171A", fontSize: 13 }}
               />
             </PieChart>
           </ResponsiveContainer>
@@ -81,14 +80,14 @@ export function ValueDistributionChart({ value_tier_distribution }: ValueDistrib
 
         <div className="flex flex-col justify-center space-y-2">
           {data.map((item) => (
-            <div key={item.name} className="flex items-center justify-between rounded-tactical border border-tactical-border bg-tactical-elevated p-3 hover:border-tactical-border-emphasis transition-colors duration-tactical">
+            <div key={item.name} className="flex items-center justify-between rounded-xl border border-tactical-border bg-tactical-elevated p-3 transition-colors hover:border-tactical-border-emphasis">
               <div className="flex items-center gap-3">
-                <div className="h-4 w-4 rounded" style={{ backgroundColor: item.color }}></div>
-                <span className="text-xs font-mono font-medium text-tactical-text">{item.name}</span>
+                <div className="h-3 w-3 rounded-full" style={{ backgroundColor: item.color }}></div>
+                <span className="text-[13px] font-medium text-tactical-text">{item.name}</span>
               </div>
               <div className="text-right">
-                <span className="text-lg font-bold text-tactical-text font-mono">{item.value}</span>
-                <span className="ml-1 text-xs text-tactical-muted font-mono">({((item.value / total) * 100).toFixed(1)}%)</span>
+                <span className="num text-[15px] font-semibold text-tactical-text">{item.value}</span>
+                <span className="num ml-1 text-[12px] text-tactical-muted">({((item.value / total) * 100).toFixed(1)}%)</span>
               </div>
             </div>
           ))}

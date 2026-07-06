@@ -18,6 +18,10 @@ type PredictionFormProps = {
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 };
 
+const fieldLabel = "text-[12px] font-medium text-tactical-muted";
+const fieldControl =
+  "rounded-sm border border-tactical-border bg-tactical-surface px-3 py-2 text-[14px] text-tactical-text transition-colors placeholder:text-tactical-dimmed hover:border-tactical-border-emphasis focus:border-tactical-accent focus:shadow-focus focus:outline-none";
+
 export function PredictionForm({
   formData,
   areaOptions,
@@ -32,201 +36,140 @@ export function PredictionForm({
   onSubmit,
 }: PredictionFormProps) {
   return (
-    <form onSubmit={onSubmit} className="tactical-card p-6 tactical-corners space-y-6">
-      <header className="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between">
-        <div className="space-y-1">
-          <p className="tactical-label">SCENARIO PRESETS</p>
-          <h3 className="text-xl font-bold text-tactical-text tracking-tactical">SAMPLE LISTINGS</h3>
-        </div>
-        <span className="tactical-badge border-tactical-border-emphasis text-tactical-muted">
-          {modelLabel}
-        </span>
-      </header>
+    <form onSubmit={onSubmit} className="tactical-card space-y-6 p-6">
+      <div className="flex items-baseline justify-between gap-3">
+        <h3 className="text-[15px] font-semibold text-tactical-text">Property details</h3>
+        <span className="tactical-badge-inactive">{modelLabel}</span>
+      </div>
 
-      <div className="flex flex-wrap gap-2">
-        {sampleListings.map((listing, index) => (
-          <button
-            key={listing.name}
-            type="button"
-            onClick={() => onSampleLoad(index)}
-            className={`tactical-btn text-[10px] ${
-              selectedSampleIndex === index
-                ? "border-tactical-success text-tactical-success tactical-glow-success"
-                : ""
-            }`}
-          >
-            {listing.name}
-          </button>
-        ))}
+      {/* Sample presets */}
+      <div>
+        <span className={`${fieldLabel} mb-2 block`}>Try a sample</span>
+        <div className="flex flex-wrap gap-2">
+          {sampleListings.map((listing, index) => {
+            const selected = selectedSampleIndex === index;
+            return (
+              <button
+                key={listing.name}
+                type="button"
+                onClick={() => onSampleLoad(index)}
+                className={`rounded-pill border px-3 py-1.5 text-[13px] font-medium transition-colors ${
+                  selected
+                    ? "border-tactical-text bg-tactical-text text-white"
+                    : "border-tactical-border bg-tactical-surface text-tactical-muted hover:border-tactical-border-emphasis hover:text-tactical-text"
+                }`}
+              >
+                {listing.name}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <label className="flex flex-col gap-1.5">
-          <span className="tactical-label">LISTING PRICE (SEK) *</span>
-          <input
-            required
-            type="number"
-            value={formData.listing_price}
-            onChange={(event) => onFieldChange("listing_price", event.target.value)}
-            className="tactical-input"
-          />
+          <span className={fieldLabel}>Listing price (kr) *</span>
+          <input required type="number" value={formData.listing_price} onChange={(e) => onFieldChange("listing_price", e.target.value)} className={`num ${fieldControl}`} />
         </label>
 
         <label className="flex flex-col gap-1.5">
-          <span className="tactical-label">LIVING AREA (M²) *</span>
-          <input
-            required
-            type="number"
-            value={formData.living_area}
-            onChange={(event) => onFieldChange("living_area", event.target.value)}
-            className="tactical-input"
-          />
+          <span className={fieldLabel}>Living area (m²) *</span>
+          <input required type="number" value={formData.living_area} onChange={(e) => onFieldChange("living_area", e.target.value)} className={`num ${fieldControl}`} />
         </label>
 
         <label className="flex flex-col gap-1.5">
-          <span className="tactical-label">ROOMS</span>
-          <select
-            value={formData.rooms}
-            onChange={(event) => onFieldChange("rooms", event.target.value)}
-            className="tactical-input"
-          >
-            <option value="1">1 ROOM</option>
-            <option value="2">2 ROOMS</option>
-            <option value="3">3 ROOMS</option>
-            <option value="4">4 ROOMS</option>
-            <option value="5">5+ ROOMS</option>
+          <span className={fieldLabel}>Rooms</span>
+          <select value={formData.rooms} onChange={(e) => onFieldChange("rooms", e.target.value)} className={fieldControl}>
+            <option value="1">1 room</option>
+            <option value="2">2 rooms</option>
+            <option value="3">3 rooms</option>
+            <option value="4">4 rooms</option>
+            <option value="5">5+ rooms</option>
           </select>
         </label>
 
         <label className="flex flex-col gap-1.5">
-          <span className="tactical-label">MONTHLY FEE (SEK)</span>
-          <input
-            type="number"
-            value={formData.monthly_fee}
-            onChange={(event) => onFieldChange("monthly_fee", event.target.value)}
-            className="tactical-input"
-          />
+          <span className={fieldLabel}>Monthly fee (kr)</span>
+          <input type="number" value={formData.monthly_fee} onChange={(e) => onFieldChange("monthly_fee", e.target.value)} className={`num ${fieldControl}`} />
         </label>
 
         <label className="flex flex-col gap-1.5">
-          <span className="tactical-label">DAYS ON MARKET</span>
-          <input
-            type="number"
-            value={formData.days_on_market}
-            onChange={(event) => onFieldChange("days_on_market", event.target.value)}
-            className="tactical-input"
-          />
+          <span className={fieldLabel}>Days on market</span>
+          <input type="number" value={formData.days_on_market} onChange={(e) => onFieldChange("days_on_market", e.target.value)} className={`num ${fieldControl}`} />
         </label>
 
         <label className="flex flex-col gap-1.5">
-          <span className="tactical-label">CONSTRUCTION YEAR</span>
-          <input
-            type="number"
-            value={formData.construction_year}
-            onChange={(event) => onFieldChange("construction_year", event.target.value)}
-            className="tactical-input"
-          />
+          <span className={fieldLabel}>Construction year</span>
+          <input type="number" value={formData.construction_year} onChange={(e) => onFieldChange("construction_year", e.target.value)} className={`num ${fieldControl}`} />
         </label>
 
         <label className="flex flex-col gap-1.5">
-          <span className="tactical-label">PROPERTY TYPE</span>
-          <select
-            value={formData.property_type}
-            onChange={(event) => onFieldChange("property_type", event.target.value)}
-            className="tactical-input"
-          >
-            <option value="Lägenhet">LÄGENHET</option>
-            <option value="Villa">VILLA</option>
-            <option value="Radhus">RADHUS</option>
-            <option value="Kedjehus">KEDJEHUS</option>
+          <span className={fieldLabel}>Property type</span>
+          <select value={formData.property_type} onChange={(e) => onFieldChange("property_type", e.target.value)} className={fieldControl}>
+            <option value="Lägenhet">Lägenhet</option>
+            <option value="Villa">Villa</option>
+            <option value="Radhus">Radhus</option>
+            <option value="Kedjehus">Kedjehus</option>
           </select>
         </label>
 
         <label className="flex flex-col gap-1.5">
-          <span className="tactical-label">AREA</span>
-          <select
-            value={formData.area}
-            onChange={(event) => onFieldChange("area", event.target.value)}
-            className="tactical-input"
-          >
+          <span className={fieldLabel}>Area</span>
+          <select value={formData.area} onChange={(e) => onFieldChange("area", e.target.value)} className={fieldControl}>
             {areaOptions.map((option) => (
               <option key={option} value={option}>
-                {option.toUpperCase()}
+                {option}
               </option>
             ))}
           </select>
         </label>
 
         <label className="flex flex-col gap-1.5">
-          <span className="tactical-label">LISTING ID (OPTIONAL)</span>
-          <input
-            value={formData.listing_id}
-            onChange={(event) => onFieldChange("listing_id", event.target.value)}
-            className="tactical-input"
-          />
+          <span className={fieldLabel}>Listing ID (optional)</span>
+          <input value={formData.listing_id} onChange={(e) => onFieldChange("listing_id", e.target.value)} className={fieldControl} />
         </label>
 
         <label className="flex flex-col gap-1.5">
-          <span className="tactical-label">FLOOR</span>
-          <input
-            type="number"
-            value={formData.floor}
-            onChange={(event) => onFieldChange("floor", event.target.value)}
-            className="tactical-input"
-          />
+          <span className={fieldLabel}>Floor</span>
+          <input type="number" value={formData.floor} onChange={(e) => onFieldChange("floor", e.target.value)} className={`num ${fieldControl}`} />
         </label>
 
         <label className="flex flex-col gap-1.5">
-          <span className="tactical-label">ELEVATOR</span>
-          <select
-            value={formData.elevator}
-            onChange={(event) => onFieldChange("elevator", event.target.value)}
-            className="tactical-input"
-          >
-            <option value="">UNKNOWN</option>
-            <option value="true">YES</option>
-            <option value="false">NO</option>
+          <span className={fieldLabel}>Elevator</span>
+          <select value={formData.elevator} onChange={(e) => onFieldChange("elevator", e.target.value)} className={fieldControl}>
+            <option value="">Unknown</option>
+            <option value="true">Yes</option>
+            <option value="false">No</option>
           </select>
         </label>
 
         <label className="flex flex-col gap-1.5">
-          <span className="tactical-label">BALCONY</span>
-          <select
-            value={formData.balcony}
-            onChange={(event) => onFieldChange("balcony", event.target.value)}
-            className="tactical-input"
-          >
-            <option value="">UNKNOWN</option>
-            <option value="true">YES</option>
-            <option value="false">NO</option>
+          <span className={fieldLabel}>Balcony</span>
+          <select value={formData.balcony} onChange={(e) => onFieldChange("balcony", e.target.value)} className={fieldControl}>
+            <option value="">Unknown</option>
+            <option value="true">Yes</option>
+            <option value="false">No</option>
           </select>
         </label>
 
         <label className="flex flex-col gap-1.5">
-          <span className="tactical-label">MODEL</span>
-          <select
-            value={formData.model}
-            onChange={(event) => onFieldChange("model", event.target.value)}
-            className="tactical-input"
-          >
+          <span className={fieldLabel}>Model</span>
+          <select value={formData.model} onChange={(e) => onFieldChange("model", e.target.value)} className={fieldControl}>
             {Object.entries(modelLabels).map(([key, label]) => (
               <option key={key} value={key}>
-                {label.toUpperCase()}
+                {label}
               </option>
             ))}
           </select>
         </label>
       </div>
 
-      <div className="flex flex-col gap-3 border border-tactical-border bg-tactical-elevated p-4 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-xs font-mono text-tactical-muted tracking-tactical">
-          SELECTED MODEL:
-          <span className="ml-2 tactical-badge border-tactical-accent text-tactical-accent">
-            {modelLabel.toUpperCase()}
-          </span>
+      <div className="flex flex-col gap-3 border-t border-tactical-border pt-5 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-[13px] text-tactical-muted">
+          Estimating with <span className="font-medium text-tactical-text">{modelLabel}</span>
         </p>
         <button type="submit" disabled={isLoading || !isApiReady} className="tactical-btn-primary">
-          {!isApiReady ? "STARTING API..." : isLoading ? "EXECUTING..." : "EXECUTE PREDICTION"}
+          {!isApiReady ? "Starting model…" : isLoading ? "Estimating…" : "Estimate value"}
         </button>
       </div>
     </form>

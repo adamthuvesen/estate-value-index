@@ -8,7 +8,7 @@ Training uses engineered listing features and LightGBM. Keep training, feature c
 - Training workflow modules: `src/estate_value_index/ml/training_workflow/`
 - Feature engineering: `src/estate_value_index/ml/features/`
 - Data loading and preprocessing: `src/estate_value_index/ml/data_loader.py`, `src/estate_value_index/ml/preprocessing.py`
-- Model serving compatibility: `api_server.py`
+- Model serving: `api_server.py`
 - Feature subsets and recommended features: `config/feature_subsets.yaml`, `config/recommended_features.json`
 
 ## Training contract
@@ -17,7 +17,7 @@ Training uses engineered listing features and LightGBM. Keep training, feature c
 - Keep inference feature context aligned with training, especially area normalization and categorical handling.
 - Use `normalize_area_for_model()` for Booli-style `Property - Area - City` area handling.
 - Follow the trainer's pandas `category` + LightGBM categorical contract.
-- If production retraining fits on all engineered data, treat holdout metrics as bounded evidence, not automatic live generalization, without a fresh temporal backtest.
+- If production retraining fits on all engineered data, treat holdout metrics as bounded evidence. Run a fresh temporal backtest before treating them as live-generalization evidence.
 - Some engineered signals are heuristic and hand-tuned. Re-check feature importances after retrains.
 - Current priority: keep the 2026 chronological split behavior intact, retrain when changing the feature set, and re-baseline `MAX_MAE_THRESHOLD` against honest temporal MAE.
 
@@ -26,7 +26,6 @@ Training uses engineered listing features and LightGBM. Keep training, feature c
 - `web/models/` is generated output, ignored by git, and should not be hand-edited.
 - Runtime model sync can come from GCS through `scripts/startup.sh`.
 - Model integrity uses `.sha256` sidecars; do not bypass those checks casually.
-- Pickled legacy compatibility lives in `api_server.py`; be careful when renaming serving classes or import paths.
 
 ## Checks to run
 

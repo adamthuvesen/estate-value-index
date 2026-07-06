@@ -89,8 +89,8 @@ OUTPUT_DIR = os.getenv("BOOLI_OUTPUT_DIR", "data/raw/booli")
 IMAGE_STORE = os.getenv("BOOLI_IMAGE_STORE", "data/images/raw/booli")
 DOWNLOAD_IMAGES = False
 
-# BigQuery settings removed - BigQuery writes now handled by processing pipeline
-# This avoids streaming buffer conflicts with MERGE operations
+# BigQuery writes happen in the processing pipeline to avoid streaming buffer
+# conflicts with MERGE operations.
 
 # Retry settings — retry only on transient server/network errors. Do not retry
 # on 403 (Forbidden) or 429 (Too Many Requests): treat those as the site asking

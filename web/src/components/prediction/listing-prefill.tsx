@@ -16,30 +16,30 @@ export function ListingPrefill({
   isLoading,
 }: ListingPrefillProps) {
   return (
-    <div className="tactical-card p-6 tactical-corners">
-      <header className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between">
-        <div className="space-y-1">
-          <p className="tactical-label">DATA IMPORT</p>
-          <h3 className="text-xl font-bold text-tactical-text tracking-tactical">BOOLI URL</h3>
-        </div>
+    <div className="tactical-card p-6">
+      <div className="mb-4 flex items-baseline justify-between gap-3">
+        <h3 className="text-[15px] font-semibold text-tactical-text">Start from a listing</h3>
+        <span className="text-[12px] text-tactical-dimmed">Optional</span>
+      </div>
+      <div className="flex flex-col gap-2.5 sm:flex-row">
+        <input
+          type="url"
+          value={listingUrl}
+          onChange={(event) => onListingUrlChange(event.target.value)}
+          placeholder="https://www.booli.se/annons/123"
+          className="tactical-input w-full flex-1"
+        />
         <button
           type="button"
           onClick={onPrefill}
           disabled={isPrefilling || isLoading}
-          className="tactical-btn-primary"
+          className="tactical-btn-primary shrink-0"
         >
-          {isPrefilling ? "IMPORTING..." : "IMPORT PROPERTY"}
+          {isPrefilling ? "Importing…" : "Import"}
         </button>
-      </header>
-      <input
-        type="url"
-        value={listingUrl}
-        onChange={(event) => onListingUrlChange(event.target.value)}
-        placeholder="https://www.booli.se/annons/123"
-        className="tactical-input w-full"
-      />
-      <p className="mt-2 text-[10px] text-tactical-muted font-mono tracking-tactical">
-        AUTO-FILL FIELDS // MANUAL OVERRIDE AVAILABLE BEFORE PREDICTION EXECUTION
+      </div>
+      <p className="mt-2.5 text-[13px] text-tactical-muted">
+        Paste a Booli URL to auto-fill the form. You can edit anything before estimating.
       </p>
     </div>
   );
