@@ -6,7 +6,6 @@ name: ML Pipeline
 #     - BigQuery Data Editor
 #     - Vertex AI User
 #     - Storage Admin (for GCS model upload)
-#   PREFECT_API_KEY - Prefect Cloud authentication (REQUIRED for Vertex AI mode)
 #
 # Required environment-scoped GitHub variables:
 #   GCP_PROJECT_ID
@@ -163,9 +162,6 @@ jobs:
 
       - name: Run ML Pipeline
         id: pipeline
-        env:
-          PREFECT_API_KEY: ${{ secrets.PREFECT_API_KEY }}
-          PREFECT_API_URL: ${{ secrets.PREFECT_API_URL }}
         run: |
           uv run python -c "
           import sys
