@@ -138,8 +138,15 @@ or production performance.
 
 ## Run locally
 
+Terminal 1:
+
 ```bash
 uv run uvicorn api_server:app --host 0.0.0.0 --port 8000
+```
+
+Terminal 2:
+
+```bash
 cd web && npm run dev
 ```
 
