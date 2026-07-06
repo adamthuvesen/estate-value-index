@@ -105,3 +105,29 @@ def test_extract_floor_falls_back_to_page_text_ground_floor() -> None:
     response = _response("<html><body>Bostaden ligger på bottenplan</body></html>")
 
     assert _Extractor().extract_floor(response) == 0
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("2,5 rum", 2),  # half-room must not be read as "5"
+        ("1,5 rum", 1),
+        ("3,5 rum", 3),
+        ("2 rum", 2),
+        ("3 rum och kök", 3),
+        ("4 rum", 4),
+        ("56 m² · 2,5 rum · 2 924 kr/mån", 2),
+    ],
+)
+def test_extract_rooms_handles_half_rooms(text: str, expected: int) -> None:
+    response = _response(f"<html><body><span>{text}</span></body></html>")
+
+    assert _Extractor().extract_rooms(response) == expected
+
+
+@pytest.mark.unit
+def test_extract_rooms_returns_none_without_match() -> None:
+    response = _response("<html><body>Ingen rumsinformation här</body></html>")
+
+    assert _Extractor().extract_rooms(response) is None
