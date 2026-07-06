@@ -22,6 +22,11 @@ from estate_value_index.ml import drop_outliers_quantile, filter_valid_listings
 
 logger = logging.getLogger(__name__)
 
+# Fields that must be real (not feature-filled) for a value score to be
+# trustworthy. price_per_sqm is derived from living_area, so the two go missing
+# together; see docs/internal/value-finder-missingness-analysis.md.
+CORE_RANK_FIELDS = ("living_area", "price_per_sqm")
+
 
 def load_production_data(data_path: Path, apply_training_filters: bool = True) -> pd.DataFrame:
     """Load production listing data from JSON or JSONL file.
@@ -127,10 +132,36 @@ def calculate_value_metrics(
         (df["predicted_price"] - df["sold_price"]) / df["sold_price"] * 100
     )
 
-    # Mark as undervalued only if exceeds threshold
-    # Must meet EITHER percentage OR absolute threshold
-    df["is_undervalued"] = (df["prediction_delta_percentage"] >= undervalue_threshold_pct) | (
-        df["prediction_delta_absolute"] >= undervalue_threshold_abs
+    # Rankability gate. A value score is only trustworthy when the size-derived
+    # features the model leans on are real rather than feature-filled. When
+    # living_area (and its derived price_per_sqm) is missing, fill lets the model
+    # treat a tiny flat as a normal-sized one, inflating predicted price and
+    # manufacturing fake "excellent value". Such rows still get a prediction but
+    # are held out of the ranking and marked, so they sort below rankable rows.
+    present = pd.DataFrame(index=df.index)
+    for field in CORE_RANK_FIELDS:
+        column = (
+            pd.to_numeric(df[field], errors="coerce")
+            if field in df.columns
+            else pd.Series(np.nan, index=df.index)
+        )
+        present[field] = column.gt(0)
+    is_rankable = present.all(axis=1)
+    df["is_rankable"] = is_rankable
+    df["missing_core_fields"] = [
+        [field for field in CORE_RANK_FIELDS if not row[field]]
+        for row in present.to_dict("records")
+    ]
+    df["rank_suppressed_reason"] = [
+        None if ok else f"missing_{missing[0]}"
+        for ok, missing in zip(is_rankable, df["missing_core_fields"])
+    ]
+
+    # Mark as undervalued only for rankable rows that clear the threshold
+    # (EITHER percentage OR absolute).
+    df["is_undervalued"] = is_rankable & (
+        (df["prediction_delta_percentage"] >= undervalue_threshold_pct)
+        | (df["prediction_delta_absolute"] >= undervalue_threshold_abs)
     )
 
     # Value score (1-100): quantile-normalize undervaluation into a bell curve
@@ -138,20 +169,21 @@ def calculate_value_metrics(
     # further below the model = better value), map the rank through the inverse
     # normal CDF to get a standard-normal spread, then scale. This uses the full
     # 1-100 range — unlike a raw z-score clipped at ±3, which collapses every
-    # extreme into a spike at 95.
-    pct_delta = df["prediction_delta_percentage"]
-    n = len(df)
-
+    # extreme into a spike at 95. Ranked over rankable rows only, so suppressed
+    # rows can neither claim a score nor distort the percentile spread.
+    rankable_delta = df.loc[is_rankable, "prediction_delta_percentage"]
+    n = len(rankable_delta)
+    value_score = pd.Series(np.nan, index=df.index)
     if n > 1:
         # Ranks -> (0, 1) open interval; the +1 denominator keeps the extremes
         # finite, and norm.ppf turns the uniform ranks into a standard normal.
-        percentile = pct_delta.rank(method="average") / (n + 1)
-        z_norm = pd.Series(norm.ppf(percentile), index=df.index)
-    else:
-        z_norm = pd.Series([0.0] * n, index=df.index)
-
-    # z*15 + 50: z=0 -> 50, z=±1 -> 35/65, z=±2 -> 20/80, z=±3.3 -> 1/100.
-    df["value_score"] = (z_norm * 15 + 50).clip(1, 100).round(1)
+        percentile = rankable_delta.rank(method="average") / (n + 1)
+        z_norm = pd.Series(norm.ppf(percentile.to_numpy()), index=rankable_delta.index)
+        # z*15 + 50: z=0 -> 50, z=±1 -> 35/65, z=±2 -> 20/80, z=±3.3 -> 1/100.
+        value_score.loc[rankable_delta.index] = (z_norm * 15 + 50).clip(1, 100).round(1)
+    elif n == 1:
+        value_score.loc[rankable_delta.index] = 50.0
+    df["value_score"] = value_score
 
     # Add value tier labels (aligned with z-score distribution)
     def get_value_tier(score: float) -> str:
@@ -168,7 +200,9 @@ def calculate_value_metrics(
         else:  # z < -1.33 (bottom ~9%)
             return "Highly Overvalued"
 
-    df["value_tier"] = df["value_score"].apply(get_value_tier)
+    df["value_tier"] = [
+        get_value_tier(score) if pd.notna(score) else None for score in df["value_score"]
+    ]
 
     return df
 
@@ -197,6 +231,9 @@ def prepare_output_records(df: pd.DataFrame) -> list[dict]:
         "is_undervalued",
         "value_score",
         "value_tier",
+        "is_rankable",
+        "rank_suppressed_reason",
+        "missing_core_fields",
         "sold_date",
         "days_on_market",
         "listing_price",
@@ -218,7 +255,9 @@ def prepare_output_records(df: pd.DataFrame) -> list[dict]:
     for record in records:
         cleaned = {}
         for key, value in record.items():
-            if pd.isna(value):
+            if isinstance(value, list):
+                cleaned[key] = value
+            elif pd.isna(value):
                 cleaned[key] = None
             elif isinstance(value, (np.integer, np.int64)):
                 cleaned[key] = int(value)
@@ -233,34 +272,43 @@ def prepare_output_records(df: pd.DataFrame) -> list[dict]:
 
 def generate_summary_statistics(df: pd.DataFrame, metrics: dict) -> dict:
     """Generate summary statistics for the analysis."""
+    # Value statistics describe the ranked population only. Rows missing core
+    # fields are held out of the ranking (value_score is NaN), so folding them
+    # in would skew the distribution and the undervalued rate.
+    rankable = df[df["is_rankable"]]
     undervalued = df[df["is_undervalued"]]
-    overvalued = df[~df["is_undervalued"]]
+    overvalued = rankable[~rankable["is_undervalued"]]
+    rankable_n = len(rankable)
 
     stats = {
         "total_properties": len(df),
+        "rankable_count": rankable_n,
+        "unrankable_count": len(df) - rankable_n,
         "undervalued_count": len(undervalued),
         "overvalued_count": len(overvalued),
-        "undervalued_percentage": round(len(undervalued) / len(df) * 100, 1),
+        "undervalued_percentage": round(len(undervalued) / rankable_n * 100, 1)
+        if rankable_n
+        else 0.0,
         "value_score": {
-            "mean": round(float(df["value_score"].mean()), 1),
-            "median": round(float(df["value_score"].median()), 1),
-            "min": round(float(df["value_score"].min()), 1),
-            "max": round(float(df["value_score"].max()), 1),
-            "std": round(float(df["value_score"].std()), 1),
+            "mean": round(float(rankable["value_score"].mean()), 1),
+            "median": round(float(rankable["value_score"].median()), 1),
+            "min": round(float(rankable["value_score"].min()), 1),
+            "max": round(float(rankable["value_score"].max()), 1),
+            "std": round(float(rankable["value_score"].std()), 1),
         },
         "prediction_delta_absolute": {
-            "mean": round(float(df["prediction_delta_absolute"].mean()), 0),
-            "median": round(float(df["prediction_delta_absolute"].median()), 0),
-            "min": round(float(df["prediction_delta_absolute"].min()), 0),
-            "max": round(float(df["prediction_delta_absolute"].max()), 0),
+            "mean": round(float(rankable["prediction_delta_absolute"].mean()), 0),
+            "median": round(float(rankable["prediction_delta_absolute"].median()), 0),
+            "min": round(float(rankable["prediction_delta_absolute"].min()), 0),
+            "max": round(float(rankable["prediction_delta_absolute"].max()), 0),
         },
         "prediction_delta_percentage": {
-            "mean": round(float(df["prediction_delta_percentage"].mean()), 2),
-            "median": round(float(df["prediction_delta_percentage"].median()), 2),
-            "min": round(float(df["prediction_delta_percentage"].min()), 2),
-            "max": round(float(df["prediction_delta_percentage"].max()), 2),
+            "mean": round(float(rankable["prediction_delta_percentage"].mean()), 2),
+            "median": round(float(rankable["prediction_delta_percentage"].median()), 2),
+            "min": round(float(rankable["prediction_delta_percentage"].min()), 2),
+            "max": round(float(rankable["prediction_delta_percentage"].max()), 2),
         },
-        "value_tier_distribution": df["value_tier"].value_counts().to_dict(),
+        "value_tier_distribution": rankable["value_tier"].value_counts().to_dict(),
         "area_statistics": {
             "total_areas": int(df["area"].nunique()),
             "top_undervalued_areas": (undervalued["area"].value_counts().head(10).to_dict()),
@@ -331,7 +379,12 @@ def run_analysis(
 
     stats = generate_summary_statistics(df, metrics)
     properties = prepare_output_records(df)
-    properties_sorted = sorted(properties, key=lambda x: x["value_score"], reverse=True)
+    # Suppressed rows carry a null value_score; sort them last, not crash.
+    properties_sorted = sorted(
+        properties,
+        key=lambda x: x["value_score"] if x["value_score"] is not None else float("-inf"),
+        reverse=True,
+    )
 
     output = {
         "metadata": {

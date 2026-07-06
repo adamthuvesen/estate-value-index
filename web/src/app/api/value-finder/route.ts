@@ -44,7 +44,7 @@ function buildPredicates(filters: ValueFinderFilters): Predicate[] {
     const tiers = new Set(
       Array.isArray(filters.value_tier) ? filters.value_tier : [filters.value_tier]
     );
-    predicates.push((p) => tiers.has(p.value_tier));
+    predicates.push((p) => p.value_tier !== null && tiers.has(p.value_tier));
   }
 
   if (filters.area) {
@@ -93,11 +93,11 @@ function buildPredicates(filters: ValueFinderFilters): Predicate[] {
   }
   if (filters.min_value_score !== undefined) {
     const min = filters.min_value_score;
-    predicates.push((p) => p.value_score >= min);
+    predicates.push((p) => p.value_score !== null && p.value_score >= min);
   }
   if (filters.max_value_score !== undefined) {
     const max = filters.max_value_score;
-    predicates.push((p) => p.value_score <= max);
+    predicates.push((p) => p.value_score !== null && p.value_score <= max);
   }
 
   if (filters.search) {

@@ -26,7 +26,8 @@ const seedRange = (): NumericRange => ({
   max: Number.NEGATIVE_INFINITY,
 });
 
-const updateRange = (range: NumericRange, value: number) => {
+const updateRange = (range: NumericRange, value: number | null) => {
+  if (value === null) return;
   if (value < range.min) range.min = value;
   if (value > range.max) range.max = value;
 };

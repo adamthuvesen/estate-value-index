@@ -69,7 +69,18 @@ function titleCaseArea(value: string): string {
     .join("");
 }
 
+// Human labels for the core fields a value score depends on. Missing any of
+// these suppresses the row from ranking (see value_analysis.py CORE_RANK_FIELDS).
+const CORE_FIELD_LABELS: Record<string, string> = {
+  living_area: "size",
+  price_per_sqm: "price per m²",
+};
+
 export function PropertyCard({ property }: PropertyCardProps) {
+  if (!property.is_rankable) {
+    return <InsufficientDataCard property={property} />;
+  }
+
   const tier = TIER_STYLES[property.value_tier as ValueTier] ?? FALLBACK_TIER;
 
   // Backend reports prediction_delta = predicted - sold; flip so positive = sold above prediction.
@@ -116,7 +127,7 @@ export function PropertyCard({ property }: PropertyCardProps) {
           title="Value score (1–100)"
         >
           <span className="num text-[14px] font-semibold leading-none">
-            {property.value_score.toFixed(0)}
+            {property.value_score?.toFixed(0) ?? "—"}
           </span>
         </div>
       </div>
@@ -201,6 +212,81 @@ export function PropertyCard({ property }: PropertyCardProps) {
         {property.days_on_market !== null &&
           ` · ${property.days_on_market} ${property.days_on_market === 1 ? "day" : "days"} on market`}
       </p>
+    </article>
+  );
+}
+
+function InsufficientDataCard({ property }: PropertyCardProps) {
+  const missing = property.missing_core_fields
+    .map((field) => CORE_FIELD_LABELS[field] ?? field)
+    .join(", ");
+  const reason = missing ? `Missing ${missing}` : "Insufficient data";
+  const sizeLabel = property.living_area ? `${property.living_area} m²` : "—";
+
+  const soldDate = new Date(property.sold_date).toLocaleDateString("en-GB", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+
+  return (
+    <article className="tactical-card group flex flex-col p-4 opacity-90">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3
+            className="truncate text-[15px] font-semibold leading-tight text-tactical-text"
+            title={property.address}
+          >
+            {property.address}
+          </h3>
+          <p className="mt-1 truncate text-[12px] text-tactical-muted">
+            {titleCaseArea(property.area)} · {titleCaseArea(property.municipality)}
+          </p>
+        </div>
+        <span
+          className="shrink-0 rounded-md border border-tactical-border bg-tactical-elevated px-2 py-1 text-[11px] font-medium text-tactical-muted"
+          title="Not enough data to score this property's value"
+        >
+          Insufficient data
+        </span>
+      </div>
+
+      <p className="mt-3 rounded-lg border border-tactical-border bg-tactical-elevated/60 px-3 py-2.5 text-[12px] text-tactical-muted">
+        {reason} — not ranked. Sold for{" "}
+        <span className="num font-medium text-tactical-text">
+          {formatCurrency(property.sold_price)}
+        </span>
+        .
+      </p>
+
+      <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 sm:grid-cols-4">
+        <Fact label="Size" value={sizeLabel} />
+        <Fact label="Rooms" value={property.rooms ? `${property.rooms}` : "—"} />
+        <Fact label="Built" value={property.construction_year ? `${property.construction_year}` : "—"} />
+        <Fact label="Fee" value={property.monthly_fee ? `${formatCurrency(property.monthly_fee)}/mo` : "—"} />
+      </dl>
+
+      <div className="mt-3 flex items-center justify-between gap-2 border-t border-tactical-border pt-2.5">
+        <p className="text-[11px] text-tactical-dimmed">Sold {soldDate}</p>
+        {property.url && (
+          <Link
+            href={property.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="tactical-focus-ring inline-flex shrink-0 items-center gap-1 text-[12px] font-medium text-tactical-muted transition-colors hover:text-tactical-accent"
+          >
+            Booli
+            <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+              />
+            </svg>
+          </Link>
+        )}
+      </div>
     </article>
   );
 }

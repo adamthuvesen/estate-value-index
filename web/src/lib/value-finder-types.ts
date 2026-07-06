@@ -17,8 +17,13 @@ export interface ValueProperty {
   prediction_delta_absolute: number;
   prediction_delta_percentage: number;
   is_undervalued: boolean;
-  value_score: number;
-  value_tier: ValueTier;
+  // Suppressed rows (missing core fields, is_rankable === false) carry a null
+  // score and tier: they are kept and searchable but held out of the ranking.
+  value_score: number | null;
+  value_tier: ValueTier | null;
+  is_rankable: boolean;
+  rank_suppressed_reason: string | null;
+  missing_core_fields: string[];
   sold_date: string;
   days_on_market: number | null;
   listing_price: number | null;

@@ -138,3 +138,64 @@ def test_generate_area_statistics_builds_and_writes_area_payload(tmp_path):
     assert area["value_insights"]["undervalued_count"] == 1
     assert area["value_insights"]["avg_value_score"] == 70.0
     assert set(area["by_room_count"]) == {"all", "2", "3"}
+
+
+def test_generate_area_statistics_falls_back_when_area_avg_price_is_empty(tmp_path):
+    feature_context_path = tmp_path / "feature_context.json"
+    value_analysis_path = tmp_path / "value_analysis.json"
+    raw_listings_path = tmp_path / "raw_listings.json"
+    output_path = tmp_path / "area_statistics.json"
+
+    feature_context_path.write_text(
+        json.dumps(
+            {
+                "reference_date": "2026-06-01",
+                "area_avg_price": {},
+                "area_target_mean": {"sodermalm": 5_500_000},
+                "area_sales_volume_3m": {"sodermalm": 2},
+            }
+        ),
+        encoding="utf-8",
+    )
+    value_analysis_path.write_text(
+        json.dumps({"metadata": {}, "properties": [{"area": "sodermalm"}]}),
+        encoding="utf-8",
+    )
+    raw_listings_path.write_text(
+        json.dumps(
+            [
+                {
+                    "listing_id": "1",
+                    "area": "sodermalm",
+                    "listing_price": 4_900_000,
+                    "sold_price": 5_100_000,
+                    "living_area": 50,
+                    "rooms": 2,
+                    "sold_date": "2026-05-15",
+                },
+                {
+                    "listing_id": "2",
+                    "area": "sodermalm",
+                    "listing_price": 5_300_000,
+                    "sold_price": 5_900_000,
+                    "living_area": 60,
+                    "rooms": 3,
+                    "sold_date": "2026-05-16",
+                },
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = generate_area_statistics(
+        data_source="json",
+        feature_context_path=feature_context_path,
+        value_analysis_path=value_analysis_path,
+        raw_listings_path=raw_listings_path,
+        output_path=output_path,
+    )
+
+    assert result["metadata"]["total_areas"] == 1
+    area = result["areas"]["sodermalm"]
+    assert area["overview"]["avg_listing_price"] == 5_100_000
+    assert area["overview"]["avg_sold_price"] == 5_500_000

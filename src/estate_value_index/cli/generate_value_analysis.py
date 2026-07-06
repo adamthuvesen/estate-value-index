@@ -147,8 +147,13 @@ def main(argv: list[str] | None = None, *, args=None) -> int:
     # Prepare output
     properties = prepare_output_records(df)
 
-    # Sort by value_score descending (best deals first)
-    properties_sorted = sorted(properties, key=lambda x: x["value_score"], reverse=True)
+    # Sort by value_score descending (best deals first). Suppressed rows carry a
+    # null score; sort them last instead of crashing on None vs float.
+    properties_sorted = sorted(
+        properties,
+        key=lambda x: x["value_score"] if x["value_score"] is not None else float("-inf"),
+        reverse=True,
+    )
 
     # Create output structure
     output = {
