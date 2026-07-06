@@ -103,7 +103,9 @@ def test_generate_area_statistics_builds_and_writes_area_payload(tmp_path):
     assert json.loads(output_path.read_text(encoding="utf-8")) == result
     assert result["metadata"]["total_areas"] == 1
     assert result["metadata"]["total_properties"] == 2
-    assert result["metadata"]["generated_at"] == "2026-06-01"
+    # "Updated" tracks the newest sold_date in the data (2026-05-15), not the
+    # model's reference_date (2026-06-01) — the training cutoff lags the data.
+    assert result["metadata"]["generated_at"] == "2026-05-15"
 
     area = result["areas"]["sodermalm"]
     assert area["overview"]["avg_listing_price"] == 5_000_000
