@@ -93,6 +93,20 @@ def test_rate_limit_store_stays_bounded(monkeypatch: pytest.MonkeyPatch) -> None
 
 
 @pytest.mark.unit
+def test_rate_limit_returns_429(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(api_server, "RATE_LIMIT_REQUESTS", 1)
+    monkeypatch.setattr(api_server, "RATE_LIMIT_STORE", TTLCache(maxsize=10, ttl=3600.0))
+
+    with TestClient(api_server.app) as client:
+        first = client.get("/docs")
+        second = client.get("/docs")
+
+    assert first.status_code == 200
+    assert second.status_code == 429
+    assert "Rate limit exceeded" in second.json()["detail"]
+
+
+@pytest.mark.unit
 def test_predict_500_hides_exception_message(caplog: pytest.LogCaptureFixture) -> None:
     mock_model = MagicMock()
     mock_model.predict.side_effect = ValueError("SECRET_INTERNAL_DO_NOT_LEAK")
@@ -216,6 +230,23 @@ def test_multi_worker_emits_rate_limit_warning(
 
 
 @pytest.mark.unit
+def test_health_requires_both_production_models() -> None:
+    with TestClient(api_server.app) as client:
+        api_server.MODEL_CACHE.clear()
+        api_server.MODEL_CACHE["with_list_price"] = {
+            "model": MagicMock(),
+            "path": Path("price_prediction_model_with_list_price.joblib"),
+            "requires_listing_price": True,
+            "model_type": "price_tiered_ensemble",
+        }
+
+        response = client.get("/health")
+
+    assert response.status_code == 503
+    assert "no_list_price" in response.json()["detail"]
+
+
+@pytest.mark.unit
 def test_health_responds_while_predicts_in_flight() -> None:
     release_predict = threading.Event()
     predict_started = threading.Event()
@@ -243,6 +274,12 @@ def test_health_responds_while_predicts_in_flight() -> None:
         "model": mock_model,
         "path": Path("dummy.joblib"),
         "requires_listing_price": True,
+        "model_type": "price_tiered_ensemble",
+    }
+    api_server.MODEL_CACHE["no_list_price"] = {
+        "model": MagicMock(),
+        "path": Path("dummy.joblib"),
+        "requires_listing_price": False,
         "model_type": "price_tiered_ensemble",
     }
 

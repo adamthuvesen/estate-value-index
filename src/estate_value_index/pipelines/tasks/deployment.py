@@ -427,23 +427,17 @@ def health_check_task(
     try:
         response = requests.get(service_url, timeout=timeout, allow_redirects=True)
         response_time_ms = (time.time() - start_time) * 1000
-        is_healthy = response.status_code == expected_status
-        # 503 = degraded but service is running; treat as "alive" for deployment checks
-        is_alive = response.status_code in (200, 503)
+        is_healthy = response.status_code == expected_status == 200
 
         if is_healthy:
             logger.info(f"Healthy (status={response.status_code}, time={response_time_ms:.0f}ms)")
-        elif is_alive:
-            logger.info(
-                f"Degraded but alive (status={response.status_code}, time={response_time_ms:.0f}ms)"
-            )
         else:
             logger.warning(f"Unhealthy (status={response.status_code})")
 
         return HealthCheckResult(
             success=True,
             timestamp=datetime.now().isoformat(),
-            healthy=is_alive,  # Consider alive services as healthy for deployment purposes
+            healthy=is_healthy,
             status_code=response.status_code,
             response_time_ms=round(response_time_ms, 2),
         )

@@ -21,9 +21,11 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 COPY src/ src/
 
-# Install Python dependencies with uv (faster than pip)
-# Uses ml, monitoring, and vertex extras for the training environment.
-RUN uv pip install --system ".[ml,monitoring,vertex]"
+# Install exact locked versions from uv.lock.
+RUN uv export --frozen --no-dev --no-hashes --extra ml --extra monitoring --extra vertex --extra geo --no-emit-project \
+        --format requirements-txt -o /tmp/requirements.txt \
+    && uv pip install --system -r /tmp/requirements.txt \
+    && uv pip install --system --no-deps .
 
 # Default environment configuration (can be overridden in the job spec)
 ENV GCS_ENABLED=true \

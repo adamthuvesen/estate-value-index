@@ -57,7 +57,8 @@ def test_health_check_validation(mock_requests):
     mock_response.status_code = 200
     mock_response.json.return_value = {
         "status": "healthy",
-        "model_loaded": True,
+        "models_loaded": ["no_list_price", "with_list_price"],
+        "models_count": 2,
         "timestamp": "2025-10-03T10:00:00Z",
     }
     mock_response.raise_for_status = Mock()
@@ -70,7 +71,7 @@ def test_health_check_validation(mock_requests):
     assert response.status_code == 200
     health_data = response.json()
     assert health_data["status"] == "healthy"
-    assert health_data["model_loaded"] is True
+    assert health_data["models_count"] == 2
 
 
 @pytest.mark.integration

@@ -36,6 +36,7 @@ data/enrichment/*
 data/metrics/*
 !data/metrics/.gitkeep
 *.csv
+!data/reference/**/*.csv
 *.parquet
 
 # Model files (loaded from GCS)

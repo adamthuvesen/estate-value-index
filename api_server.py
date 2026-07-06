@@ -23,6 +23,7 @@ import uvicorn
 from cachetools import TTLCache
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from estate_value_index.ml.preprocessing import normalize_area_for_model
@@ -64,6 +65,7 @@ AUTO_MODEL = "auto"
 NO_LIST_MODEL = NO_LIST_MODEL_ID
 LISTING_MODEL = LISTING_MODEL_ID
 PRODUCTION_MODEL_FILES = production_model_files(DEFAULT_MODEL_PREFIX)
+REQUIRED_MODEL_IDS = frozenset(PRODUCTION_MODEL_FILES)
 
 MODEL_CACHE: dict[str, dict] = {}
 
@@ -121,8 +123,9 @@ async def lifespan(app: FastAPI):
     logger.info("Loading models from %s", MODELS_DIR.absolute())
     MODEL_CACHE = load_all_models(MODELS_DIR)
 
-    if not MODEL_CACHE:
-        logger.error("No models loaded; the server will return errors.")
+    missing_models = _missing_required_models(MODEL_CACHE)
+    if missing_models:
+        logger.error("Missing required model(s): %s; the server is not ready.", missing_models)
     else:
         logger.info("Successfully loaded %d models: %s", len(MODEL_CACHE), list(MODEL_CACHE.keys()))
         logger.info("Server ready to accept requests")
@@ -165,12 +168,14 @@ async def rate_limit_middleware(request: Request, call_next):
     req_list = [ts for ts in req_list if current_time - ts < RATE_LIMIT_WINDOW]
 
     if len(req_list) >= RATE_LIMIT_REQUESTS:
-        raise HTTPException(
+        return JSONResponse(
             status_code=429,
-            detail=(
-                f"Rate limit exceeded. Max {RATE_LIMIT_REQUESTS} requests per "
-                f"{RATE_LIMIT_WINDOW} seconds."
-            ),
+            content={
+                "detail": (
+                    f"Rate limit exceeded. Max {RATE_LIMIT_REQUESTS} requests per "
+                    f"{RATE_LIMIT_WINDOW} seconds."
+                )
+            },
         )
 
     req_list.append(current_time)
@@ -234,6 +239,10 @@ def _available_models(models_dir: Path) -> dict[str, Path]:
         if path.exists():
             mapping[model_id] = path
     return mapping
+
+
+def _missing_required_models(cache: dict[str, dict]) -> list[str]:
+    return sorted(REQUIRED_MODEL_IDS.difference(cache))
 
 
 def _download_models_from_gcs(models_dir: Path) -> None:
@@ -362,8 +371,9 @@ def load_all_models(models_dir: Path) -> dict[str, dict]:
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
     """Liveness probe; reports loaded models."""
-    if not MODEL_CACHE:
-        raise HTTPException(status_code=503, detail="No models loaded")
+    missing = _missing_required_models(MODEL_CACHE)
+    if missing:
+        raise HTTPException(status_code=503, detail=f"Missing required models: {', '.join(missing)}")
 
     return HealthResponse(
         status="healthy", models_loaded=list(MODEL_CACHE.keys()), models_count=len(MODEL_CACHE)

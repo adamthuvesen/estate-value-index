@@ -4,9 +4,14 @@ set -euo pipefail
 echo "[STARTUP] Starting Estate Value Index services..."
 
 # Configuration
-: "${GCS_BUCKET:?GCS_BUCKET is required when syncing runtime artifacts from GCS}"
-MODEL_DIR="/app/web/models"
-ENRICHMENT_DIR="/app/data/derived"
+GCS_ENABLED="${GCS_ENABLED:-false}"
+MODEL_DIR="${MODEL_DIR:-/app/web/models}"
+ENRICHMENT_DIR="${ENRICHMENT_DIR:-/app/data/derived}"
+START_SERVICES="${START_SERVICES:-true}"
+REQUIRED_MODELS=(
+    "price_prediction_model_no_list_price.joblib"
+    "price_prediction_model_with_list_price.joblib"
+)
 
 # Function to download from GCS.
 #
@@ -46,11 +51,17 @@ download_from_gcs() {
 mkdir -p "${MODEL_DIR}"
 mkdir -p "${ENRICHMENT_DIR}"
 
-# Download model artifacts from GCS — required.
-download_from_gcs "models/" "${MODEL_DIR}" "model artifacts" "required"
+if [ "${GCS_ENABLED}" = "true" ]; then
+    : "${GCS_BUCKET:?GCS_BUCKET is required when GCS_ENABLED=true}"
 
-# Download enrichment data from GCS — optional (degrade gracefully).
-download_from_gcs "derived/" "${ENRICHMENT_DIR}" "enrichment data" "optional" || true
+    # Download model artifacts from GCS — required.
+    download_from_gcs "models/" "${MODEL_DIR}" "model artifacts" "required"
+
+    # Download enrichment data from GCS — optional (degrade gracefully).
+    download_from_gcs "derived/" "${ENRICHMENT_DIR}" "enrichment data" "optional" || true
+else
+    echo "[STARTUP] GCS_ENABLED=false; using local runtime artifacts"
+fi
 
 # List downloaded files for verification.
 echo "[STARTUP] Model files:"
@@ -59,37 +70,35 @@ ls -lh "${MODEL_DIR}" || echo "  (empty)"
 echo "[STARTUP] Enrichment files:"
 ls -lh "${ENRICHMENT_DIR}" || echo "  (empty)"
 
-# Preflight: at least one *.joblib must be present, and every *.joblib must
-# have a matching *.joblib.sha256 sidecar. A missing sidecar means the upload
-# pipeline is broken; surface that loudly here rather than letting the API
-# server boot into a no-models 503 loop.
-shopt -s nullglob
-joblib_files=("${MODEL_DIR}"/*.joblib)
-shopt -u nullglob
-
-if [ "${#joblib_files[@]}" -eq 0 ]; then
-    echo "FATAL: no *.joblib files present in ${MODEL_DIR} after rsync (gs://${GCS_BUCKET}/models/). Refusing to start." >&2
-    exit 1
-fi
+sha256_file() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$1" | cut -d' ' -f1
+    else
+        shasum -a 256 "$1" | cut -d' ' -f1
+    fi
+}
 
 bad_sidecars=()
-for joblib_file in "${joblib_files[@]}"; do
+for model_name in "${REQUIRED_MODELS[@]}"; do
+    joblib_file="${MODEL_DIR}/${model_name}"
     sidecar="${joblib_file}.sha256"
-    if [ ! -f "${sidecar}" ]; then
-        bad_sidecars+=("${joblib_file##*/}: sidecar missing")
+    if [ ! -f "${joblib_file}" ]; then
+        bad_sidecars+=("${model_name}: model missing")
         continue
     fi
-    # Verify content, not just existence: a stale sidecar (e.g. a joblib promoted
-    # without its sidecar) otherwise boots into a no-models 503 loop.
+    if [ ! -f "${sidecar}" ]; then
+        bad_sidecars+=("${model_name}: sidecar missing")
+        continue
+    fi
     expected="$(cut -d' ' -f1 <"${sidecar}")"
-    observed="$(sha256sum "${joblib_file}" | cut -d' ' -f1)"
+    observed="$(sha256_file "${joblib_file}")"
     if [ "${expected}" != "${observed}" ]; then
-        bad_sidecars+=("${joblib_file##*/}: sha256 mismatch (sidecar ${expected:0:12}..., file ${observed:0:12}...)")
+        bad_sidecars+=("${model_name}: sha256 mismatch (sidecar ${expected:0:12}..., file ${observed:0:12}...)")
     fi
 done
 
 if [ "${#bad_sidecars[@]}" -gt 0 ]; then
-    echo "FATAL: SHA256 sidecar problem(s) for required model artefact(s):" >&2
+    echo "FATAL: required production model artifact problem(s):" >&2
     for bad in "${bad_sidecars[@]}"; do
         echo "  - ${bad}" >&2
     done
@@ -97,8 +106,13 @@ if [ "${#bad_sidecars[@]}" -gt 0 ]; then
     exit 1
 fi
 
-echo "[STARTUP] Preflight OK: ${#joblib_files[@]} model artefact(s) with verified sidecars"
+echo "[STARTUP] Preflight OK: ${#REQUIRED_MODELS[@]} required model artefact(s) with verified sidecars"
 echo "[STARTUP] Data download complete, starting services..."
+
+if [ "${START_SERVICES}" = "false" ]; then
+    echo "[STARTUP] START_SERVICES=false; preflight complete"
+    exit 0
+fi
 
 # Start supervisor to run Next.js and FastAPI.
 exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
