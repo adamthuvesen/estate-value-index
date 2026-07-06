@@ -125,11 +125,7 @@ class GCSClient:
     def exists(self, gcs_path: str) -> bool:
         if not self.enabled:
             return Path(gcs_path).exists()
-        try:
-            return self._bucket.blob(gcs_path).exists()
-        except Exception:
-            # Missing bucket or transient API error — treat as non-existent.
-            return False
+        return self._bucket.blob(gcs_path).exists()
 
     def list_files(self, prefix: str = "") -> list[str]:
         """List files under ``prefix``; when disabled, list local files under that dir."""
@@ -158,21 +154,10 @@ def resolve_data_path(
     if not auto_download:
         return default_local
 
-    if client.exists(gcs_path):
-        try:
-            return client.download_file(gcs_path, default_local)
-        except Exception as e:
-            logger.warning(
-                "GCS download failed: %s. Falling back to local file: %s", e, default_local
-            )
-            if default_local.exists():
-                return default_local
-            raise
+    if not client.exists(gcs_path):
+        raise FileNotFoundError(f"File not found in GCS: gs://{client.bucket_name}/{gcs_path}")
 
-    if default_local.exists():
-        logger.info("File not in GCS, using local: %s", default_local)
-        return default_local
-    raise FileNotFoundError(f"File not found in GCS ({gcs_path}) or locally ({default_local})")
+    return client.download_file(gcs_path, default_local)
 
 
 def upload_blob(
@@ -273,8 +258,6 @@ def _upload_json_model_artifacts(
         ("importance", "_feature_importance.json"),
     ):
         path = model_dir / f"{model_prefix}{suffix}"
-        if key == "metrics" and not path.exists():
-            path = model_dir / f"{model_prefix}_metrics_lgbm.json"
         if path.exists():
             artifacts[key] = client.upload_file(path, _destination_path(resolved_prefix, path.name))
 
@@ -297,14 +280,13 @@ def upload_model_artifacts(
 
         model_file = model_dir / f"{model_prefix}.joblib"
         if not model_file.exists():
-            model_file = model_dir / f"{model_prefix}_lgbm.joblib"
-        if model_file.exists():
-            _upload_joblib_with_sidecar(client, model_file, "model", resolved_prefix, artifacts)
+            raise FileNotFoundError(f"Model artifact not found: {model_file}")
 
+        _upload_joblib_with_sidecar(client, model_file, "model", resolved_prefix, artifacts)
         _upload_json_model_artifacts(client, model_dir, model_prefix, resolved_prefix, artifacts)
 
         return artifacts
 
     except Exception as e:
-        logger.error("GCS upload failed: %s. Models saved locally but not uploaded to cloud", e)
-        return {}
+        logger.error("GCS upload failed: %s", e)
+        raise RuntimeError("GCS model artifact upload failed") from e

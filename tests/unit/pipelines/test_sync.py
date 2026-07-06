@@ -10,11 +10,33 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from estate_value_index.exceptions import DataError
 from estate_value_index.pipelines.tasks.sync import (
+    _listing_id_checksum,
     sync_bigquery_to_local_task,
     sync_local_to_gcs_task,
     verify_sync_task,
 )
+
+
+class _SummaryRow(dict):
+    def keys(self):  # type: ignore[override]
+        return super().keys()
+
+
+def _summary_result(rows: list[dict]):
+    mock_result = MagicMock()
+    mock_result.__iter__ = lambda self: iter([_SummaryRow(row) for row in rows])
+    return mock_result
+
+
+def _bq_summary(*, ids: list[str], max_record_date: str | None = None) -> dict:
+    return {
+        "count": len(ids),
+        "listing_id_count": len(set(ids)),
+        "listing_id_checksum": _listing_id_checksum(ids),
+        "max_record_date": max_record_date,
+    }
 
 
 class TestSyncBigqueryToLocalTask:
@@ -242,12 +264,16 @@ class TestVerifySyncTask:
     @pytest.mark.unit
     def test_files_in_sync(self, tmp_path: Path, mocker: Any) -> None:
         local_file = tmp_path / "data.json"
-        local_file.write_text('{"id": "1"}\n{"id": "2"}\n{"id": "3"}\n')
+        local_file.write_text(
+            '{"listing_id": "1", "sold_date": "2026-01-01"}\n'
+            '{"listing_id": "2", "sold_date": "2026-01-03"}\n'
+            '{"listing_id": "3", "sold_date": "2026-01-02"}\n'
+        )
 
         mock_client = MagicMock()
-        mock_result = MagicMock()
-        mock_result.__iter__ = lambda self: iter([{"count": 3}])
-        mock_client.query.return_value.result.return_value = mock_result
+        mock_client.query.return_value.result.return_value = _summary_result(
+            [_bq_summary(ids=["1", "2", "3"], max_record_date="2026-01-03")]
+        )
 
         mocker.patch(
             "estate_value_index.pipelines.tasks.sync.get_bq_config",
@@ -264,16 +290,17 @@ class TestVerifySyncTask:
         assert result["local_count"] == 3
         assert result["bigquery_count"] == 3
         assert result["difference"] == 0
+        assert result["local_summary"] == result["bigquery_summary"]
 
     @pytest.mark.unit
     def test_files_out_of_sync(self, tmp_path: Path, mocker: Any) -> None:
         local_file = tmp_path / "data.json"
-        local_file.write_text('{"id": "1"}\n{"id": "2"}\n')  # 2 records
+        local_file.write_text('{"listing_id": "1"}\n{"listing_id": "2"}\n')
 
         mock_client = MagicMock()
-        mock_result = MagicMock()
-        mock_result.__iter__ = lambda self: iter([{"count": 5}])  # 5 in BigQuery
-        mock_client.query.return_value.result.return_value = mock_result
+        mock_client.query.return_value.result.return_value = _summary_result(
+            [_bq_summary(ids=["1", "2", "3", "4", "5"])]
+        )
 
         mocker.patch(
             "estate_value_index.pipelines.tasks.sync.get_bq_config",
@@ -283,12 +310,8 @@ class TestVerifySyncTask:
             ),
         )
 
-        result = verify_sync_task.fn(local_file=local_file)
-
-        assert result["in_sync"] is False
-        assert result["local_count"] == 2
-        assert result["bigquery_count"] == 5
-        assert result["difference"] == 3
+        with pytest.raises(DataError, match="out of sync"):
+            verify_sync_task.fn(local_file=local_file)
 
     @pytest.mark.unit
     def test_missing_local_file_raises(self, tmp_path: Path, mocker: Any) -> None:
@@ -312,9 +335,7 @@ class TestVerifySyncTask:
         local_file.write_text("")
 
         mock_client = MagicMock()
-        mock_result = MagicMock()
-        mock_result.__iter__ = lambda self: iter([{"count": 0}])
-        mock_client.query.return_value.result.return_value = mock_result
+        mock_client.query.return_value.result.return_value = _summary_result([_bq_summary(ids=[])])
 
         mocker.patch(
             "estate_value_index.pipelines.tasks.sync.get_bq_config",
@@ -333,12 +354,12 @@ class TestVerifySyncTask:
     @pytest.mark.unit
     def test_returns_correct_result_structure(self, tmp_path: Path, mocker: Any) -> None:
         local_file = tmp_path / "data.json"
-        local_file.write_text('{"id": "1"}\n')
+        local_file.write_text('{"listing_id": "1"}\n')
 
         mock_client = MagicMock()
-        mock_result = MagicMock()
-        mock_result.__iter__ = lambda self: iter([{"count": 1}])
-        mock_client.query.return_value.result.return_value = mock_result
+        mock_client.query.return_value.result.return_value = _summary_result(
+            [_bq_summary(ids=["1"])]
+        )
 
         mocker.patch(
             "estate_value_index.pipelines.tasks.sync.get_bq_config",
@@ -355,4 +376,27 @@ class TestVerifySyncTask:
         assert "local_count" in result
         assert "bigquery_count" in result
         assert "difference" in result
+        assert "local_summary" in result
+        assert "bigquery_summary" in result
         assert "timestamp" in result
+
+    @pytest.mark.unit
+    def test_same_count_different_listing_ids_fails(self, tmp_path: Path, mocker: Any) -> None:
+        local_file = tmp_path / "data.json"
+        local_file.write_text('{"listing_id": "1"}\n{"listing_id": "2"}\n')
+
+        mock_client = MagicMock()
+        mock_client.query.return_value.result.return_value = _summary_result(
+            [_bq_summary(ids=["1", "3"])]
+        )
+
+        mocker.patch(
+            "estate_value_index.pipelines.tasks.sync.get_bq_config",
+            return_value=MagicMock(
+                client=mock_client,
+                full_table_id="project.dataset.table",
+            ),
+        )
+
+        with pytest.raises(DataError, match="out of sync"):
+            verify_sync_task.fn(local_file=local_file)

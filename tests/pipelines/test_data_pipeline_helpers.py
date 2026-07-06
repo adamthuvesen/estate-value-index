@@ -50,23 +50,22 @@ def test_geocode_stage_is_skipped_without_bigquery_upload():
     geocode_task.assert_not_called()
 
 
-def test_geocode_stage_records_failure_without_raising():
+def test_geocode_stage_raises_failure():
     def fail_geocode(batch_size):
         raise RuntimeError(f"nope at {batch_size}")
 
-    result = data_pipeline._run_geocode_stage(
-        MagicMock(),
-        fail_geocode,
-        upload_to_bq=True,
-    )
-
-    assert result == {"error": "nope at 200", "success": False}
+    with pytest.raises(RuntimeError, match="nope at 200"):
+        data_pipeline._run_geocode_stage(
+            MagicMock(),
+            fail_geocode,
+            upload_to_bq=True,
+        )
 
 
 def test_sync_stage_attaches_verification_result():
     result = data_pipeline._run_sync_stage(
         MagicMock(),
-        lambda: {"success": True, "listings_count": 12},
+        lambda: {"success": True, "records_synced": 12},
         lambda: {"in_sync": True},
         sync_after_upload=True,
         upload_to_bq=True,
@@ -74,24 +73,23 @@ def test_sync_stage_attaches_verification_result():
 
     assert result == {
         "success": True,
-        "listings_count": 12,
+        "records_synced": 12,
         "verification": {"in_sync": True},
     }
 
 
-def test_sync_stage_records_failure_without_raising():
+def test_sync_stage_raises_failure():
     def fail_sync():
         raise RuntimeError("sync failed")
 
-    result = data_pipeline._run_sync_stage(
-        MagicMock(),
-        fail_sync,
-        lambda: {"in_sync": True},
-        sync_after_upload=True,
-        upload_to_bq=True,
-    )
-
-    assert result == {"error": "sync failed", "success": False}
+    with pytest.raises(RuntimeError, match="sync failed"):
+        data_pipeline._run_sync_stage(
+            MagicMock(),
+            fail_sync,
+            lambda: {"in_sync": True},
+            sync_after_upload=True,
+            upload_to_bq=True,
+        )
 
 
 def test_run_scrapy_spider_fails_when_booli_returns_403_in_log_file(tmp_path, monkeypatch):
@@ -113,7 +111,7 @@ def test_run_scrapy_spider_fails_when_booli_returns_403_in_log_file(tmp_path, mo
         data_pipeline.run_scrapy_spider.fn(max_pages=1, output_file=output_file)
 
 
-def test_run_scrapy_spider_allows_empty_output_without_block_signal(tmp_path, monkeypatch):
+def test_run_scrapy_spider_fails_on_empty_output(tmp_path, monkeypatch):
     output_file = tmp_path / "empty.jsonl"
 
     def fake_run(cmd, **kwargs):
@@ -122,4 +120,27 @@ def test_run_scrapy_spider_allows_empty_output_without_block_signal(tmp_path, mo
 
     monkeypatch.setattr(data_pipeline.subprocess, "run", fake_run)
 
-    assert data_pipeline.run_scrapy_spider.fn(max_pages=1, output_file=output_file) == output_file
+    with pytest.raises(RuntimeError, match="zero listings"):
+        data_pipeline.run_scrapy_spider.fn(max_pages=1, output_file=output_file)
+
+
+def test_validate_listings_fails_below_threshold(tmp_path):
+    output_file = tmp_path / "mixed.jsonl"
+    output_file.write_text(
+        '{"listing_id": "1", "sold_price": 1, "living_area": 40, "area": "A"}\n'
+        '{"listing_id": "2", "sold_price": null, "living_area": 50, "area": "B"}\n',
+        encoding="utf-8",
+    )
+
+    with pytest.raises(RuntimeError, match="validation rate"):
+        data_pipeline.validate_listings.fn(output_file, min_validation_rate=0.75)
+
+
+def test_validation_summary_treats_blank_required_strings_as_missing():
+    summary = data_pipeline._validation_summary(
+        [{"listing_id": " ", "sold_price": 1, "living_area": 40, "area": "A"}],
+        ["listing_id", "sold_price", "living_area", "area"],
+    )
+
+    assert summary["valid_listings"] == 0
+    assert summary["missing_fields"] == ["listing_id"]

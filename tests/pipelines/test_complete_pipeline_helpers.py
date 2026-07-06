@@ -40,14 +40,19 @@ def test_data_collection_stage_uses_empty_config_and_dry_run_flags(monkeypatch):
     assert results["stages"]["data_collection"]["processing"]["total_listings"] == 10
 
 
-def test_sync_stage_records_failure_without_raising(monkeypatch):
+def test_sync_stage_records_failure_and_raises(monkeypatch):
     def fail_sync():
         raise RuntimeError("sync exploded")
 
     monkeypatch.setattr(pipeline, "sync_bigquery_to_local_task", fail_sync)
     results = {"stages": {}}
 
-    pipeline._run_sync_stage(MagicMock(), results, dry_run=False)
+    try:
+        pipeline._run_sync_stage(MagicMock(), results, dry_run=False)
+    except RuntimeError as exc:
+        assert str(exc) == "sync exploded"
+    else:  # pragma: no cover - defensive assertion
+        raise AssertionError("sync failure should raise")
 
     assert results["stages"]["sync"] == {"error": "sync exploded", "success": False}
 

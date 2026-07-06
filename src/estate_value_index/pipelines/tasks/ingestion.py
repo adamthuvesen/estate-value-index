@@ -15,6 +15,13 @@ from estate_value_index.utils.bigquery_safety import quote_identifier, safe_tabl
 from estate_value_index.utils.clients import get_bq_client
 
 
+def _clean_listing_id(value) -> str:
+    listing_id = "" if value is None else str(value).strip()
+    if not listing_id or listing_id.lower() == "none":
+        raise ValueError("listing_id is required and cannot be blank before BigQuery upload")
+    return listing_id
+
+
 class GeocodeResult(TypedDict):
     """Result from geocoding task."""
 
@@ -120,11 +127,11 @@ def _load_unique_bq_rows(processed_file: Path, prepare_bq_row) -> list[dict]:
             if not line:
                 continue
             raw_listing = json.loads(line)
-            listing_id = raw_listing.get("listing_id")
+            listing_id = _clean_listing_id(raw_listing.get("listing_id"))
             if listing_id in seen_ids:
                 continue
-            if listing_id:
-                seen_ids.add(listing_id)
+            seen_ids.add(listing_id)
+            raw_listing["listing_id"] = listing_id
             listings.append(prepare_bq_row(raw_listing))
 
     return listings
@@ -435,7 +442,7 @@ def geocode_new_addresses_task(
 
         errors = client.insert_rows_json(geocodes_table, new_geocodes)
         if errors:
-            logger.error(f"BigQuery insert errors: {errors[:3]}")
+            raise RuntimeError(f"BigQuery geocode insert errors: {errors[:3]}")
         else:
             logger.info(f"Uploaded {len(new_geocodes)} geocodes")
 

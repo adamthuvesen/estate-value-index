@@ -120,6 +120,13 @@ def get_max_pages() -> int:
     return get_scraping_config().get("default_max_pages", 10)
 
 
+def get_min_scrape_validation_rate() -> float:
+    env_rate = os.getenv("SCRAPER_MIN_VALIDATION_RATE")
+    if env_rate:
+        return float(env_rate)
+    return float(get_scraping_config().get("min_validation_rate", 0.5))
+
+
 def is_debug() -> bool:
     return os.getenv("DEBUG", "false").lower() in _TRUTHY
 

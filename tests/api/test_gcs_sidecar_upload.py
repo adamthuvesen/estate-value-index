@@ -63,6 +63,9 @@ class _FakeGCSClient:
         blob.upload_from_filename(str(local_path))
         return f"gs://{self.bucket_name}/{gcs_path}"
 
+    def exists(self, gcs_path: str) -> bool:
+        return (self._base / gcs_path).exists()
+
 
 @pytest.fixture
 def fake_model_dir(tmp_path: Path) -> Path:
@@ -130,8 +133,8 @@ def test_sidecar_upload_failure_rolls_back_artefact(
     monkeypatch.setattr(gcs_module, "is_gcs_enabled", lambda: True)
     monkeypatch.setattr(gcs_module, "GCSClient", lambda *a, **kw: fake_client)
 
-    # The helper currently swallows GCS exceptions and returns {} on failure.
-    result = gcs_module.upload_model_artifacts(fake_model_dir, "price_prediction_model_no_list_price")
+    with pytest.raises(RuntimeError, match="GCS model artifact upload failed"):
+        gcs_module.upload_model_artifacts(fake_model_dir, "price_prediction_model_no_list_price")
 
     uploaded_joblib = bucket_dir / "models" / "price_prediction_model_no_list_price.joblib"
     uploaded_sidecar = bucket_dir / "models" / "price_prediction_model_no_list_price.joblib.sha256"
@@ -140,9 +143,31 @@ def test_sidecar_upload_failure_rolls_back_artefact(
         "partial joblib upload must be rolled back when the sidecar fails"
     )
     assert not uploaded_sidecar.exists()
-    # Caller-visible: failure produces an empty mapping; no half-uploaded model leaks.
-    assert "model" not in result
-    assert "model_sha256" not in result
+
+
+def test_upload_missing_model_raises(tmp_path: Path, monkeypatch) -> None:
+    model_dir = tmp_path / "models"
+    model_dir.mkdir()
+
+    monkeypatch.setattr(gcs_module, "is_gcs_enabled", lambda: True)
+    monkeypatch.setattr(gcs_module, "GCSClient", lambda *a, **kw: _FakeGCSClient(tmp_path / "bucket"))
+
+    with pytest.raises(RuntimeError, match="GCS model artifact upload failed"):
+        gcs_module.upload_model_artifacts(model_dir, "price_prediction_model_no_list_price")
+
+
+def test_resolve_data_path_does_not_fallback_to_local_when_gcs_enabled(
+    tmp_path: Path, monkeypatch
+) -> None:
+    local_file = tmp_path / "stale.json"
+    local_file.write_text("{}", encoding="utf-8")
+    fake_client = _FakeGCSClient(tmp_path / "bucket")
+
+    monkeypatch.setattr(gcs_module, "is_gcs_enabled", lambda: True)
+    monkeypatch.setattr(gcs_module, "GCSClient", lambda *a, **kw: fake_client)
+
+    with pytest.raises(FileNotFoundError, match="File not found in GCS"):
+        gcs_module.resolve_data_path(local_file, "missing/stale.json")
 
 
 def test_compute_sha256_matches_hashlib(tmp_path: Path) -> None:

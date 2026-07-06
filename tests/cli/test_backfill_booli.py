@@ -52,6 +52,27 @@ def test_write_window_config_updates_sold_date_parameters(tmp_path: Path) -> Non
     }
 
 
+def test_write_window_config_rejects_missing_base_config(tmp_path: Path) -> None:
+    with pytest.raises(FileNotFoundError, match="Booli base config not found"):
+        write_window_config(
+            tmp_path / "missing.json",
+            tmp_path / "config.json",
+            DateWindow(date(2026, 1, 1), date(2026, 1, 7)),
+        )
+
+
+def test_write_window_config_rejects_invalid_json(tmp_path: Path) -> None:
+    base_config = tmp_path / "base.json"
+    base_config.write_text("{not-json", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Invalid Booli base config JSON"):
+        write_window_config(
+            base_config,
+            tmp_path / "config.json",
+            DateWindow(date(2026, 1, 1), date(2026, 1, 7)),
+        )
+
+
 def test_merge_deduped_jsonl_keeps_first_listing_id(tmp_path: Path) -> None:
     first = tmp_path / "listings_2026-01-01.jsonl"
     second = tmp_path / "listings_2026-01-08.jsonl"
@@ -99,6 +120,19 @@ def test_validate_jsonl_file_reports_valid_rate(tmp_path: Path) -> None:
     assert summary["validation_rate"] == pytest.approx(1 / 3)
     assert summary["missing_fields"] == ["sold_price"]
     assert summary["invalid_json"] == 1
+
+
+def test_validate_jsonl_file_treats_blank_listing_id_as_missing(tmp_path: Path) -> None:
+    listings = tmp_path / "listings.jsonl"
+    listings.write_text(
+        '{"listing_id": " ", "sold_price": 1000000, "living_area": 55, "area": "Solna"}\n',
+        encoding="utf-8",
+    )
+
+    summary = validate_jsonl_file(listings)
+
+    assert summary["valid_listings"] == 0
+    assert summary["missing_fields"] == ["listing_id"]
 
 
 def test_run_backfill_dry_run_does_not_read_config(tmp_path: Path) -> None:
@@ -211,6 +245,31 @@ def test_run_backfill_fails_after_low_validation_retry(tmp_path: Path) -> None:
             dry_run=False,
             max_window_retries=1,
             min_validation_rate=0.5,
+            scrape=scrape,
+        )
+
+
+def test_run_backfill_fails_on_zero_scraped_rows(tmp_path: Path) -> None:
+    base_config = tmp_path / "base.json"
+    base_config.write_text(json.dumps({"search_parameters": {}}), encoding="utf-8")
+
+    def scrape(**kwargs) -> Path:
+        output_file = Path(kwargs["output_file"])
+        output_file.write_text("", encoding="utf-8")
+        return output_file
+
+    with pytest.raises(RuntimeError, match="zero scraped rows"):
+        run_backfill(
+            base_config_file=base_config,
+            output_dir=tmp_path / "backfill",
+            start_date=date(2026, 1, 1),
+            end_date=date(2026, 1, 1),
+            window_days=1,
+            max_pages=20,
+            concurrent_requests=2,
+            delay=0.5,
+            dry_run=False,
+            max_window_retries=0,
             scrape=scrape,
         )
 

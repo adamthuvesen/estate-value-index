@@ -25,6 +25,13 @@ from estate_value_index.utils.settings import bq_table, get_batch_size, load_env
 logger = logging.getLogger(__name__)
 
 
+def _clean_listing_id(value: Any) -> str:
+    listing_id = "" if value is None else str(value).strip()
+    if not listing_id or listing_id.lower() == "none":
+        raise ValueError("listing_id is required and cannot be blank")
+    return listing_id
+
+
 def prepare_bq_row(item: dict[str, Any]) -> dict[str, Any]:
     """Convert JSONL item to BigQuery-compatible row."""
     # Extract scraped_at timestamp
@@ -54,7 +61,7 @@ def prepare_bq_row(item: dict[str, Any]) -> dict[str, Any]:
             return None
 
     bq_row = {
-        "listing_id": str(item.get("listing_id")),
+        "listing_id": _clean_listing_id(item.get("listing_id")),
         "url": item.get("url"),
         "scraped_at": scraped_at.isoformat(),
         "scraped_at_date": scraped_at.date().isoformat(),
@@ -102,16 +109,14 @@ def _prepare_rows(listings: list[dict[str, Any]]) -> list[dict[str, Any]]:
     duplicates_skipped = 0
 
     for item in listings:
+        listing_id = _clean_listing_id(item.get("listing_id"))
+        if listing_id in seen_ids:
+            duplicates_skipped += 1
+            continue
+
+        seen_ids.add(listing_id)
+
         try:
-            listing_id = item.get("listing_id")
-
-            if listing_id in seen_ids:
-                duplicates_skipped += 1
-                continue
-
-            if listing_id:
-                seen_ids.add(listing_id)
-
             bq_row = prepare_bq_row(item)
             bq_rows.append(bq_row)
         except Exception as e:

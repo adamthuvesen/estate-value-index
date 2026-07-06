@@ -13,6 +13,7 @@ from prefect import flow, get_run_logger, task
 
 from estate_value_index.pipelines.utils import get_task_logger
 from estate_value_index.utils.gcs import GCSClient, is_gcs_enabled
+from estate_value_index.utils.settings import get_min_scrape_validation_rate
 
 
 def _blocked_status_from_scrapy_output(output: str) -> str | None:
@@ -137,6 +138,9 @@ def run_scrapy_spider(
     with open(output_file) as f:
         listing_count = sum(1 for line in f if line.strip())
 
+    if listing_count == 0:
+        raise RuntimeError(f"Scrapy spider produced zero listings: {output_file}")
+
     logger.info(f"Scraped {listing_count} listings to {output_file}")
     return output_file
 
@@ -166,7 +170,13 @@ def _load_listing_records(file_path: Path, logger) -> list[dict]:
 
 
 def _missing_required_fields(item: dict, required_fields: list[str]) -> list[str]:
-    return [field for field in required_fields if field not in item or item[field] is None]
+    return [
+        field
+        for field in required_fields
+        if field not in item
+        or item[field] is None
+        or (isinstance(item[field], str) and not item[field].strip())
+    ]
 
 
 def _validation_summary(data: list[dict], required_fields: list[str]) -> dict:
@@ -186,12 +196,12 @@ def _validation_summary(data: list[dict], required_fields: list[str]) -> dict:
         "valid_listings": valid,
         "invalid_listings": total - valid,
         "validation_rate": valid / total if total > 0 else 0,
-        "missing_fields": list(missing_fields),
+        "missing_fields": sorted(missing_fields),
     }
 
 
 @task(name="validate-listings-data")
-def validate_listings(file_path: Path) -> dict:
+def validate_listings(file_path: Path, min_validation_rate: float | None = None) -> dict:
     """Validate scraped listings data.
 
     Args:
@@ -200,11 +210,14 @@ def validate_listings(file_path: Path) -> dict:
     Returns:
         Validation results dict
     """
-    logger = get_run_logger()
+    logger = get_task_logger(__name__)
     logger.info(f"Validating listings from {file_path}")
 
     data = _load_listing_records(file_path, logger)
     required_fields = ["listing_id", "sold_price", "living_area", "area"]
+    min_validation_rate = (
+        get_min_scrape_validation_rate() if min_validation_rate is None else min_validation_rate
+    )
     validation_result = _validation_summary(data, required_fields)
 
     logger.info(
@@ -214,8 +227,15 @@ def validate_listings(file_path: Path) -> dict:
         validation_result["validation_rate"] * 100,
     )
 
-    if validation_result["validation_rate"] < 0.5:
-        logger.warning(f"Low validation rate: {validation_result['validation_rate']:.1%}")
+    if validation_result["total_listings"] == 0:
+        raise RuntimeError(f"Scrape produced zero listings: {file_path}")
+
+    if validation_result["validation_rate"] < min_validation_rate:
+        raise RuntimeError(
+            "Scrape validation rate "
+            f"{validation_result['validation_rate']:.1%} is below "
+            f"{min_validation_rate:.1%}"
+        )
 
     return validation_result
 
@@ -336,18 +356,14 @@ def _run_geocode_stage(logger, geocode_new_addresses_task, *, upload_to_bq: bool
         return None
 
     logger.info("Stage 3.5: Geocoding new addresses")
-    try:
-        geocode_result = geocode_new_addresses_task(batch_size=200)
-        if geocode_result["new_addresses"] > 0:
-            logger.info(
-                f"   Geocoded {geocode_result['geocoded']}/{geocode_result['new_addresses']} new addresses"
-            )
-        else:
-            logger.info("   No new addresses to geocode")
-        return geocode_result
-    except Exception as e:
-        logger.warning(f"Geocoding failed but continuing: {e}")
-        return {"error": str(e), "success": False}
+    geocode_result = geocode_new_addresses_task(batch_size=200)
+    if geocode_result["new_addresses"] > 0:
+        logger.info(
+            f"   Geocoded {geocode_result['geocoded']}/{geocode_result['new_addresses']} new addresses"
+        )
+    else:
+        logger.info("   No new addresses to geocode")
+    return geocode_result
 
 
 def _run_feature_materialization_stage(
@@ -376,18 +392,17 @@ def _run_sync_stage(
         return None
 
     logger.info("Stage 5: Syncing local file from BigQuery")
-    try:
-        sync_result = sync_bigquery_to_local_task()
-        verify_result = verify_sync_task()
+    sync_result = sync_bigquery_to_local_task()
+    verify_result = verify_sync_task()
 
-        logger.info(f"Sync complete: {sync_result.get('listings_count', 0)} listings")
-        logger.info(f"   In sync: {verify_result.get('in_sync', False)}")
+    if not verify_result.get("in_sync", False):
+        raise RuntimeError(f"Sync verification failed: {verify_result}")
 
-        sync_result["verification"] = verify_result
-        return sync_result
-    except Exception as e:
-        logger.warning(f"Sync failed but continuing: {e}")
-        return {"error": str(e), "success": False}
+    logger.info(f"Sync complete: {sync_result.get('records_synced', 0)} listings")
+    logger.info(f"   In sync: {verify_result.get('in_sync', False)}")
+
+    sync_result["verification"] = verify_result
+    return sync_result
 
 
 def _run_gcs_backup_stage(logger, process_result: dict, *, upload_to_cloud: bool) -> str | None:
@@ -435,13 +450,13 @@ def _log_complete_scrape_summary(
     logger.info(f"   Scraped: {validation_results['valid_listings']} valid listings")
     logger.info(f"   Processed: {process_result.get('total_listings', 0)} total listings")
     if bq_result:
-        logger.info(f"   BigQuery: {bq_result.get('uploaded', 0)} rows uploaded")
+        logger.info(f"   BigQuery: {bq_result.get('rows_uploaded', 0)} rows uploaded")
     if geocode_result and geocode_result.get("success"):
         logger.info(f"   Geocoded: {geocode_result.get('geocoded', 0)} new addresses")
     if feature_result:
         logger.info(f"   Features: {feature_result.get('row_count', 0)} rows materialized")
     if sync_result and sync_result.get("success"):
-        logger.info(f"   Synced: {sync_result.get('listings_count', 0)} listings to local file")
+        logger.info(f"   Synced: {sync_result.get('records_synced', 0)} listings to local file")
         if sync_result.get("verification"):
             logger.info(f"   Verified: {sync_result['verification'].get('in_sync', False)}")
 

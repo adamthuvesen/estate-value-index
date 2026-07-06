@@ -1,5 +1,6 @@
 """Tasks for syncing data between BigQuery, local storage, and GCS."""
 
+import hashlib
 import json
 from datetime import datetime
 from pathlib import Path
@@ -10,6 +11,62 @@ from prefect import task
 from estate_value_index.exceptions import DataError
 from estate_value_index.pipelines.types import SyncResult
 from estate_value_index.pipelines.utils import get_bq_config, get_task_logger
+
+
+def _normalize_scalar(value: Any) -> Any:
+    if hasattr(value, "isoformat"):
+        return value.isoformat()
+    return value
+
+
+def _listing_id_checksum(listing_ids: list[str]) -> str:
+    joined = "\n".join(sorted(listing_ids))
+    return hashlib.sha256(joined.encode("utf-8")).hexdigest()
+
+
+def _local_sync_summary(local_file: Path) -> dict[str, Any]:
+    listings: list[dict[str, Any]] = []
+    with open(local_file, encoding="utf-8") as f:
+        for line in f:
+            if not line.strip():
+                continue
+            listings.append(json.loads(line))
+
+    listing_ids = [
+        str(listing["listing_id"]).strip()
+        for listing in listings
+        if str(listing.get("listing_id", "")).strip()
+    ]
+    dates = [
+        str(date_value)
+        for listing in listings
+        if (date_value := listing.get("sold_date") or listing.get("scraped_at"))
+    ]
+
+    return {
+        "count": len(listings),
+        "listing_id_count": len(set(listing_ids)),
+        "listing_id_checksum": _listing_id_checksum(listing_ids),
+        "max_record_date": max(dates) if dates else None,
+    }
+
+
+def _bigquery_sync_summary(client, table_ref: str) -> dict[str, Any]:
+    query = f"""
+    SELECT
+      COUNT(*) AS count,
+      COUNT(DISTINCT listing_id) AS listing_id_count,
+      LOWER(TO_HEX(SHA256(COALESCE(
+        STRING_AGG(CAST(listing_id AS STRING), '\\n' ORDER BY CAST(listing_id AS STRING)),
+        ''
+      )))) AS listing_id_checksum,
+      CAST(MAX(COALESCE(CAST(sold_date AS STRING), CAST(scraped_at AS STRING))) AS STRING)
+        AS max_record_date
+    FROM `{table_ref}`
+    """
+    row = list(client.query(query).result())[0]
+    keys = ("count", "listing_id_count", "listing_id_checksum", "max_record_date")
+    return {key: _normalize_scalar(row[key]) for key in keys}
 
 
 @task(
@@ -180,7 +237,7 @@ def verify_sync_task(
     dataset_id: str | None = None,
     table_id: str | None = None,
 ) -> dict:
-    """Verify that local file and BigQuery have the same number of records.
+    """Verify that local file and BigQuery contain the same listing set.
 
     Args:
         local_file: Local file to verify
@@ -203,27 +260,27 @@ def verify_sync_task(
 
     logger.info(f"Verifying sync between {local_file} and {table_ref}")
 
-    # Count local records
-    with open(local_file, encoding="utf-8") as f:
-        local_count = sum(1 for line in f if line.strip())
+    local_summary = _local_sync_summary(local_file)
+    bq_summary = _bigquery_sync_summary(client, table_ref)
 
-    # Count BigQuery records
-    query = f"SELECT COUNT(*) as count FROM `{table_ref}`"
-    bq_count = list(client.query(query).result())[0]["count"]
-
-    in_sync = local_count == bq_count
-    difference = abs(local_count - bq_count)
+    in_sync = local_summary == bq_summary
+    difference = abs(int(local_summary["count"]) - int(bq_summary["count"]))
 
     if in_sync:
-        logger.info(f"Files are in sync: {local_count} listings")
+        logger.info(f"Files are in sync: {local_summary['count']} listings")
     else:
-        logger.warning(f"OUT OF SYNC: local={local_count}, BigQuery={bq_count} (diff={difference})")
+        raise DataError(
+            "Local file and BigQuery are out of sync",
+            context={"local": local_summary, "bigquery": bq_summary, "difference": difference},
+        )
 
     return {
         "success": True,
         "in_sync": in_sync,
-        "local_count": local_count,
-        "bigquery_count": bq_count,
+        "local_count": local_summary["count"],
+        "bigquery_count": bq_summary["count"],
         "difference": difference,
+        "local_summary": local_summary,
+        "bigquery_summary": bq_summary,
         "timestamp": datetime.now().isoformat(),
     }
