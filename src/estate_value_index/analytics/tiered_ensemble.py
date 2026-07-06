@@ -420,7 +420,15 @@ def _build_oof_training_data(
     n_splits: int,
     random_state: int,
     tier_specs: tuple[TierSpec, ...],
+    include_calibration_features: bool = False,
 ) -> pd.DataFrame:
+    """Build out-of-fold expert predictions via a forward-chaining time split.
+
+    With ``include_calibration_features`` the engineered valid-fold columns are
+    carried alongside the predictions, so a residual calibrator can be trained on
+    genuinely out-of-fold rows (each valid fold is scored by models that never saw
+    it). The default return shape is unchanged so blend selection stays untouched.
+    """
     sorted_train = train_raw.sort_values("sold_date").reset_index(drop=True)
     splitter = TimeSeriesSplit(n_splits=n_splits)
     rows = []
@@ -445,14 +453,19 @@ def _build_oof_training_data(
             fallback_predictions=normalized_fit.predictions,
         )
         fold_frame = prepared.test_engineered.reset_index(drop=True)
-        fold_rows = pd.DataFrame(
-            {
-                "fold": fold,
-                "actual_price": fold_frame["sold_price"],
-                "base_prediction": base_fit.predictions,
-                "normalized_prediction": normalized_fit.predictions,
-            }
-        )
+        if include_calibration_features:
+            fold_rows = fold_frame.copy()
+            fold_rows["fold"] = fold
+            fold_rows["actual_price"] = fold_frame["sold_price"].to_numpy()
+        else:
+            fold_rows = pd.DataFrame(
+                {
+                    "fold": fold,
+                    "actual_price": fold_frame["sold_price"],
+                }
+            )
+        fold_rows["base_prediction"] = base_fit.predictions
+        fold_rows["normalized_prediction"] = normalized_fit.predictions
         for spec in tier_specs:
             fold_rows[f"{spec.name}_prediction"] = tier_fit.predictions[spec.name]
         rows.append(fold_rows)

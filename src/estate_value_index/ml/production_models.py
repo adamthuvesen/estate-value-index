@@ -27,10 +27,14 @@ from estate_value_index.analytics.market_normalized_target import (
     select_best_market_blend_weight,
 )
 from estate_value_index.analytics.residual_calibration import (
+    CENTRAL_AREAS,
     _feature_set_requires_listing_price,
+    _fit_residual_calibrator,
     _prediction_metrics,
     _resolve_features,
     _train_lgbm,
+    apply_calibration_correction,
+    build_calibration_features,
 )
 from estate_value_index.analytics.tiered_ensemble import (
     DEFAULT_GATE_HIGH_MIN,
@@ -41,6 +45,7 @@ from estate_value_index.analytics.tiered_ensemble import (
     DEFAULT_MID_MIN_PRICE,
     DEFAULT_MIN_SEGMENT_ROWS,
     DEFAULT_WEIGHT_STEP,
+    HIGH_END_REPORT_PRICE,
     MODEL_NAMES,
     TierSpec,
     _build_oof_training_data,
@@ -77,6 +82,15 @@ DEFAULT_NO_LIST_FEATURE_SET = "no_list_price_h3_market_street_rfe25"
 DEFAULT_LISTING_FEATURE_SET = "listing_price_h3_market_street_aligned30"
 ASK_PRICE_COLUMNS = ("listing_price", "price_per_sqm", "relative_area_price", "price_change")
 
+# Residual calibration is applied only to the no_list model, and only to high
+# predictions where the tiered model still underpredicts. Offline proof showed
+# global calibration worsened aggregate bias by nudging the well-calibrated
+# mid-market down; restricting to the tail improves MAE, bias, and the high-end
+# at once. See analytics/production_residual_calibration.py.
+DEFAULT_CALIBRATION_MAX_ABS = 1_000_000.0
+DEFAULT_CALIBRATION_MAX_FRAC = 0.12
+DEFAULT_CALIBRATION_MIN_PREDICTION = 8_000_000.0
+
 
 @dataclass(frozen=True)
 class ProductionModelSpec:
@@ -112,12 +126,16 @@ class TieredProductionModel:
     fallback_weights: dict[str, float]
     gate_low_max: float = DEFAULT_GATE_LOW_MAX
     gate_high_min: float = DEFAULT_GATE_HIGH_MIN
+    residual_calibrator: Any | None = None
+    calibration_max_abs: float = DEFAULT_CALIBRATION_MAX_ABS
+    calibration_max_frac: float = DEFAULT_CALIBRATION_MAX_FRAC
+    calibration_min_prediction: float = DEFAULT_CALIBRATION_MIN_PREDICTION
 
     @property
     def model_type(self) -> str:
         return "tiered_max"
 
-    def predict(self, X_raw: pd.DataFrame) -> np.ndarray:
+    def predict(self, X_raw: pd.DataFrame, *, apply_calibration: bool = True) -> np.ndarray:
         raw = _prepare_raw_for_model(X_raw, requires_listing_price=self.requires_listing_price)
         engineered = create_optimized_features(raw, context=self.context)
         X = _feature_matrix(
@@ -164,11 +182,34 @@ class TieredProductionModel:
             low_max=self.gate_low_max,
             high_min=self.gate_high_min,
         )
-        return apply_gated_expert_blend(
+        gated_predictions = apply_gated_expert_blend(
             expert_predictions,
             gate,
             self.gated_weights_by_gate,
             fallback_weights=self.fallback_weights,
+        )
+        if apply_calibration:
+            return self._apply_calibration(engineered, gated_predictions)
+        return gated_predictions
+
+    def _apply_calibration(
+        self,
+        engineered: pd.DataFrame,
+        gated_predictions: np.ndarray,
+    ) -> np.ndarray:
+        # getattr guards models serialized before calibration fields existed.
+        calibrator = getattr(self, "residual_calibrator", None)
+        if calibrator is None or self.model_id != NO_LIST_MODEL_ID:
+            return gated_predictions
+        correction = calibrator.predict(build_calibration_features(engineered, gated_predictions))
+        return apply_calibration_correction(
+            gated_predictions,
+            correction,
+            max_abs=getattr(self, "calibration_max_abs", DEFAULT_CALIBRATION_MAX_ABS),
+            max_frac=getattr(self, "calibration_max_frac", DEFAULT_CALIBRATION_MAX_FRAC),
+            min_base_prediction=getattr(
+                self, "calibration_min_prediction", DEFAULT_CALIBRATION_MIN_PREDICTION
+            ),
         )
 
 
@@ -235,11 +276,11 @@ def train_and_persist_production_models(
             n_splits=n_splits,
             random_state=seed,
         )
-        predictions = evaluation_model.predict(test_raw.reset_index(drop=True))
-        heldout_metrics = _prediction_metrics(
-            test_raw["sold_price"].reset_index(drop=True),
-            predictions,
-        )
+        eval_test = test_raw.reset_index(drop=True)
+        y_test = eval_test["sold_price"]
+        predictions = evaluation_model.predict(eval_test)
+        heldout_metrics = _prediction_metrics(y_test, predictions)
+        calibration = _calibration_report(evaluation_model, eval_test, y_test, served=predictions)
 
         production_model = fit_tiered_production_model(
             filtered,
@@ -250,6 +291,7 @@ def train_and_persist_production_models(
         metrics = _metrics_payload(
             production_model,
             heldout_metrics=heldout_metrics,
+            calibration=calibration,
             train_rows=len(train_raw),
             test_rows=len(test_raw),
             production_rows=len(filtered),
@@ -352,9 +394,19 @@ def fit_tiered_production_model(
         tier_specs=tier_specs,
         random_state=random_state,
     )
-    blend = _select_blend(raw, spec.feature_set, n_splits, random_state, tier_specs, weight_step, min_segment_rows)
+    fit_calibrator = spec.model_id == NO_LIST_MODEL_ID
+    blend = _select_blend(
+        raw,
+        spec.feature_set,
+        n_splits,
+        random_state,
+        tier_specs,
+        weight_step,
+        min_segment_rows,
+        include_calibration_features=fit_calibrator,
+    )
 
-    return TieredProductionModel(
+    model = TieredProductionModel(
         model_id=spec.model_id,
         feature_set=spec.feature_set,
         requires_listing_price=spec.requires_listing_price,
@@ -374,6 +426,16 @@ def fit_tiered_production_model(
         gate_low_max=gate_low_max,
         gate_high_min=gate_high_min,
     )
+    if fit_calibrator:
+        # Calibrator uses the model's own selected blend weights, so it must be fit
+        # after the model exists. Trained on out-of-fold residuals only.
+        model.residual_calibrator = _fit_model_residual_calibrator(
+            model,
+            blend["oof"],
+            tier_specs,
+            random_state,
+        )
+    return model
 
 
 def persist_production_model(
@@ -419,6 +481,15 @@ def _prepare_raw_for_model(raw_frame: pd.DataFrame, *, requires_listing_price: b
         for column in ASK_PRICE_COLUMNS:
             raw[column] = np.nan
     return raw
+
+
+def _engineer_for_model(raw_frame: pd.DataFrame, model: TieredProductionModel) -> pd.DataFrame:
+    """Engineer rows the same way ``model.predict`` does, for offline calibration inputs."""
+    raw = _prepare_raw_for_model(
+        raw_frame.reset_index(drop=True),
+        requires_listing_price=model.requires_listing_price,
+    )
+    return create_optimized_features(raw, context=model.context)
 
 
 def _feature_matrix(
@@ -495,6 +566,7 @@ def _select_blend(
     tier_specs: tuple[TierSpec, ...],
     weight_step: float,
     min_segment_rows: int,
+    include_calibration_features: bool = False,
 ) -> dict[str, object]:
     oof = _build_oof_training_data(
         raw_frame,
@@ -502,6 +574,7 @@ def _select_blend(
         n_splits=n_splits,
         random_state=random_state,
         tier_specs=tier_specs,
+        include_calibration_features=include_calibration_features,
     )
     global_selection = select_best_market_blend_weight(
         oof["actual_price"].to_numpy(),
@@ -540,13 +613,59 @@ def _select_blend(
         "global": global_selection,
         "overall_ensemble": overall_selection,
         "gated_ensemble": gated_selection,
+        "oof": oof,
     }
+
+
+def _oof_final_blend(
+    model: TieredProductionModel,
+    oof: pd.DataFrame,
+    tier_specs: tuple[TierSpec, ...],
+) -> np.ndarray:
+    """Reproduce the model's gated-blend prediction on the out-of-fold rows."""
+    global_blend = blend_market_predictions(
+        oof["base_prediction"].to_numpy(dtype=float),
+        oof["normalized_prediction"].to_numpy(dtype=float),
+        normalized_weight=model.market_blend_weight,
+    )
+    expert_predictions = _prediction_frame(
+        global_predictions=global_blend,
+        tier_predictions={
+            spec.name: oof[f"{spec.name}_prediction"].to_numpy(dtype=float)
+            for spec in tier_specs
+        },
+    )
+    gate = prediction_tier_labels(
+        global_blend,
+        low_max=model.gate_low_max,
+        high_min=model.gate_high_min,
+    )
+    return apply_gated_expert_blend(
+        expert_predictions,
+        gate,
+        model.gated_weights_by_gate,
+        fallback_weights=model.fallback_weights,
+    )
+
+
+def _fit_model_residual_calibrator(
+    model: TieredProductionModel,
+    oof: pd.DataFrame,
+    tier_specs: tuple[TierSpec, ...],
+    random_state: int,
+):
+    """Fit a residual calibrator on genuinely out-of-fold gated-blend residuals."""
+    oof_final = _oof_final_blend(model, oof, tier_specs)
+    features = build_calibration_features(oof, oof_final)
+    features["residual"] = oof["actual_price"].to_numpy(dtype=float) - oof_final
+    return _fit_residual_calibrator(features, random_state=random_state)
 
 
 def _metrics_payload(
     model: TieredProductionModel,
     *,
     heldout_metrics: dict[str, float],
+    calibration: dict[str, object],
     train_rows: int,
     test_rows: int,
     production_rows: int,
@@ -558,6 +677,7 @@ def _metrics_payload(
         "model_type": model.model_type,
         "feature_set": model.feature_set,
         "requires_listing_price": model.requires_listing_price,
+        "served_prediction": calibration["served"],
         "mae": heldout_metrics["mae"],
         "rmse": heldout_metrics["rmse"],
         "mape": heldout_metrics["mape"],
@@ -566,6 +686,7 @@ def _metrics_payload(
         "numeric_features": model.numeric_features,
         "categorical_features": model.categorical_features,
         "heldout": heldout_metrics,
+        "calibration": calibration,
         "n_train": train_rows,
         "n_test": test_rows,
         "production_n_train": production_rows,
@@ -574,6 +695,87 @@ def _metrics_payload(
         "market_blend_weight": model.market_blend_weight,
         "overall_weights": model.overall_weights,
         "gated_weights_by_gate": model.gated_weights_by_gate,
+    }
+
+
+def _calibration_report(
+    model: TieredProductionModel,
+    test_raw: pd.DataFrame,
+    y_test: pd.Series,
+    *,
+    served: np.ndarray,
+) -> dict[str, object]:
+    """Compare calibrated vs uncalibrated heldout predictions for the served model.
+
+    Makes the served prediction explicit and records the acceptance-gate signals:
+    overall and high-end MAE/bias, underprediction rate, and the correction
+    distribution. ``listing`` (no calibrator) reports ``served="uncalibrated"``.
+    """
+    has_calibrator = (
+        getattr(model, "residual_calibrator", None) is not None
+        and model.model_id == NO_LIST_MODEL_ID
+    )
+    if not has_calibrator:
+        return {"served": "uncalibrated", "applied": False}
+
+    y = y_test.to_numpy(dtype=float)
+    calibrated = np.asarray(served, dtype=float)
+    uncalibrated = np.asarray(model.predict(test_raw, apply_calibration=False), dtype=float)
+    correction = calibrated - uncalibrated
+
+    high_end = y >= HIGH_END_REPORT_PRICE
+    central = test_raw.get("area")
+    central_high_end = (
+        high_end & central.astype("string").isin(CENTRAL_AREAS).to_numpy()
+        if central is not None
+        else np.zeros_like(high_end)
+    )
+    adjusted = np.abs(correction) > 1.0
+    cap = np.minimum(
+        model.calibration_max_abs,
+        model.calibration_max_frac * np.abs(uncalibrated),
+    )
+    at_cap = adjusted & np.isclose(np.abs(correction), cap, rtol=1e-3, atol=1.0)
+    adjusted_corrections = correction[adjusted]
+
+    return {
+        "served": "calibrated",
+        "applied": True,
+        "min_prediction_threshold": model.calibration_min_prediction,
+        "max_abs": model.calibration_max_abs,
+        "max_frac": model.calibration_max_frac,
+        "uncalibrated": _served_metrics(y, uncalibrated),
+        "calibrated": _served_metrics(y, calibrated),
+        "high_end_12m": {
+            "rows": int(high_end.sum()),
+            "uncalibrated": _served_metrics(y[high_end], uncalibrated[high_end]),
+            "calibrated": _served_metrics(y[high_end], calibrated[high_end]),
+        },
+        "central_high_end_12m": {
+            "rows": int(central_high_end.sum()),
+            "uncalibrated": _served_metrics(y[central_high_end], uncalibrated[central_high_end]),
+            "calibrated": _served_metrics(y[central_high_end], calibrated[central_high_end]),
+        },
+        "correction": {
+            "n_adjusted": int(adjusted.sum()),
+            "share_adjusted": float(adjusted.mean()),
+            "median": float(np.median(adjusted_corrections)) if adjusted.any() else 0.0,
+            "p90": float(np.quantile(np.abs(adjusted_corrections), 0.90)) if adjusted.any() else 0.0,
+            "p95": float(np.quantile(np.abs(adjusted_corrections), 0.95)) if adjusted.any() else 0.0,
+            "share_at_cap": float(at_cap.sum() / adjusted.sum()) if adjusted.any() else 0.0,
+        },
+    }
+
+
+def _served_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, float] | None:
+    if len(y_true) == 0:
+        return None
+    metrics = _prediction_metrics(pd.Series(y_true), y_pred)
+    return {
+        "mae": metrics["mae"],
+        "mean_bias": metrics["mean_bias"],
+        "median_bias": metrics["median_bias"],
+        "underprediction_rate": metrics["underprediction_rate"],
     }
 
 

@@ -167,6 +167,32 @@ def apply_residual_calibration(
     )
 
 
+def apply_calibration_correction(
+    base_predictions: np.ndarray,
+    correction: np.ndarray,
+    *,
+    max_abs: float = 1_000_000.0,
+    max_frac: float = 0.12,
+    min_base_prediction: float = 0.0,
+) -> np.ndarray:
+    """Apply a clipped residual correction, keeping predictions non-negative.
+
+    Each correction is limited to +/- ``max_abs`` SEK and to +/- ``max_frac`` of the
+    base prediction, whichever is tighter, so calibration can never swing a
+    prediction wildly. Corrections are only applied where the base prediction is at
+    least ``min_base_prediction`` (the tiered model is already well-calibrated in the
+    mid-market; the bias worth correcting sits in the high-end tail). The final
+    prediction is floored at zero.
+    """
+    base = np.asarray(base_predictions, dtype=float)
+    delta = np.asarray(correction, dtype=float)
+    cap = np.minimum(float(max_abs), float(max_frac) * np.abs(base))
+    clipped = np.clip(delta, -cap, cap)
+    if min_base_prediction > 0:
+        clipped = np.where(base >= float(min_base_prediction), clipped, 0.0)
+    return np.clip(base + clipped, 0, None)
+
+
 def _load_temporal_raw_split(
     data_file: Path | None,
     feature_set: str,
