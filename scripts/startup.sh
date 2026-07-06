@@ -72,23 +72,32 @@ if [ "${#joblib_files[@]}" -eq 0 ]; then
     exit 1
 fi
 
-missing_sidecars=()
+bad_sidecars=()
 for joblib_file in "${joblib_files[@]}"; do
-    if [ ! -f "${joblib_file}.sha256" ]; then
-        missing_sidecars+=("${joblib_file}")
+    sidecar="${joblib_file}.sha256"
+    if [ ! -f "${sidecar}" ]; then
+        bad_sidecars+=("${joblib_file##*/}: sidecar missing")
+        continue
+    fi
+    # Verify content, not just existence: a stale sidecar (e.g. a joblib promoted
+    # without its sidecar) otherwise boots into a no-models 503 loop.
+    expected="$(cut -d' ' -f1 <"${sidecar}")"
+    observed="$(sha256sum "${joblib_file}" | cut -d' ' -f1)"
+    if [ "${expected}" != "${observed}" ]; then
+        bad_sidecars+=("${joblib_file##*/}: sha256 mismatch (sidecar ${expected:0:12}..., file ${observed:0:12}...)")
     fi
 done
 
-if [ "${#missing_sidecars[@]}" -gt 0 ]; then
-    echo "FATAL: missing SHA256 sidecar(s) for required model artefact(s):" >&2
-    for missing in "${missing_sidecars[@]}"; do
-        echo "  - ${missing}.sha256" >&2
+if [ "${#bad_sidecars[@]}" -gt 0 ]; then
+    echo "FATAL: SHA256 sidecar problem(s) for required model artefact(s):" >&2
+    for bad in "${bad_sidecars[@]}"; do
+        echo "  - ${bad}" >&2
     done
     echo "Re-run the deployment upload step or roll back to a previous artefact." >&2
     exit 1
 fi
 
-echo "[STARTUP] Preflight OK: ${#joblib_files[@]} model artefact(s) with matching sidecars"
+echo "[STARTUP] Preflight OK: ${#joblib_files[@]} model artefact(s) with verified sidecars"
 echo "[STARTUP] Data download complete, starting services..."
 
 # Start supervisor to run Next.js and FastAPI.
