@@ -683,6 +683,7 @@ def _metrics_payload(
         "mape": heldout_metrics["mape"],
         "median_ape": heldout_metrics["median_ape"],
         "within_10_pct": heldout_metrics["within_10_pct"],
+        "within_20_pct": heldout_metrics["within_20_pct"],
         "features_used": model.numeric_features + model.categorical_features,
         "numeric_features": model.numeric_features,
         "categorical_features": model.categorical_features,
@@ -774,6 +775,9 @@ def _served_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, float] 
     metrics = _prediction_metrics(pd.Series(y_true), y_pred)
     return {
         "mae": metrics["mae"],
+        "median_ape": metrics["median_ape"],
+        "within_10_pct": metrics["within_10_pct"],
+        "within_20_pct": metrics["within_20_pct"],
         "mean_bias": metrics["mean_bias"],
         "median_bias": metrics["median_bias"],
         "underprediction_rate": metrics["underprediction_rate"],

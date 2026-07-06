@@ -461,7 +461,9 @@ def _prediction_metrics(y_true: pd.Series, y_pred: np.ndarray) -> dict[str, floa
         # Median absolute % error — the AVM-standard headline metric (what Zillow
         # reports). Robust to the fat right tail that inflates the mean-based mape.
         "median_ape": float(abs_pct.median()),
+        # PPE10 / PPE20 — hit-rate within 10% / 20%, reported alongside MdAPE.
         "within_10_pct": float((abs_pct <= 0.10).mean() * 100),
+        "within_20_pct": float((abs_pct <= 0.20).mean() * 100),
         "mean_bias": float(error.mean()),
         "median_bias": float(error.median()),
         "underprediction_rate": float((error < 0).mean() * 100),
@@ -479,7 +481,9 @@ def _metric_delta(
         "mae": calibrated["mae"] - base["mae"],
         "rmse": calibrated["rmse"] - base["rmse"],
         "mape": calibrated["mape"] - base["mape"],
+        "median_ape": calibrated["median_ape"] - base["median_ape"],
         "within_10_pct": calibrated["within_10_pct"] - base["within_10_pct"],
+        "within_20_pct": calibrated["within_20_pct"] - base["within_20_pct"],
         "mean_bias": calibrated["mean_bias"] - base["mean_bias"],
         "underprediction_rate": calibrated["underprediction_rate"]
         - base["underprediction_rate"],

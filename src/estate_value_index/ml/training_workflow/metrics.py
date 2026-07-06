@@ -14,6 +14,7 @@ def regression_metrics(y_true: pd.Series, y_pred: np.ndarray) -> dict[str, float
     mape = mean_absolute_percentage_error(y_true, y_pred)
     absolute_pct_error = np.abs((np.asarray(y_pred) - y_true.to_numpy()) / y_true.to_numpy())
     within_10_pct = np.mean(absolute_pct_error <= 0.10) * 100
+    within_20_pct = np.mean(absolute_pct_error <= 0.20) * 100
     return {
         "mae": float(mae),
         "rmse": float(rmse),
@@ -21,7 +22,9 @@ def regression_metrics(y_true: pd.Series, y_pred: np.ndarray) -> dict[str, float
         # Median absolute % error — the AVM-standard headline metric (what Zillow
         # reports). Robust to the fat right tail that inflates the mean-based mape.
         "median_ape": float(np.median(absolute_pct_error)),
+        # PPE10 / PPE20 — hit-rate within 10% / 20%, reported alongside MdAPE.
         "within_10_pct": float(within_10_pct),
+        "within_20_pct": float(within_20_pct),
     }
 
 
