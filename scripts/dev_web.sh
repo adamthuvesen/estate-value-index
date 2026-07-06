@@ -20,7 +20,7 @@ cd "$(dirname "$0")/.."
 DATA_FILE="${WEB_DATA_FILE:-data/raw/booli/booli_listings_prod.json}"
 API_PORT="${API_PORT:-8000}"
 WEB_PORT="${WEB_PORT:-3000}"
-MODEL="web/models/price_prediction_model_no_list.joblib"
+MODEL="web/models/price_prediction_model_no_list_price.joblib"
 VALUE_JSON="data/derived/value_analysis.json"
 AREA_JSON="data/derived/area_statistics.json"
 
@@ -54,7 +54,7 @@ fi
 if ! $skip_data && { $refresh || [[ ! -f "$VALUE_JSON" ]] || [[ ! -f "$AREA_JSON" ]]; }; then
   echo ">> regenerating derived data from $DATA_FILE + web/models ..."
   uv run python -m estate_value_index.cli value-analysis \
-    --data-file "$DATA_FILE" --models-dir web/models --model-type no_list \
+    --data-file "$DATA_FILE" --models-dir web/models --model-type no_list_price \
     --output "$VALUE_JSON"
   uv run python -m estate_value_index.cli areas \
     --data-source json --raw-listings "$DATA_FILE" \
