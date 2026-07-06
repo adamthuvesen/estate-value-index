@@ -1,4 +1,9 @@
-"""Premium-over-comp high-end specialist experiments."""
+"""Premium-over-comp high-end specialist experiments.
+
+Experiment track, not the production path — the tiered ensemble in
+tiered_ensemble.py won this comparison and is what ml/production_models.py
+ships. Kept for comparison reports and future high-end tuning experiments.
+"""
 
 from __future__ import annotations
 
@@ -35,7 +40,7 @@ from estate_value_index.analytics.specialist_model import (
     DEFAULT_GATE_MIN_LIVING_AREA,
     DEFAULT_GATE_PREDICTION_MIN,
     DEFAULT_SPECIALIST_MIN_PRICE,
-    HIGH_END_REPORT_PRICE,
+    REPORT_HIGH_END_MIN_PRICE,
     _capture_rate,
     apply_gated_specialist_predictions,
     build_specialist_gate,
@@ -404,7 +409,7 @@ def _build_result_payload(
             "oof_gate_rows": int(np.asarray(oof_gate, dtype=bool).sum()),
             "test_gate_rows": int(np.asarray(test_gate, dtype=bool).sum()),
             "test_gate_rate": float(np.asarray(test_gate, dtype=bool).mean() * 100),
-            "test_12m_plus_capture_rate": _capture_rate(y_test, test_gate, HIGH_END_REPORT_PRICE),
+            "test_12m_plus_capture_rate": _capture_rate(y_test, test_gate, REPORT_HIGH_END_MIN_PRICE),
         },
         "blend_selection": {
             "global": global_blend_selection,

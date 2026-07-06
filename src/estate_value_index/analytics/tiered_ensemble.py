@@ -1,4 +1,11 @@
-"""Tiered low/mid/high expert ensemble experiments."""
+"""Tiered low/mid/high expert ensemble experiments.
+
+This is the experiment track that won: ml/production_models.py's
+TieredProductionModel imports the tier-spec, gating, and blend-selection
+helpers defined here to build the shipped no_list/listing models. See
+specialist_model.py and premium_specialist.py for the two experiment tracks
+that did not make it to production.
+"""
 
 from __future__ import annotations
 
@@ -37,15 +44,15 @@ from estate_value_index.analytics.residual_calibration import (
 from estate_value_index.utils.settings import get_random_state
 
 DEFAULT_OUTPUT_DIR = Path("reports/tiered_ensemble_experiments")
-DEFAULT_LOW_MAX_PRICE = 5_000_000.0
-DEFAULT_MID_MIN_PRICE = 5_000_000.0
-DEFAULT_MID_MAX_PRICE = 10_000_000.0
-DEFAULT_HIGH_MIN_PRICE = 8_000_000.0
-DEFAULT_GATE_LOW_MAX = 5_000_000.0
-DEFAULT_GATE_HIGH_MIN = 10_000_000.0
+DEFAULT_TRAIN_TIER_LOW_MAX_PRICE = 5_000_000.0
+DEFAULT_TRAIN_TIER_MID_MIN_PRICE = 5_000_000.0
+DEFAULT_TRAIN_TIER_MID_MAX_PRICE = 10_000_000.0
+DEFAULT_TRAIN_TIER_HIGH_MIN_PRICE = 8_000_000.0
+DEFAULT_INFERENCE_GATE_LOW_MAX = 5_000_000.0
+DEFAULT_INFERENCE_GATE_HIGH_MIN = 10_000_000.0
 DEFAULT_WEIGHT_STEP = 0.05
 DEFAULT_MIN_SEGMENT_ROWS = 200
-HIGH_END_REPORT_PRICE = 12_000_000.0
+REPORT_HIGH_END_MIN_PRICE = 12_000_000.0
 MODEL_NAMES = ("global", "low", "mid", "high")
 
 
@@ -71,12 +78,12 @@ def run_tiered_ensemble_experiment(
     output_dir: Path = DEFAULT_OUTPUT_DIR,
     n_splits: int = 4,
     random_state: int | None = None,
-    low_max_price: float = DEFAULT_LOW_MAX_PRICE,
-    mid_min_price: float = DEFAULT_MID_MIN_PRICE,
-    mid_max_price: float = DEFAULT_MID_MAX_PRICE,
-    high_min_price: float = DEFAULT_HIGH_MIN_PRICE,
-    gate_low_max: float = DEFAULT_GATE_LOW_MAX,
-    gate_high_min: float = DEFAULT_GATE_HIGH_MIN,
+    low_max_price: float = DEFAULT_TRAIN_TIER_LOW_MAX_PRICE,
+    mid_min_price: float = DEFAULT_TRAIN_TIER_MID_MIN_PRICE,
+    mid_max_price: float = DEFAULT_TRAIN_TIER_MID_MAX_PRICE,
+    high_min_price: float = DEFAULT_TRAIN_TIER_HIGH_MIN_PRICE,
+    gate_low_max: float = DEFAULT_INFERENCE_GATE_LOW_MAX,
+    gate_high_min: float = DEFAULT_INFERENCE_GATE_HIGH_MIN,
     weight_step: float = DEFAULT_WEIGHT_STEP,
     min_segment_rows: int = DEFAULT_MIN_SEGMENT_ROWS,
 ) -> dict[str, object]:
@@ -210,8 +217,8 @@ def run_tiered_ensemble_experiment(
 def prediction_tier_labels(
     predictions: np.ndarray | pd.Series,
     *,
-    low_max: float = DEFAULT_GATE_LOW_MAX,
-    high_min: float = DEFAULT_GATE_HIGH_MIN,
+    low_max: float = DEFAULT_INFERENCE_GATE_LOW_MAX,
+    high_min: float = DEFAULT_INFERENCE_GATE_HIGH_MIN,
 ) -> np.ndarray:
     """Assign inference-safe low/mid/high gates from predicted price only."""
     values = np.asarray(predictions, dtype=float)
@@ -547,7 +554,7 @@ def _build_result_payload(
             "high_min": gate_high_min,
             "oof_rows_by_gate": _count_labels(oof_gate),
             "test_rows_by_gate": _count_labels(test_gate),
-            "test_12m_plus_capture_rate": _capture_rate(y_test, test_gate, HIGH_END_REPORT_PRICE),
+            "test_12m_plus_capture_rate": _capture_rate(y_test, test_gate, REPORT_HIGH_END_MIN_PRICE),
         },
         "blend_selection": {
             "global": global_blend_selection,

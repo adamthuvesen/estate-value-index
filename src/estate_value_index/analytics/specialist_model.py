@@ -1,4 +1,9 @@
-"""Gated high-end specialist model experiments."""
+"""Gated high-end specialist model experiments.
+
+Experiment track, not the production path — the tiered ensemble in
+tiered_ensemble.py won this comparison and is what ml/production_models.py
+ships. Kept for comparison reports and future high-end tuning experiments.
+"""
 
 from __future__ import annotations
 
@@ -43,7 +48,7 @@ DEFAULT_GATE_PREDICTION_MIN = 8_000_000.0
 DEFAULT_GATE_COMP_VALUE_MIN = 9_000_000.0
 DEFAULT_GATE_LUXURY_SCORE_MIN = 0.60
 DEFAULT_GATE_MIN_LIVING_AREA = 55.0
-HIGH_END_REPORT_PRICE = 12_000_000.0
+REPORT_HIGH_END_MIN_PRICE = 12_000_000.0
 
 
 @dataclass(frozen=True)
@@ -407,7 +412,7 @@ def _build_result_payload(
             "oof_gate_rows": int(np.asarray(oof_gate, dtype=bool).sum()),
             "test_gate_rows": int(np.asarray(test_gate, dtype=bool).sum()),
             "test_gate_rate": float(np.asarray(test_gate, dtype=bool).mean() * 100),
-            "test_12m_plus_capture_rate": _capture_rate(y_test, test_gate, HIGH_END_REPORT_PRICE),
+            "test_12m_plus_capture_rate": _capture_rate(y_test, test_gate, REPORT_HIGH_END_MIN_PRICE),
         },
         "blend_selection": {
             "global": global_blend_selection,

@@ -5,14 +5,14 @@ from pathlib import Path
 
 from estate_value_index.analytics.tiered_ensemble import (
     DEFAULT_DATA_FILE,
-    DEFAULT_GATE_HIGH_MIN,
-    DEFAULT_GATE_LOW_MAX,
-    DEFAULT_HIGH_MIN_PRICE,
-    DEFAULT_LOW_MAX_PRICE,
-    DEFAULT_MID_MAX_PRICE,
-    DEFAULT_MID_MIN_PRICE,
+    DEFAULT_INFERENCE_GATE_HIGH_MIN,
+    DEFAULT_INFERENCE_GATE_LOW_MAX,
     DEFAULT_MIN_SEGMENT_ROWS,
     DEFAULT_OUTPUT_DIR,
+    DEFAULT_TRAIN_TIER_HIGH_MIN_PRICE,
+    DEFAULT_TRAIN_TIER_LOW_MAX_PRICE,
+    DEFAULT_TRAIN_TIER_MID_MAX_PRICE,
+    DEFAULT_TRAIN_TIER_MID_MIN_PRICE,
     DEFAULT_WEIGHT_STEP,
     run_tiered_ensemble_experiment,
 )
@@ -25,12 +25,12 @@ def main(argv: list[str] | None = None, *, args=None) -> int:
         parser.add_argument("--feature-set", default="no_list_price_h3_market_street")
         parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
         parser.add_argument("--splits", type=int, default=4)
-        parser.add_argument("--low-max-price", type=float, default=DEFAULT_LOW_MAX_PRICE)
-        parser.add_argument("--mid-min-price", type=float, default=DEFAULT_MID_MIN_PRICE)
-        parser.add_argument("--mid-max-price", type=float, default=DEFAULT_MID_MAX_PRICE)
-        parser.add_argument("--high-min-price", type=float, default=DEFAULT_HIGH_MIN_PRICE)
-        parser.add_argument("--gate-low-max", type=float, default=DEFAULT_GATE_LOW_MAX)
-        parser.add_argument("--gate-high-min", type=float, default=DEFAULT_GATE_HIGH_MIN)
+        parser.add_argument("--low-max-price", type=float, default=DEFAULT_TRAIN_TIER_LOW_MAX_PRICE)
+        parser.add_argument("--mid-min-price", type=float, default=DEFAULT_TRAIN_TIER_MID_MIN_PRICE)
+        parser.add_argument("--mid-max-price", type=float, default=DEFAULT_TRAIN_TIER_MID_MAX_PRICE)
+        parser.add_argument("--high-min-price", type=float, default=DEFAULT_TRAIN_TIER_HIGH_MIN_PRICE)
+        parser.add_argument("--gate-low-max", type=float, default=DEFAULT_INFERENCE_GATE_LOW_MAX)
+        parser.add_argument("--gate-high-min", type=float, default=DEFAULT_INFERENCE_GATE_HIGH_MIN)
         parser.add_argument("--weight-step", type=float, default=DEFAULT_WEIGHT_STEP)
         parser.add_argument("--min-segment-rows", type=int, default=DEFAULT_MIN_SEGMENT_ROWS)
         args = parser.parse_args(argv)

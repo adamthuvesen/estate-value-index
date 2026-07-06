@@ -4,6 +4,10 @@ The public serving contract has two model ids:
 
 - ``no_list``: does not use asking price.
 - ``listing``: uses asking price when it is available.
+
+``TieredProductionModel`` wraps the tier-spec, gating, and blend-selection
+helpers from ``analytics.tiered_ensemble`` — the experiment track that won
+over ``analytics.specialist_model`` and ``analytics.premium_specialist``.
 """
 
 from __future__ import annotations
@@ -37,16 +41,16 @@ from estate_value_index.analytics.residual_calibration import (
     build_calibration_features,
 )
 from estate_value_index.analytics.tiered_ensemble import (
-    DEFAULT_GATE_HIGH_MIN,
-    DEFAULT_GATE_LOW_MAX,
-    DEFAULT_HIGH_MIN_PRICE,
-    DEFAULT_LOW_MAX_PRICE,
-    DEFAULT_MID_MAX_PRICE,
-    DEFAULT_MID_MIN_PRICE,
+    DEFAULT_INFERENCE_GATE_HIGH_MIN,
+    DEFAULT_INFERENCE_GATE_LOW_MAX,
     DEFAULT_MIN_SEGMENT_ROWS,
+    DEFAULT_TRAIN_TIER_HIGH_MIN_PRICE,
+    DEFAULT_TRAIN_TIER_LOW_MAX_PRICE,
+    DEFAULT_TRAIN_TIER_MID_MAX_PRICE,
+    DEFAULT_TRAIN_TIER_MID_MIN_PRICE,
     DEFAULT_WEIGHT_STEP,
-    HIGH_END_REPORT_PRICE,
     MODEL_NAMES,
+    REPORT_HIGH_END_MIN_PRICE,
     TierSpec,
     _build_oof_training_data,
     _prediction_frame,
@@ -124,8 +128,8 @@ class TieredProductionModel:
     overall_weights: dict[str, float]
     gated_weights_by_gate: dict[str, dict[str, float]]
     fallback_weights: dict[str, float]
-    gate_low_max: float = DEFAULT_GATE_LOW_MAX
-    gate_high_min: float = DEFAULT_GATE_HIGH_MIN
+    gate_low_max: float = DEFAULT_INFERENCE_GATE_LOW_MAX
+    gate_high_min: float = DEFAULT_INFERENCE_GATE_HIGH_MIN
     residual_calibrator: Any | None = None
     calibration_max_abs: float = DEFAULT_CALIBRATION_MAX_ABS
     calibration_max_frac: float = DEFAULT_CALIBRATION_MAX_FRAC
@@ -332,12 +336,12 @@ def fit_tiered_production_model(
     spec: ProductionModelSpec,
     n_splits: int,
     random_state: int,
-    low_max_price: float = DEFAULT_LOW_MAX_PRICE,
-    mid_min_price: float = DEFAULT_MID_MIN_PRICE,
-    mid_max_price: float = DEFAULT_MID_MAX_PRICE,
-    high_min_price: float = DEFAULT_HIGH_MIN_PRICE,
-    gate_low_max: float = DEFAULT_GATE_LOW_MAX,
-    gate_high_min: float = DEFAULT_GATE_HIGH_MIN,
+    low_max_price: float = DEFAULT_TRAIN_TIER_LOW_MAX_PRICE,
+    mid_min_price: float = DEFAULT_TRAIN_TIER_MID_MIN_PRICE,
+    mid_max_price: float = DEFAULT_TRAIN_TIER_MID_MAX_PRICE,
+    high_min_price: float = DEFAULT_TRAIN_TIER_HIGH_MIN_PRICE,
+    gate_low_max: float = DEFAULT_INFERENCE_GATE_LOW_MAX,
+    gate_high_min: float = DEFAULT_INFERENCE_GATE_HIGH_MIN,
     weight_step: float = DEFAULT_WEIGHT_STEP,
     min_segment_rows: int = DEFAULT_MIN_SEGMENT_ROWS,
 ) -> TieredProductionModel:
@@ -720,7 +724,7 @@ def _calibration_report(
     uncalibrated = np.asarray(model.predict(test_raw, apply_calibration=False), dtype=float)
     correction = calibrated - uncalibrated
 
-    high_end = y >= HIGH_END_REPORT_PRICE
+    high_end = y >= REPORT_HIGH_END_MIN_PRICE
     central = test_raw.get("area")
     central_high_end = (
         high_end & central.astype("string").isin(CENTRAL_AREAS).to_numpy()

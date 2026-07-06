@@ -8,10 +8,10 @@ import pandas as pd
 from estate_value_index.analytics.production_residual_calibration import _gate_summary
 from estate_value_index.analytics.residual_calibration import apply_calibration_correction
 from estate_value_index.analytics.tiered_ensemble import (
-    DEFAULT_HIGH_MIN_PRICE,
-    DEFAULT_LOW_MAX_PRICE,
-    DEFAULT_MID_MAX_PRICE,
-    DEFAULT_MID_MIN_PRICE,
+    DEFAULT_TRAIN_TIER_HIGH_MIN_PRICE,
+    DEFAULT_TRAIN_TIER_LOW_MAX_PRICE,
+    DEFAULT_TRAIN_TIER_MID_MAX_PRICE,
+    DEFAULT_TRAIN_TIER_MID_MIN_PRICE,
     _tier_specs,
 )
 from estate_value_index.ml.production_models import _oof_final_blend
@@ -58,10 +58,10 @@ def test_apply_calibration_correction_skips_low_predictions() -> None:
 
 def test_oof_final_blend_routes_rows_through_their_gate_weights() -> None:
     tier_specs = _tier_specs(
-        low_max_price=DEFAULT_LOW_MAX_PRICE,
-        mid_min_price=DEFAULT_MID_MIN_PRICE,
-        mid_max_price=DEFAULT_MID_MAX_PRICE,
-        high_min_price=DEFAULT_HIGH_MIN_PRICE,
+        low_max_price=DEFAULT_TRAIN_TIER_LOW_MAX_PRICE,
+        mid_min_price=DEFAULT_TRAIN_TIER_MID_MIN_PRICE,
+        mid_max_price=DEFAULT_TRAIN_TIER_MID_MAX_PRICE,
+        high_min_price=DEFAULT_TRAIN_TIER_HIGH_MIN_PRICE,
     )
     oof = pd.DataFrame(
         {
