@@ -18,13 +18,27 @@ def main(argv: list[str] | None = None, *, args=None) -> int:
     if args is None:
         parser = argparse.ArgumentParser(description="Run residual calibration experiments")
         parser.add_argument("--data-file", type=Path, default=DEFAULT_DATA_FILE)
-        parser.add_argument("--feature-set", default=None)
+        parser.add_argument(
+            "--feature-set",
+            default=None,
+            help=(
+                "Feature set to calibrate. Its meaning depends on --production: "
+                "without --production this selects a single LGBM's feature set "
+                "(default 'no_list_price_h3_market'); with --production it "
+                f"selects the tiered no_list production model's feature set "
+                f"(default '{DEFAULT_NO_LIST_FEATURE_SET}') — the same flag "
+                "resolves against a different model depending on --production."
+            ),
+        )
         parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
         parser.add_argument("--splits", type=int, default=4)
         parser.add_argument(
             "--production",
             action="store_true",
-            help="Calibrate the production tiered no_list model instead of a single LGBM.",
+            help=(
+                "Calibrate the production tiered no_list model instead of a "
+                "single LGBM. Also changes what --feature-set resolves against."
+            ),
         )
         args = parser.parse_args(argv)
 
