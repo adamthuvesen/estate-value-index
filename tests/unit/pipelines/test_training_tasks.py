@@ -288,12 +288,10 @@ class TestPromoteModelToProduction:
             side_effect=lambda cmd, *a, **k: copied.append(cmd),
         )
 
-        promote_model_to_production_task.fn(
-            "gs://test-bucket/vertex-ai/models/20260706-160501"
-        )
+        promote_model_to_production_task.fn("gs://test-bucket/vertex-ai/models/20260706-160501")
 
         dests = [cmd[-1] for cmd in copied if "cp" in cmd]
         assert any(d.endswith("price_prediction_model_lgbm.joblib") for d in dests)
-        assert any(
-            d.endswith("price_prediction_model_lgbm.joblib.sha256") for d in dests
-        ), "sidecar must be promoted alongside the joblib"
+        assert any(d.endswith("price_prediction_model_lgbm.joblib.sha256") for d in dests), (
+            "sidecar must be promoted alongside the joblib"
+        )
