@@ -1,37 +1,17 @@
 import { NextResponse } from "next/server";
+import { DataFileMissingError } from "@/lib/data-file-errors";
 
 export const AREA_DATA_MISSING_CODE = "AREA_DATA_MISSING";
 export const AREA_DATA_ERROR_CODE = "AREA_DATA_ERROR";
 export const VALUE_ANALYSIS_DATA_MISSING_CODE = "VALUE_ANALYSIS_DATA_MISSING";
 export const VALUE_ANALYSIS_DATA_ERROR_CODE = "VALUE_ANALYSIS_DATA_ERROR";
 
-/**
- * Returns true when an error from the area-statistics or value-analysis loader
- * indicates the source file simply isn't available yet (vs. a real failure).
- * Shared by every API route that reads enrichment JSON.
- */
 export function isMissingDataError(error: unknown): boolean {
-  if (!(error instanceof Error)) return false;
-  const message = error.message.toLowerCase();
-  return (
-    message.includes("enoent") ||
-    message.includes("not found") ||
-    message.includes("gcs is not enabled") ||
-    message.includes("failed to load data")
-  );
+  return error instanceof DataFileMissingError;
 }
 
 export function isValueAnalysisDataMissingError(error: unknown): boolean {
-  if (!(error instanceof Error)) return false;
-  const message = error.message.toLowerCase();
-  return (
-    message.includes("enoent") ||
-    message.includes("file not found") ||
-    message.includes("not found") ||
-    message.includes("gcs fallback is disabled") ||
-    message.includes("gcs is not enabled") ||
-    message.includes("no such object")
-  );
+  return isMissingDataError(error);
 }
 
 export interface ErrorResponseInit {

@@ -74,7 +74,6 @@ def test_training_config_matches_vertex_and_local_modes():
     assert vertex_config.skip_materialization is True
     assert vertex_config.register_to_vertex is False
     assert vertex_config.stream_logs is True
-    assert vertex_config.production_mode is True
     assert vertex_config.dry_run is True
 
     local_config = pipeline._training_config(
@@ -88,7 +87,6 @@ def test_training_config_matches_vertex_and_local_modes():
 
     assert local_config.tune is True
     assert local_config.use_vertex is False
-    assert local_config.production_mode is True
     assert local_config.skip_materialization is False
     assert local_config.dry_run is False
 

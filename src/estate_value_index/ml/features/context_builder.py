@@ -95,7 +95,8 @@ def _latest_area_metric(training_frame: pd.DataFrame, column: str) -> dict[str, 
 
 def _global_median(training_frame: pd.DataFrame, column: str, default: float) -> float:
     if column in training_frame.columns:
-        median_val = training_frame[column].median()
+        valid_values = training_frame[column].dropna()
+        median_val = valid_values.median() if not valid_values.empty else pd.NA
         if pd.notna(median_val):
             return float(median_val)
     return default
@@ -109,7 +110,8 @@ def _fill_values(
 
     for col in NUMERIC_FEATURE_NAMES:
         if col in training_frame.columns:
-            median_val = training_frame[col].median()
+            valid_values = training_frame[col].dropna()
+            median_val = valid_values.median() if not valid_values.empty else pd.NA
             numeric_fill_values[col] = float(median_val) if pd.notna(median_val) else None
 
     for col in CATEGORICAL_FEATURE_NAMES:

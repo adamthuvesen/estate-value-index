@@ -192,13 +192,18 @@ export function usePredictionForm({
     let mounted = true;
     const checkApi = async () => {
       try {
-        const response = await fetch("/api/predict", { method: "GET" });
-        if (mounted && response.ok) {
-          setIsApiReady(true);
+        const response = await fetch("/api/health", { method: "GET", cache: "no-store" });
+        if (!mounted) {
+          return;
+        }
+        setIsApiReady(response.ok);
+        if (!response.ok) {
+          setTimeout(checkApi, 1000);
         }
       } catch (err) {
         console.warn("API not ready yet:", err);
         if (mounted) {
+          setIsApiReady(false);
           setTimeout(checkApi, 1000);
         }
       }

@@ -173,7 +173,7 @@
     @apply border-t border-tactical-border my-12;
   }
 
-  /* ---------- Headers (now sentence-case, real hierarchy) ---------- */
+  /* ---------- Headers ---------- */
   .tactical-header-xl {
     @apply text-4xl md:text-5xl font-semibold tracking-tactical text-tactical-text;
   }

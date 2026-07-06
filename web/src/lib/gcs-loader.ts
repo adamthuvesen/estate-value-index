@@ -3,6 +3,7 @@
 import { readFile, writeFile, mkdir } from "fs/promises";
 import { dirname } from "path";
 import { Storage } from "@google-cloud/storage";
+import { DataFileLoadError, DataFileMissingError } from "@/lib/data-file-errors";
 
 // Default to true in production, false in development/test
 const isProduction = process.env.NODE_ENV === "production";
@@ -27,6 +28,12 @@ function getGcsBucket(): string {
   return bucket;
 }
 
+function isNotFoundError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const code = "code" in error ? String(error.code) : "";
+  return code === "404" || error.message.toLowerCase().includes("no such object");
+}
+
 export async function loadDataFile(
   localPath: string,
   gcsPath: string
@@ -37,7 +44,12 @@ export async function loadDataFile(
     return content;
   } catch (error) {
     if (error instanceof Error && "code" in error && error.code !== "ENOENT") {
-      throw error;
+      throw new DataFileLoadError(
+        "Failed to read data file.",
+        localPath,
+        gcsPath,
+        error.message,
+      );
     }
 
     if (!GCS_ENABLED) {
@@ -50,9 +62,10 @@ export async function loadDataFile(
         nodeEnv: process.env.NODE_ENV,
         remediation: "Set GCS_ENABLED=true or ensure local file exists"
       }));
-      throw new Error(
-        `File not found: ${localPath}. GCS fallback is disabled. ` +
-        `Set GCS_ENABLED=true to enable automatic download from GCS.`
+      throw new DataFileMissingError(
+        "Data file is not available and GCS fallback is disabled.",
+        localPath,
+        gcsPath,
       );
     }
 
@@ -77,10 +90,15 @@ export async function loadDataFile(
 
       return contentStr;
     } catch (gcsError) {
-      throw new Error(
-        `Failed to load data from ${localPath} or GCS (${gcsPath}): ${
-          gcsError instanceof Error ? gcsError.message : "Unknown error"
-        }`
+      const message = gcsError instanceof Error ? gcsError.message : "Unknown error";
+      if (isNotFoundError(gcsError)) {
+        throw new DataFileMissingError("Data file is not available in GCS.", localPath, gcsPath);
+      }
+      throw new DataFileLoadError(
+        "Failed to load data file.",
+        localPath,
+        gcsPath,
+        message,
       );
     }
   }

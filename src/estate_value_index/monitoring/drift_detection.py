@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import warnings
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -126,9 +127,14 @@ class ModelMonitor:
             target_column=target_column,
             prediction_column=prediction_column,
         )
-        drift_report = self._run_drift_report(current_data, column_mapping, has_predictions)
-
-        extracted = self._extract_all_metrics(drift_report.as_dict())
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message="divide by zero encountered in divide",
+                category=RuntimeWarning,
+            )
+            drift_report = self._run_drift_report(current_data, column_mapping, has_predictions)
+            extracted = self._extract_all_metrics(drift_report.as_dict())
         drift_score = self._drift_score(extracted.drift_scores)
         # Gate performance on MdAPE (median absolute % error), the AVM-standard
         # metric. Evidently reports MAE, not MdAPE, so compute it from the data.

@@ -9,11 +9,9 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Nordic Ledger — light, Scandinavian-calm system.
-        // The `tactical` namespace name is kept so existing components restyle
-        // themselves; the values are now a light palette.
+        // Nordic Ledger light palette.
         tactical: {
-          bg: "#FBFBFA", // Page background — warm near-white paper
+          bg: "#FBFBFA", // Page background
           surface: "#FFFFFF", // Cards / panels
           elevated: "#F4F4F2", // Sunken insets, rails, chips
           border: "#E9E9E4", // Hairline borders
@@ -100,8 +98,8 @@ const config: Config = {
         pill: "999px",
       },
       letterSpacing: {
-        tactical: "-0.01em", // Tight display tracking
-        "tactical-wide": "0.08em", // Restrained label tracking (was 0.2em)
+        tactical: "0em",
+        "tactical-wide": "0.08em",
       },
       transitionTimingFunction: {
         tactical: "cubic-bezier(0.22, 0.61, 0.36, 1)", // Smooth ease-out

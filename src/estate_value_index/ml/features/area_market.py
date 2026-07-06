@@ -145,20 +145,30 @@ def _add_context_area_market_features(
 
 
 def _fill_area_market_defaults(df: pd.DataFrame) -> None:
-    df["area_inventory"] = df["area_inventory"].fillna(df["area_inventory"].median() or 50.0)
+    df["area_inventory"] = df["area_inventory"].fillna(
+        _median_or_default(df["area_inventory"], 50.0)
+    )
     df["area_price_volatility"] = df["area_price_volatility"].fillna(
-        df["area_price_volatility"].median() or 500000.0
+        _median_or_default(df["area_price_volatility"], 500000.0)
     )
     df["area_price_median"] = df["area_price_median"].fillna(
-        df["area_price_median"].median() or 5000000.0
+        _median_or_default(df["area_price_median"], 5000000.0)
     )
     df["area_days_on_market_median"] = df["area_days_on_market_median"].fillna(
-        df["area_days_on_market_median"].median() or 20.0
+        _median_or_default(df["area_days_on_market_median"], 20.0)
     )
     df["area_price_change_mean"] = df["area_price_change_mean"].fillna(
-        df["area_price_change_mean"].median() or 350000.0
+        _median_or_default(df["area_price_change_mean"], 350000.0)
     )
     df["area_price_change_count"] = df["area_price_change_count"].fillna(10.0)
+
+
+def _median_or_default(series: pd.Series, default: float) -> float:
+    valid = series.dropna()
+    if valid.empty:
+        return default
+    value = valid.median()
+    return float(value) if pd.notna(value) else default
 
 
 def _add_area_market_indicators(df: pd.DataFrame) -> None:
@@ -183,11 +193,20 @@ def _create_area_temporal_metrics(
     current observation (temporal safety: only uses data from before sold_date).
     """
     window_definitions = TEMPORAL_WINDOWS
+    temporal_columns = [
+        column
+        for _, suffix in window_definitions
+        for column in (f"area_sold_price_median_{suffix}", f"area_sales_volume_{suffix}")
+    ]
+    existing_temporal_columns = [column for column in temporal_columns if column in df.columns]
+    if existing_temporal_columns:
+        df = df.drop(columns=existing_temporal_columns)
 
     if context is None:
-        for _, suffix in window_definitions:
-            df[f"area_sold_price_median_{suffix}"] = np.nan
-            df[f"area_sales_volume_{suffix}"] = np.nan
+        df = pd.concat(
+            [df, pd.DataFrame(np.nan, index=df.index, columns=temporal_columns)],
+            axis=1,
+        )
 
         if "sold_price" in df.columns and "sold_date" in df.columns:
             work = df[["area", "sold_date", "sold_price"]].copy()
@@ -228,29 +247,48 @@ def _create_area_temporal_metrics(
                         f"count_{suffix}"
                     ]
     else:
-        # Inference mode: Use cached values
-        df["area_sold_price_median_1m"] = df["area"].map(context.area_median_price_1m)
-        df["area_sold_price_median_3m"] = df["area"].map(context.area_median_price_3m)
-        df["area_sold_price_median_6m"] = df["area"].map(context.area_median_price_6m)
-        df["area_sold_price_median_12m"] = df["area"].map(context.area_median_price_12m)
+        temporal_frame = pd.DataFrame(index=df.index)
+        temporal_frame["area_sold_price_median_1m"] = df["area"].map(context.area_median_price_1m)
+        temporal_frame["area_sold_price_median_3m"] = df["area"].map(context.area_median_price_3m)
+        temporal_frame["area_sold_price_median_6m"] = df["area"].map(context.area_median_price_6m)
+        temporal_frame["area_sold_price_median_12m"] = df["area"].map(
+            context.area_median_price_12m
+        )
 
-        df["area_sold_price_median_1m"] = df["area_sold_price_median_1m"].fillna(
+        temporal_frame["area_sold_price_median_1m"] = temporal_frame[
+            "area_sold_price_median_1m"
+        ].fillna(
             context.global_area_median_price_1m
         )
-        df["area_sold_price_median_3m"] = df["area_sold_price_median_3m"].fillna(
+        temporal_frame["area_sold_price_median_3m"] = temporal_frame[
+            "area_sold_price_median_3m"
+        ].fillna(
             context.global_area_median_price_3m
         )
-        df["area_sold_price_median_6m"] = df["area_sold_price_median_6m"].fillna(
+        temporal_frame["area_sold_price_median_6m"] = temporal_frame[
+            "area_sold_price_median_6m"
+        ].fillna(
             context.global_area_median_price_6m
         )
-        df["area_sold_price_median_12m"] = df["area_sold_price_median_12m"].fillna(
+        temporal_frame["area_sold_price_median_12m"] = temporal_frame[
+            "area_sold_price_median_12m"
+        ].fillna(
             context.global_area_median_price_12m
         )
 
-        df["area_sales_volume_1m"] = df["area"].map(context.area_sales_volume_1m).fillna(0.0)
-        df["area_sales_volume_3m"] = df["area"].map(context.area_sales_volume_3m).fillna(0.0)
-        df["area_sales_volume_6m"] = df["area"].map(context.area_sales_volume_6m).fillna(0.0)
-        df["area_sales_volume_12m"] = df["area"].map(context.area_sales_volume_12m).fillna(0.0)
+        temporal_frame["area_sales_volume_1m"] = df["area"].map(
+            context.area_sales_volume_1m
+        ).fillna(0.0)
+        temporal_frame["area_sales_volume_3m"] = df["area"].map(
+            context.area_sales_volume_3m
+        ).fillna(0.0)
+        temporal_frame["area_sales_volume_6m"] = df["area"].map(
+            context.area_sales_volume_6m
+        ).fillna(0.0)
+        temporal_frame["area_sales_volume_12m"] = df["area"].map(
+            context.area_sales_volume_12m
+        ).fillna(0.0)
+        df = pd.concat([df, temporal_frame], axis=1)
 
     # Fill missing values with fallbacks (same order as original)
     df["area_sold_price_median_6m"] = df["area_sold_price_median_6m"].fillna(
@@ -263,7 +301,9 @@ def _create_area_temporal_metrics(
         df["area_sold_price_median_3m"]
     )
 
-    global_listing_median = df["listing_price"].median(skipna=True)
+    global_listing_median = (
+        _median_or_default(df["listing_price"], np.nan) if "listing_price" in df.columns else np.nan
+    )
     df["area_sold_price_median_12m"] = df["area_sold_price_median_12m"].fillna(
         global_listing_median
     )

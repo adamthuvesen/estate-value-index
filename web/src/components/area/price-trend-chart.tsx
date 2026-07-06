@@ -27,6 +27,9 @@ interface PriceTrendChartProps {
 
 export function PriceTrendChart({ median_price_3m, median_price_6m, median_price_12m, monthly_prices, avgLivingArea }: PriceTrendChartProps) {
   const [showPerSqm, setShowPerSqm] = useState(true);
+  const canShowPerSqm = Boolean(avgLivingArea && avgLivingArea > 0);
+  const displayPerSqm = showPerSqm && canShowPerSqm;
+  const unitLabel = displayPerSqm ? "kr/m²" : "kr";
   const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
   const now = new Date();
@@ -94,18 +97,18 @@ export function PriceTrendChart({ median_price_3m, median_price_6m, median_price
 
   const data = baseData.map((d) => ({
     ...d,
-    displayValue: showPerSqm && avgLivingArea ? Math.round(d.price! / avgLivingArea) : d.price!,
+    displayValue: displayPerSqm ? Math.round(d.price! / avgLivingArea!) : d.price!,
   }));
 
   const formatPrice = (value: number) => {
-    if (showPerSqm) {
+    if (displayPerSqm) {
       return formatShortThousands(value);
     }
     return formatShortSek(value);
   };
 
   const formatTooltipPrice = (value: number) => {
-    return showPerSqm ? formatSekPerSqm(value) : formatSek(value);
+    return displayPerSqm ? formatSekPerSqm(value) : formatSek(value);
   };
 
   // Use only real data points (not filled) for the change calculation
@@ -126,11 +129,11 @@ export function PriceTrendChart({ median_price_3m, median_price_6m, median_price
         <div>
           <h3 className="text-[14px] font-semibold tracking-tight text-tactical-text">Price trend</h3>
           <p className="text-[12px] text-tactical-muted">
-            {showPerSqm ? "Median price per m² over time" : "Median sold prices over time"}
+            {displayPerSqm ? "Median price per m² over time" : "Median sold prices over time"}
           </p>
         </div>
         <div className="flex items-center gap-4">
-          {avgLivingArea && (
+          {canShowPerSqm && (
             <div className="flex items-center gap-1 rounded-pill border border-tactical-border bg-tactical-elevated p-1">
               <button
                 onClick={() => setShowPerSqm(true)}
@@ -182,7 +185,19 @@ export function PriceTrendChart({ median_price_3m, median_price_6m, median_price
             textAnchor="end"
             height={60}
           />
-          <YAxis tickFormatter={formatPrice} stroke="#E9E9E4" tick={{ fill: "#63666E", fontSize: 11 }} width={80} />
+          <YAxis
+            tickFormatter={formatPrice}
+            stroke="#E9E9E4"
+            tick={{ fill: "#63666E", fontSize: 11 }}
+            width={80}
+            label={{
+              value: unitLabel,
+              angle: -90,
+              position: "insideLeft",
+              fill: "#63666E",
+              fontSize: 11,
+            }}
+          />
           <Tooltip
             contentStyle={{
               backgroundColor: "#FFFFFF",
@@ -191,7 +206,7 @@ export function PriceTrendChart({ median_price_3m, median_price_6m, median_price
               boxShadow: "0 4px 14px rgba(16,17,20,0.08)",
               color: "#16171A",
             }}
-            formatter={(value: number) => [formatTooltipPrice(value), showPerSqm ? "Median price/m²" : "Median price"]}
+            formatter={(value: number) => [formatTooltipPrice(value), displayPerSqm ? "Median price/m²" : "Median price"]}
             labelFormatter={(label) => {
               const point = data.find((d) => d.month === label);
               return point ? `${label} (${point.label})` : label;
@@ -206,7 +221,7 @@ export function PriceTrendChart({ median_price_3m, median_price_6m, median_price
             strokeWidth={2}
             dot={{ fill: "#0B62FF", r: 3 }}
             activeDot={{ r: 6 }}
-            name={showPerSqm ? "Median Price/m²" : "Median Price"}
+            name={displayPerSqm ? "Median price/m²" : "Median price"}
             connectNulls={false}
           />
         </LineChart>

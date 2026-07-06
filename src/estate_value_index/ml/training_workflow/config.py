@@ -17,6 +17,5 @@ class TrainingConfig:
     model_dir: str | Path | None = None
     metrics_prefix: str | None = None
     importance_threshold: float | None = None
-    production_mode: bool = False
     config_file: str | None = None
     feature_set: str | None = None

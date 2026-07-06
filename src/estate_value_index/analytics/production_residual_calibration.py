@@ -1,15 +1,9 @@
 """Offline residual calibration proof for the production tiered ``no_list`` model.
 
-Phase 1 go/no-go: does the residual calibrator that ships inside
-``TieredProductionModel`` actually help the model we serve? The model fit here is
-the real production no_list model (calibrator fit on out-of-fold gated-blend
-residuals, applied selectively to high predictions), so this evaluates exactly
-what ``predict()`` returns in production, on the newest temporal holdout.
-
-Reframed gate (the original "mean bias down 50%" was unreachable for an already
-well-calibrated model): calibration must improve overall MAE (or not worsen it by
-more than 10k SEK), improve mean bias, move the underprediction rate toward 50%,
-and improve high-end (12M+) MAE and bias.
+Checks whether the residual calibrator inside ``TieredProductionModel`` improves
+the served no-list model on the newest temporal holdout. The calibrator must
+improve overall MAE, or stay within 10k SEK while improving bias, the
+underprediction rate, and high-end (12M+) MAE/bias.
 """
 
 from __future__ import annotations

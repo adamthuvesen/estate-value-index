@@ -21,7 +21,6 @@ TRAIN_DEPLOYMENT_PARAMETERS: dict = {
         TrainingFlowConfig(
             tune=False,
             max_median_ape=0.08,
-            production_mode=True,
         )
     ),
 }

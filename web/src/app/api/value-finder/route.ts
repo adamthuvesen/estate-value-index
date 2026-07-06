@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import type {
-  ValueProperty,
-  ValueFinderFilters,
-  ValueFinderResponse,
-  SortField,
-  SortOrder,
-  ValueTier,
+import {
+  VALUE_TIERS,
+  type SortField,
+  type SortOrder,
+  type ValueFinderFilters,
+  type ValueFinderResponse,
+  type ValueProperty,
+  type ValueTier,
 } from "@/lib/value-finder-types";
 import { getValueAnalysisData } from "@/lib/value-analysis-cache";
 import {
@@ -19,20 +20,119 @@ import {
 // available on the Edge runtime.
 export const runtime = "nodejs";
 
+const SORT_FIELDS: readonly SortField[] = [
+  "value_score",
+  "prediction_delta_percentage",
+  "prediction_delta_absolute",
+  "sold_date",
+  "sold_price",
+  "living_area",
+];
+const SORT_ORDERS: readonly SortOrder[] = ["asc", "desc"];
+const MAX_LIMIT = 200;
+
+class QueryValidationError extends Error {}
+
+function badRequest(message: string) {
+  return NextResponse.json({ error: message }, { status: 400 });
+}
+
 function parseArrayParam(param: string | null): string[] | undefined {
   if (!param) return undefined;
   return param.split(",").map((s) => s.trim()).filter(Boolean);
 }
 
-function parseNumberParam(param: string | null): number | undefined {
-  if (!param) return undefined;
+function parseNumberParam(
+  params: URLSearchParams,
+  name: string,
+  options: {
+    integer?: boolean;
+    min?: number;
+    max?: number;
+  } = {},
+): number | undefined {
+  const param = params.get(name);
+  if (param === null || param.trim() === "") return undefined;
   const num = Number(param);
-  return isNaN(num) ? undefined : num;
+  if (!Number.isFinite(num)) {
+    throw new QueryValidationError(`${name} must be a finite number`);
+  }
+  if (options.integer && !Number.isInteger(num)) {
+    throw new QueryValidationError(`${name} must be an integer`);
+  }
+  if (options.min !== undefined && num < options.min) {
+    throw new QueryValidationError(`${name} must be at least ${options.min}`);
+  }
+  if (options.max !== undefined && num > options.max) {
+    throw new QueryValidationError(`${name} must be at most ${options.max}`);
+  }
+  return num;
 }
 
-function parseBooleanParam(param: string | null): boolean | undefined {
-  if (!param) return undefined;
-  return param.toLowerCase() === "true";
+function parseBooleanParam(params: URLSearchParams, name: string): boolean | undefined {
+  const param = params.get(name);
+  if (param === null || param.trim() === "") return undefined;
+  const token = param.toLowerCase();
+  if (token === "true") return true;
+  if (token === "false") return false;
+  throw new QueryValidationError(`${name} must be true or false`);
+}
+
+function parseSortField(param: string | null): SortField {
+  if (!param) return "value_score";
+  if (!SORT_FIELDS.includes(param as SortField)) {
+    throw new QueryValidationError(`sort must be one of: ${SORT_FIELDS.join(", ")}`);
+  }
+  return param as SortField;
+}
+
+function parseSortOrder(param: string | null): SortOrder {
+  if (!param) return "desc";
+  if (!SORT_ORDERS.includes(param as SortOrder)) {
+    throw new QueryValidationError("order must be asc or desc");
+  }
+  return param as SortOrder;
+}
+
+function parseValueTiers(param: string | null): ValueTier[] | undefined {
+  const values = parseArrayParam(param);
+  if (!values) return undefined;
+  const allowed = new Set<ValueTier>(VALUE_TIERS);
+  const invalid = values.filter((tier) => !allowed.has(tier as ValueTier));
+  if (invalid.length > 0) {
+    throw new QueryValidationError(`value_tier contains unknown value: ${invalid[0]}`);
+  }
+  return values as ValueTier[];
+}
+
+function parseFilters(searchParams: URLSearchParams): ValueFinderFilters {
+  return {
+    sort: parseSortField(searchParams.get("sort")),
+    order: parseSortOrder(searchParams.get("order")),
+    limit: parseNumberParam(searchParams, "limit", {
+      integer: true,
+      min: 1,
+      max: MAX_LIMIT,
+    }) ?? 50,
+    offset: parseNumberParam(searchParams, "offset", { integer: true, min: 0 }) ?? 0,
+
+    area: parseArrayParam(searchParams.get("area")),
+    min_living_area: parseNumberParam(searchParams, "min_living_area", { min: 0 }),
+    max_living_area: parseNumberParam(searchParams, "max_living_area", { min: 0 }),
+    min_rooms: parseNumberParam(searchParams, "min_rooms", { min: 0 }),
+    max_rooms: parseNumberParam(searchParams, "max_rooms", { min: 0 }),
+    min_price: parseNumberParam(searchParams, "min_price", { min: 0 }),
+    max_price: parseNumberParam(searchParams, "max_price", { min: 0 }),
+    property_type: parseArrayParam(searchParams.get("property_type")),
+    has_elevator: parseBooleanParam(searchParams, "has_elevator"),
+    has_balcony: parseBooleanParam(searchParams, "has_balcony"),
+
+    min_value_score: parseNumberParam(searchParams, "min_value_score", { min: 0 }),
+    max_value_score: parseNumberParam(searchParams, "max_value_score", { min: 0 }),
+    value_tier: parseValueTiers(searchParams.get("value_tier")),
+
+    search: searchParams.get("search") || undefined,
+  };
 }
 
 type Predicate = (property: ValueProperty) => boolean;
@@ -174,37 +274,9 @@ function applySorting(
 
 export async function GET(request: NextRequest) {
   try {
-    const data = await getValueAnalysisData();
-
     const searchParams = request.nextUrl.searchParams;
-
-    const filters: ValueFinderFilters = {
-      sort: (searchParams.get("sort") as SortField) || "value_score",
-      order: (searchParams.get("order") as SortOrder) || "desc",
-      limit: parseNumberParam(searchParams.get("limit")) || 50,
-      offset: parseNumberParam(searchParams.get("offset")) || 0,
-
-      area: parseArrayParam(searchParams.get("area")),
-      min_living_area: parseNumberParam(searchParams.get("min_living_area")),
-      max_living_area: parseNumberParam(searchParams.get("max_living_area")),
-      min_rooms: parseNumberParam(searchParams.get("min_rooms")),
-      max_rooms: parseNumberParam(searchParams.get("max_rooms")),
-      min_price: parseNumberParam(searchParams.get("min_price")),
-      max_price: parseNumberParam(searchParams.get("max_price")),
-      property_type: parseArrayParam(searchParams.get("property_type")),
-      has_elevator: parseBooleanParam(searchParams.get("has_elevator")),
-      has_balcony: parseBooleanParam(searchParams.get("has_balcony")),
-
-      min_value_score: parseNumberParam(searchParams.get("min_value_score")),
-      max_value_score: parseNumberParam(searchParams.get("max_value_score")),
-      value_tier: parseArrayParam(searchParams.get("value_tier")) as ValueTier[],
-
-      search: searchParams.get("search") || undefined,
-    };
-
-    if (filters.limit && filters.limit > 200) {
-      filters.limit = 200;
-    }
+    const filters = parseFilters(searchParams);
+    const data = await getValueAnalysisData();
 
     let properties = applyFilters(data.properties, filters);
     properties = applySorting(properties, filters.sort, filters.order);
@@ -233,6 +305,10 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
+    if (error instanceof QueryValidationError) {
+      return badRequest(error.message);
+    }
+
     console.error("Error in value-finder API:", error);
 
     return isValueAnalysisDataMissingError(error)

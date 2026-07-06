@@ -809,5 +809,8 @@ def _float_stat(row: pd.Series, column: str, *, fallback: float = np.nan) -> flo
 
 
 def global_observed_ppsqm_median(training_frame: pd.DataFrame) -> float | None:
-    median = observed_price_per_sqm(training_frame).median(skipna=True)
+    values = observed_price_per_sqm(training_frame).dropna()
+    if values.empty:
+        return None
+    median = values.median(skipna=True)
     return float(median) if pd.notna(median) else None

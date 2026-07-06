@@ -168,6 +168,24 @@ def test_predict_accepts_optional_coordinates() -> None:
 
 
 @pytest.mark.unit
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"living_area": -1},
+        {"living_area": 55, "latitude": 91},
+        {"living_area": 55, "longitude": -181},
+        {"living_area": 55, "model": "old_listing"},
+        {"living_area": "nan"},
+    ],
+)
+def test_predict_rejects_invalid_request_fields(payload: dict) -> None:
+    with TestClient(api_server.app) as client:
+        response = client.post("/predict", json=payload)
+
+    assert 400 <= response.status_code < 500
+
+
+@pytest.mark.unit
 def test_predict_auto_routes_to_no_list_without_listing_price() -> None:
     mock_model = MagicMock()
     mock_model.predict.return_value = [4_250_000.0]

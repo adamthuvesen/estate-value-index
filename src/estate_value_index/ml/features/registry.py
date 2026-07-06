@@ -207,7 +207,8 @@ def handle_missing_values(
     numeric_fill_values = {}
     for col in numeric_features:
         if col in X_train.columns:
-            median_val = X_train[col].median()
+            valid_values = X_train[col].dropna()
+            median_val = valid_values.median() if not valid_values.empty else pd.NA
             fill_val = median_val if pd.notna(median_val) else 0
 
             # Handle Int64 (nullable integer) dtype - must use integer fill value

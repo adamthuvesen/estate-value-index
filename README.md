@@ -172,7 +172,7 @@ fixtures are synthetic and are the only data meant for public redistribution.
 ## Common tasks
 
 ```bash
-# Test (Python coverage gate is 70%)
+# Test (Python coverage gate is 59%)
 uv run pytest
 cd web && npm test && cd ..
 

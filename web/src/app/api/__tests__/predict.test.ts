@@ -28,6 +28,10 @@ function mockFastApiPrediction(predictedPrice: number, modelId = 'no_list_price'
   )
 }
 
+beforeEach(() => {
+  jest.spyOn(console, 'error').mockImplementation(() => {})
+})
+
 afterEach(() => {
   jest.restoreAllMocks()
 })
@@ -49,6 +53,60 @@ describe('/api/predict', () => {
   })
 
   describe('POST /api/predict', () => {
+    it('rejects invalid numeric input before calling FastAPI', async () => {
+      const fetchSpy = jest.spyOn(global, 'fetch')
+
+      const response = await POST(makeRequest({ living_area: -1 }))
+      const data = await response.json()
+
+      expect(response.status).toBe(400)
+      expect(data.error).toContain('living_area')
+      expect(fetchSpy).not.toHaveBeenCalled()
+    })
+
+    it('rejects unknown model ids before calling FastAPI', async () => {
+      const fetchSpy = jest.spyOn(global, 'fetch')
+
+      const response = await POST(makeRequest({ living_area: 55, model: 'old_listing' }))
+      const data = await response.json()
+
+      expect(response.status).toBe(400)
+      expect(data.error).toContain('model')
+      expect(fetchSpy).not.toHaveBeenCalled()
+    })
+
+    it('preserves safe upstream status without exposing backend details', async () => {
+      jest.spyOn(global, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({ detail: 'internal path /app/secret/model.joblib' }), {
+          status: 429,
+          headers: { 'content-type': 'application/json' },
+        })
+      )
+
+      const response = await POST(makeRequest({ living_area: 55 }))
+      const data = await response.json()
+
+      expect(response.status).toBe(429)
+      expect(data.error).toContain('rate limit')
+      expect(JSON.stringify(data)).not.toContain('/app/secret')
+    })
+
+    it('maps unexpected upstream failures to a safe 502', async () => {
+      jest.spyOn(global, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({ detail: 'backend stack trace' }), {
+          status: 500,
+          headers: { 'content-type': 'application/json' },
+        })
+      )
+
+      const response = await POST(makeRequest({ living_area: 55 }))
+      const data = await response.json()
+
+      expect(response.status).toBe(502)
+      expect(data.error).toContain('unexpected error')
+      expect(JSON.stringify(data)).not.toContain('stack trace')
+    })
+
     it('rounds no-list predictions up for the 100k display range', async () => {
       mockFastApiPrediction(2_136_441)
 

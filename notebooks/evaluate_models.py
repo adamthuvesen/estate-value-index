@@ -3,7 +3,8 @@
 
 Not the production training/eval path: this script uses a random ``train_test_split``
 after full feature engineering. For temporal, leakage-safe evaluation use
-``train_model.py`` and the tests under ``tests/ml/``.
+``uv run python -m estate_value_index.cli train-production-models`` and the tests
+under ``tests/ml/``.
 """
 
 from __future__ import annotations

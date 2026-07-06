@@ -3,8 +3,7 @@
 The canonical area-key normaliser is
 :func:`estate_value_index.ml.preprocessing.normalize_area_for_model` and is
 re-exported here as ``normalize_area_key`` for a stable entry point alongside
-the display-name mapping. Historically this slug logic was duplicated and
-diverged subtly from the ML-side rules, so the implementation now delegates.
+the display-name mapping.
 """
 
 from estate_value_index.ml.preprocessing import normalize_area_for_model as _normalize
@@ -60,8 +59,6 @@ def get_display_name(area_key: str) -> str:
 def normalize_area_key(area_name: str) -> str:
     """Normalize an area string to a stable ASCII slug.
 
-    Thin re-export of :func:`normalize_area_for_model` so a single
-    transliteration / generic-token / Booli-format implementation lives in the
-    ML preprocessing module.
+    Thin re-export of :func:`normalize_area_for_model`.
     """
     return _normalize(area_name)

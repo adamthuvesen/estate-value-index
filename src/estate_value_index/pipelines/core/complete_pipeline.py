@@ -162,7 +162,6 @@ def _training_config(
             skip_materialization=not skip_scraping,
             register_to_vertex=False,
             stream_logs=True,
-            production_mode=True,
             dry_run=dry_run,
             use_vertex=True,
         )
@@ -170,7 +169,6 @@ def _training_config(
     return TrainingFlowConfig(
         tune=tune,
         use_vertex=False,
-        production_mode=True,
     )
 
 

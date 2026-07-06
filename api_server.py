@@ -15,6 +15,7 @@ import time
 import warnings
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Literal
 from uuid import uuid4
 
 import joblib
@@ -193,23 +194,48 @@ async def rate_limit_middleware(request: Request, call_next):
 class PredictionRequest(BaseModel):
     """Prediction request payload."""
 
-    listing_price: float | None = Field(default=None, description="Property listing price in SEK")
-    living_area: float = Field(..., description="Living area in square meters")
-    rooms: float = Field(default=2, description="Number of rooms")
-    monthly_fee: float = Field(default=3000, description="Monthly fee in SEK")
-    days_on_market: float = Field(default=30, description="Days property has been on market")
-    construction_year: int = Field(default=1970, description="Year property was constructed")
-    municipality: str = Field(default="Stockholm", description="Municipality name")
-    property_type: str = Field(default="Lägenhet", description="Property type")
-    area: str = Field(default="Södermalm", description="Area/neighborhood name")
-    model: str = Field(
-        default=AUTO_MODEL, description="Model id to use: auto, no_list_price, with_list_price"
+    listing_price: float | None = Field(
+        default=None,
+        gt=0,
+        allow_inf_nan=False,
+        description="Property listing price in SEK",
     )
-    floor: float | None = Field(default=None, description="Floor number")
+    living_area: float = Field(
+        ..., gt=0, allow_inf_nan=False, description="Living area in square meters"
+    )
+    rooms: float = Field(default=2, gt=0, allow_inf_nan=False, description="Number of rooms")
+    monthly_fee: float = Field(
+        default=3000, ge=0, allow_inf_nan=False, description="Monthly fee in SEK"
+    )
+    days_on_market: float = Field(
+        default=30, ge=0, allow_inf_nan=False, description="Days property has been on market"
+    )
+    construction_year: int = Field(
+        default=1970, ge=1800, le=2100, description="Year property was constructed"
+    )
+    municipality: str = Field(
+        default="Stockholm", min_length=1, max_length=120, description="Municipality name"
+    )
+    property_type: str = Field(
+        default="Lägenhet", min_length=1, max_length=80, description="Property type"
+    )
+    area: str = Field(
+        default="Södermalm", min_length=1, max_length=160, description="Area/neighborhood name"
+    )
+    model: Literal["auto", "no_list_price", "with_list_price"] = Field(
+        default=AUTO_MODEL, description="Model id to use"
+    )
+    floor: float | None = Field(
+        default=None, ge=-20, le=200, allow_inf_nan=False, description="Floor number"
+    )
     elevator: bool | None = Field(default=None, description="Has elevator")
     balcony: bool | None = Field(default=None, description="Has balcony")
-    latitude: float | None = Field(default=None, description="Property latitude")
-    longitude: float | None = Field(default=None, description="Property longitude")
+    latitude: float | None = Field(
+        default=None, ge=-90, le=90, allow_inf_nan=False, description="Property latitude"
+    )
+    longitude: float | None = Field(
+        default=None, ge=-180, le=180, allow_inf_nan=False, description="Property longitude"
+    )
 
 
 class PredictionResponse(BaseModel):
@@ -446,62 +472,6 @@ def _resolve_prediction_model(requested_model: str, listing_price: float | None)
     return model_type
 
 
-@app.get("/diagnostics/area-sensitivity")
-async def area_sensitivity_check():
-    """Compare predictions for identical apartments in two areas to gauge area sensitivity."""
-    try:
-        if LISTING_MODEL not in MODEL_CACHE:
-            raise HTTPException(status_code=503, detail="Listing model not loaded")
-
-        entry = MODEL_CACHE[LISTING_MODEL]
-        pipeline = entry.get("model")
-        if pipeline is None:
-            raise HTTPException(status_code=503, detail="Model pipeline not available")
-
-        base_case = {
-            "living_area": 60,
-            "rooms": 2,
-            "monthly_fee": 3000,
-            "construction_year": 1960,
-            "has_elevator": "yes",
-            "has_balcony": "yes",
-            "floor": 3,
-            "days_on_market": 20,
-        }
-        test_cases = [
-            {**base_case, "area": "Östermalm", "listing_price": 7000000},
-            {**base_case, "area": "Sundbyberg", "listing_price": 5200000},
-        ]
-
-        predictions: dict[str, float] = {}
-        for case in test_cases:
-            area_display = case["area"]
-            row = {
-                **{k: v for k, v in case.items() if k != "area"},
-                "area": normalize_area_for_model(area_display),
-            }
-            pred_arr = await asyncio.to_thread(pipeline.predict, pd.DataFrame([row]))
-            predictions[area_display] = float(pred_arr[0])
-
-        expected_diff = 1_800_000
-        actual_diff = predictions["Östermalm"] - predictions["Sundbyberg"]
-        sensitivity_pct = (actual_diff / expected_diff) * 100
-
-        return {
-            "test": "area_sensitivity",
-            "predictions": predictions,
-            "expected_difference_sek": expected_diff,
-            "actual_difference_sek": int(actual_diff),
-            "sensitivity_percent": round(sensitivity_pct, 1),
-            "status": "pass" if sensitivity_pct >= 80.0 else "fail",
-            "threshold_percent": 80.0,
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        _raise_internal_error("Diagnostics failed", e)
-
-
 @app.get("/")
 async def root():
     """Root endpoint with API information."""
@@ -511,7 +481,6 @@ async def root():
         "endpoints": {
             "health": "GET /health - Health check",
             "predict": "POST /predict - Make price prediction",
-            "diagnostics": "GET /diagnostics/area-sensitivity - Model area sensitivity check",
         },
         "models_loaded": list(MODEL_CACHE.keys()) if MODEL_CACHE else [],
         "documentation": "/docs",
