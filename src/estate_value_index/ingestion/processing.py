@@ -76,10 +76,8 @@ def _pick_newer(existing: dict, new: dict) -> dict:
     if new_sold is not None and existing_sold is None:
         return new
 
-    # Normalize to naive UTC: records come from a mix of tz-aware (current
-    # scraper, "...+00:00") and naive (older prod data) ISO timestamps, and
-    # comparing the two kinds directly raises TypeError. Both represent UTC, so
-    # dropping the offset makes them comparable without shifting the instant.
+    # Timestamps mix tz-aware and naive ISO forms (both UTC); drop the offset
+    # so comparing across the two can't raise TypeError.
     try:
         existing_scraped = datetime.fromisoformat(str(existing.get("scraped_at"))).replace(
             tzinfo=None
