@@ -26,8 +26,8 @@ class DriftResult:
     drifted_features: list[str]
     drift_score: float
     performance_degraded: bool
-    current_mae: float | None
-    reference_mae: float | None
+    current_median_ape: float | None
+    reference_median_ape: float | None
     degradation_pct: float | None
     report_html: str
     timestamp: str
@@ -39,8 +39,6 @@ class _ExtractedMetrics:
     dataset_drift: bool
     drifted_features: list[str]
     drift_scores: list[float]
-    current_mae: float | None
-    reference_mae: float | None
 
 
 class ModelMonitor:
@@ -101,8 +99,15 @@ class ModelMonitor:
 
         extracted = self._extract_all_metrics(drift_report.as_dict())
         drift_score = self._drift_score(extracted.drift_scores)
+        # Gate performance on MdAPE (median absolute % error), the AVM-standard
+        # metric. Evidently reports MAE, not MdAPE, so compute it from the data.
+        current_median_ape = self._median_ape(current_data, target_column, prediction_column)
+        reference_median_ape = self._median_ape(
+            self.reference_data, target_column, prediction_column
+        )
         performance_degraded, degradation_pct = self._performance_degradation(
-            extracted,
+            current_median_ape,
+            reference_median_ape,
             has_predictions=has_predictions,
         )
 
@@ -117,13 +122,30 @@ class ModelMonitor:
             drifted_features=extracted.drifted_features,
             drift_score=drift_score,
             performance_degraded=performance_degraded,
-            current_mae=extracted.current_mae,
-            reference_mae=extracted.reference_mae,
+            current_median_ape=current_median_ape,
+            reference_median_ape=reference_median_ape,
             degradation_pct=degradation_pct,
             report_html=drift_report.get_html(),
             timestamp=datetime.now().isoformat(),
             num_drifted_features=len(extracted.drifted_features),
         )
+
+    def _median_ape(
+        self,
+        data: pd.DataFrame,
+        target_column: str,
+        prediction_column: str,
+    ) -> float | None:
+        """Median absolute % error, or None when target/prediction are unavailable."""
+        if target_column not in data.columns or prediction_column not in data.columns:
+            return None
+        actual = pd.to_numeric(data[target_column], errors="coerce")
+        predicted = pd.to_numeric(data[prediction_column], errors="coerce")
+        abs_pct = (predicted - actual).abs() / actual.replace(0, pd.NA)
+        abs_pct = abs_pct.replace([float("inf"), float("-inf")], pd.NA).dropna()
+        if abs_pct.empty:
+            return None
+        return float(abs_pct.median())
 
     def _has_predictions(
         self,
@@ -195,25 +217,29 @@ class ModelMonitor:
 
     def _performance_degradation(
         self,
-        extracted: _ExtractedMetrics,
+        current_median_ape: float | None,
+        reference_median_ape: float | None,
         *,
         has_predictions: bool,
     ) -> tuple[bool, float | None]:
-        if not has_predictions or extracted.current_mae is None or extracted.reference_mae is None:
+        if (
+            not has_predictions
+            or current_median_ape is None
+            or reference_median_ape is None
+            or reference_median_ape == 0
+        ):
             return False, None
 
         degradation_pct = (
-            (extracted.current_mae - extracted.reference_mae) / extracted.reference_mae * 100
+            (current_median_ape - reference_median_ape) / reference_median_ape * 100
         )
         return degradation_pct > (PERFORMANCE_DEGRADATION_THRESHOLD * 100), degradation_pct
 
     def _extract_all_metrics(self, report_dict: dict) -> _ExtractedMetrics:
-        """Extract drift + regression metrics from an Evidently report dict."""
+        """Extract data-drift metrics from an Evidently report dict."""
         dataset_drift = False
         drifted_features: list[str] = []
         drift_scores: list[float] = []
-        current_mae: float | None = None
-        reference_mae: float | None = None
 
         for metric in report_dict.get("metrics", []):
             metric_type = metric.get("metric")
@@ -231,14 +257,8 @@ class ModelMonitor:
                     score = 1.0
                 drift_scores.append(score)
 
-            elif metric_type == "RegressionQualityMetric":
-                current_mae = result.get("current", {}).get("mean_absolute_error")
-                reference_mae = result.get("reference", {}).get("mean_absolute_error")
-
         return _ExtractedMetrics(
             dataset_drift=dataset_drift,
             drifted_features=drifted_features,
             drift_scores=drift_scores,
-            current_mae=current_mae,
-            reference_mae=reference_mae,
         )

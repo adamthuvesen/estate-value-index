@@ -199,7 +199,7 @@ def mock_subprocess_failure(mocker: Any) -> MagicMock:
 
 @pytest.fixture
 def temp_metrics_file(tmp_path: Path) -> Path:
-    """Temporary metrics JSON file."""
+    """Temporary metrics JSON file (MdAPE below the 8% gate)."""
     import json
 
     metrics = {
@@ -207,6 +207,7 @@ def temp_metrics_file(tmp_path: Path) -> Path:
         "rmse": 350_000,
         "r2": 0.85,
         "mape": 0.12,
+        "median_ape": 0.06,
     }
     metrics_path = tmp_path / "metrics.json"
     metrics_path.write_text(json.dumps(metrics))
@@ -214,16 +215,17 @@ def temp_metrics_file(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def temp_metrics_file_high_mae(tmp_path: Path) -> Path:
-    """Temporary metrics JSON file with MAE above threshold."""
+def temp_metrics_file_high_mdape(tmp_path: Path) -> Path:
+    """Temporary metrics JSON file with MdAPE above the 8% gate."""
     import json
 
     metrics = {
-        "mae": 300_000,  # Above typical 255K threshold
+        "mae": 300_000,
         "rmse": 400_000,
         "r2": 0.75,
+        "median_ape": 0.10,
     }
-    metrics_path = tmp_path / "metrics_high_mae.json"
+    metrics_path = tmp_path / "metrics_high_mdape.json"
     metrics_path.write_text(json.dumps(metrics))
     return metrics_path
 

@@ -179,8 +179,8 @@ def monitor_model_drift_task(
                 "num_drifted_features": 0,
                 "drift_score": 0.0,
                 "performance_degraded": False,
-                "current_mae": None,
-                "reference_mae": None,
+                "current_median_ape": None,
+                "reference_median_ape": None,
                 "degradation_pct": None,
                 "timestamp": datetime.now().isoformat(),
                 "error": "Baseline not found - run model training first to create baseline",
@@ -231,7 +231,7 @@ def monitor_model_drift_task(
     if result.performance_degraded:
         logger.critical(
             f"Model performance degraded by {result.degradation_pct:.1f}%! "
-            f"MAE: {result.reference_mae:,.0f} → {result.current_mae:,.0f}"
+            f"MdAPE: {result.reference_median_ape:.2%} → {result.current_median_ape:.2%}"
         )
 
     # Return structured result
@@ -242,8 +242,8 @@ def monitor_model_drift_task(
         "num_drifted_features": result.num_drifted_features,
         "drift_score": result.drift_score,
         "performance_degraded": result.performance_degraded,
-        "current_mae": result.current_mae,
-        "reference_mae": result.reference_mae,
+        "current_median_ape": result.current_median_ape,
+        "reference_median_ape": result.reference_median_ape,
         "degradation_pct": result.degradation_pct,
         "timestamp": result.timestamp,
     }

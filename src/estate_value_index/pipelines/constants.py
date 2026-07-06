@@ -7,10 +7,11 @@ DEFAULT_MACHINE_TYPE = "n1-standard-4"
 # Model defaults
 DEFAULT_MODEL_PREFIX = "price_prediction_model"
 DEFAULT_MODEL_DIR = "web/models"
-# Single production quality bar; .github/workflows/ml-pipeline.yml repeats this
-# number inline (it cannot import Python), guarded by a test in
-# tests/unit/pipelines/test_training_pipeline.py.
-DEFAULT_MAE_THRESHOLD = 350_000
+# Single production quality bar, as MdAPE (median absolute % error) — the
+# AVM-standard headline metric, scale-robust unlike an absolute-SEK MAE gate.
+# .github/workflows/ml-pipeline.yml repeats this number inline (it cannot import
+# Python), guarded by a test in tests/unit/pipelines/test_training_pipeline.py.
+DEFAULT_MEDIAN_APE_THRESHOLD = 0.08
 
 # Polling defaults
 DEFAULT_POLL_INTERVAL = 30

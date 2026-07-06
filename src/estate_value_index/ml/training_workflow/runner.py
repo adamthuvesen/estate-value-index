@@ -45,7 +45,11 @@ from estate_value_index.utils.gcs import (
     upload_blob,
     upload_model_artifacts,
 )
-from estate_value_index.utils.settings import get_mae_threshold, get_random_state, get_test_size
+from estate_value_index.utils.settings import (
+    get_median_ape_threshold,
+    get_random_state,
+    get_test_size,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -719,16 +723,18 @@ def _persist_evaluation_model(
     with open(resolved_model_dir / f"{prefix}_feature_context.json", "w", encoding="utf-8") as f:
         json.dump(context_payload, f, indent=2, ensure_ascii=False)
 
-    target_mae = get_mae_threshold()
+    target_median_ape = get_median_ape_threshold()
 
     metrics_lgbm = {
         "mae": lgbm_metrics["mae"],
         "rmse": lgbm_metrics["rmse"],
         "mape": lgbm_metrics["mape"],
+        "median_ape": lgbm_metrics["median_ape"],
         "within_10_pct": lgbm_metrics["within_10_pct"],
+        "within_20_pct": lgbm_metrics.get("within_20_pct"),
         "n_train": final_results["train_size"],
         "n_test": final_results["test_size"],
-        "target_achieved": lgbm_metrics["mae"] < target_mae,
+        "target_achieved": lgbm_metrics["median_ape"] < target_median_ape,
         "features_used": all_features,
         "best_params": lgbm_metrics["best_params"],
         "tuning_time_seconds": lgbm_metrics["tuning_time"],

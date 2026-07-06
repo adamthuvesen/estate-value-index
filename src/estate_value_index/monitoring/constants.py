@@ -3,7 +3,7 @@
 # Drift thresholds
 WASSERSTEIN_THRESHOLD = 0.1  # Data drift threshold for numeric features
 CHI_SQUARE_ALPHA = 0.05  # Categorical drift significance level
-PERFORMANCE_DEGRADATION_THRESHOLD = 0.10  # 10% MAE increase triggers alert
+PERFORMANCE_DEGRADATION_THRESHOLD = 0.10  # 10% MdAPE increase triggers alert
 
 # Critical features for drift monitoring (high importance from feature engineering)
 CRITICAL_NUMERIC_FEATURES = [

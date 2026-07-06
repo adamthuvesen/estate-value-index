@@ -44,6 +44,7 @@ class ValidationResult(TaskResult):
     """Result from model validation tasks."""
 
     validation_passed: bool
+    median_ape: float
     mae: float
     rmse: float | None
     reasons: list[str]

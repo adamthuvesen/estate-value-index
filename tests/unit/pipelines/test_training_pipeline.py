@@ -9,7 +9,7 @@ from unittest.mock import MagicMock
 import pytest
 
 import estate_value_index.pipelines.tasks as pipeline_tasks
-from estate_value_index.pipelines.constants import DEFAULT_MAE_THRESHOLD
+from estate_value_index.pipelines.constants import DEFAULT_MEDIAN_APE_THRESHOLD
 from estate_value_index.pipelines.core import training_pipeline
 from estate_value_index.pipelines.core.training_pipeline import (
     _artifact_locations_from_job_info,
@@ -276,14 +276,14 @@ class TestValidateAndPromoteStage:
     def _validation_result(self, passed: bool) -> dict:
         return {
             "validation_passed": passed,
+            "median_ape": 0.062,
             "mae": 271_788.0,
             "rmse": None,
-            "r2": None,
-            "reasons": [] if passed else ["MAE (271,788) exceeds threshold"],
+            "reasons": [] if passed else ["MdAPE (6.20%) exceeds threshold"],
         }
 
     @pytest.mark.unit
-    def test_sets_validation_mae_passed_true_when_validation_passes(
+    def test_sets_validation_median_ape_passed_true_when_validation_passes(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setattr(
@@ -299,14 +299,14 @@ class TestValidateAndPromoteStage:
         _validate_and_promote_stage(config, state, results, MagicMock())
 
         assert results["validation_passed"] is True
-        assert results["validation_mae_passed"] is True
+        assert results["validation_median_ape_passed"] is True
 
     @pytest.mark.unit
-    def test_sets_validation_mae_passed_false_when_validation_fails(
+    def test_sets_validation_median_ape_passed_false_when_validation_fails(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """The production failure path: ml-pipeline.yml reads
-        validation_mae_passed and must not silently default to True."""
+        validation_median_ape_passed and must not silently default to True."""
         monkeypatch.setattr(
             training_pipeline,
             "validate_model_performance_task",
@@ -320,10 +320,10 @@ class TestValidateAndPromoteStage:
         _validate_and_promote_stage(config, state, results, MagicMock())
 
         assert results["validation_passed"] is False
-        assert results["validation_mae_passed"] is False
+        assert results["validation_median_ape_passed"] is False
 
     @pytest.mark.unit
-    def test_sets_validation_mae_passed_false_when_metrics_file_missing(
+    def test_sets_validation_median_ape_passed_false_when_metrics_file_missing(
         self, tmp_path: Path
     ) -> None:
         config = TrainingFlowConfig(local_model_dir=str(tmp_path), dry_run=True)
@@ -333,7 +333,7 @@ class TestValidateAndPromoteStage:
         _validate_and_promote_stage(config, state, results, MagicMock())
 
         assert results["validation_passed"] is False
-        assert results["validation_mae_passed"] is False
+        assert results["validation_median_ape_passed"] is False
 
 
 class TestGenerateEnrichmentStage:
@@ -413,33 +413,33 @@ class TestGenerateEnrichmentStage:
         assert "enrichment" not in results["steps"]
 
 
-class TestMaeThresholdSingleSourceOfTruth:
+class TestMedianApeThresholdSingleSourceOfTruth:
     @pytest.mark.unit
-    def test_workflow_yml_gate_matches_default_mae_threshold(self) -> None:
-        """ml-pipeline.yml cannot import Python constants, so its inline MAE
-        gate must be kept equal to DEFAULT_MAE_THRESHOLD by hand."""
+    def test_workflow_yml_gate_matches_default_median_ape_threshold(self) -> None:
+        """ml-pipeline.yml cannot import Python constants, so its inline MdAPE
+        gate must be kept equal to DEFAULT_MEDIAN_APE_THRESHOLD by hand."""
         workflow_path = Path(__file__).parents[3] / ".github" / "workflows" / "ml-pipeline.yml"
         workflow_text = workflow_path.read_text()
 
-        gates = re.findall(r"if mae > (\d+)", workflow_text)
+        gates = re.findall(r"if median_ape > (\d+\.\d+)", workflow_text)
 
-        assert gates, "MAE quality gate not found in ml-pipeline.yml"
-        assert [int(gate) for gate in gates] == [DEFAULT_MAE_THRESHOLD]
+        assert gates, "MdAPE quality gate not found in ml-pipeline.yml"
+        assert [float(gate) for gate in gates] == [DEFAULT_MEDIAN_APE_THRESHOLD]
 
     @pytest.mark.unit
-    def test_production_flow_uses_default_mae_threshold(
+    def test_production_flow_uses_default_median_ape_threshold(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         captured: dict = {}
         monkeypatch.setattr(
             training_pipeline,
             "vertex_training_flow",
-            lambda config: captured.update(max_mae=config.max_mae) or {},
+            lambda config: captured.update(max_median_ape=config.max_median_ape) or {},
         )
 
         training_pipeline.production_vertex_training_flow.fn(rebuild=False, register=False)
 
-        assert captured["max_mae"] == DEFAULT_MAE_THRESHOLD
+        assert captured["max_median_ape"] == DEFAULT_MEDIAN_APE_THRESHOLD
 
     @pytest.mark.unit
     def test_validate_task_default_matches_constant(self) -> None:
@@ -450,4 +450,4 @@ class TestMaeThresholdSingleSourceOfTruth:
         )
 
         signature = inspect.signature(validate_model_performance_task.fn)
-        assert signature.parameters["max_mae"].default == DEFAULT_MAE_THRESHOLD
+        assert signature.parameters["max_median_ape"].default == DEFAULT_MEDIAN_APE_THRESHOLD

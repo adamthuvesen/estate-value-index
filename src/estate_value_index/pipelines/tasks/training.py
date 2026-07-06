@@ -13,7 +13,7 @@ from typing import Final
 
 from prefect import task
 
-from estate_value_index.pipelines.constants import DEFAULT_MAE_THRESHOLD
+from estate_value_index.pipelines.constants import DEFAULT_MEDIAN_APE_THRESHOLD
 from estate_value_index.pipelines.types import (
     MaterializationResult,
     ValidationResult,
@@ -447,14 +447,17 @@ def download_model_artifacts_task(
 @task(name="validate-model-performance", retries=0, timeout_seconds=60)
 def validate_model_performance_task(
     metrics_path: Path,
-    max_mae: float = DEFAULT_MAE_THRESHOLD,
+    max_median_ape: float = DEFAULT_MEDIAN_APE_THRESHOLD,
     max_rmse: float | None = None,
 ) -> ValidationResult:
     """Validate model performance against thresholds.
 
+    Gates on MdAPE (median absolute % error), the AVM-standard headline metric.
+    MAE/RMSE are logged for context but do not decide acceptance.
+
     Args:
         metrics_path: Path to metrics JSON file
-        max_mae: Maximum acceptable MAE
+        max_median_ape: Maximum acceptable MdAPE (fraction, e.g. 0.08 = 8%)
         max_rmse: Optional maximum acceptable RMSE
 
     Returns:
@@ -466,23 +469,23 @@ def validate_model_performance_task(
     with open(metrics_path) as f:
         metrics = json.load(f)
 
+    median_ape = metrics.get("median_ape")
     mae = metrics.get("mae")
     rmse = metrics.get("rmse")
-    r2 = metrics.get("r2")
 
-    if mae is None:
-        raise ValueError("MAE not found in metrics file")
+    if median_ape is None:
+        raise ValueError("median_ape not found in metrics file")
 
+    mae_str = f"{mae:,.0f}" if mae else "N/A"
     rmse_str = f"{rmse:,.0f}" if rmse else "N/A"
-    r2_str = f"{r2:.4f}" if r2 else "N/A"
-    logger.info(f"Model metrics: MAE={mae:,.0f}, RMSE={rmse_str}, R2={r2_str}")
+    logger.info(f"Model metrics: MdAPE={median_ape:.2%}, MAE={mae_str}, RMSE={rmse_str}")
 
     validation_passed = True
     reasons: list[str] = []
 
-    if mae > max_mae:
+    if median_ape > max_median_ape:
         validation_passed = False
-        reasons.append(f"MAE ({mae:,.0f}) exceeds threshold ({max_mae:,.0f})")
+        reasons.append(f"MdAPE ({median_ape:.2%}) exceeds threshold ({max_median_ape:.2%})")
 
     if max_rmse and rmse and rmse > max_rmse:
         validation_passed = False
@@ -497,7 +500,8 @@ def validate_model_performance_task(
         success=True,
         timestamp=datetime.now().isoformat(),
         validation_passed=validation_passed,
-        mae=mae,
+        median_ape=median_ape,
+        mae=mae or 0.0,
         rmse=rmse or 0.0,
         reasons=reasons,
     )

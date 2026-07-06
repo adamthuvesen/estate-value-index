@@ -241,8 +241,8 @@ class TestModelMonitor:
 
         assert isinstance(result, DriftResult)
         # Degradation may not always trigger depending on threshold and seed
-        assert result.current_mae is not None
-        assert result.reference_mae is not None
+        assert result.current_median_ape is not None
+        assert result.reference_median_ape is not None
         assert result.degradation_pct is not None
 
     def test_drift_result_structure(
@@ -260,8 +260,8 @@ class TestModelMonitor:
             "drifted_features",
             "drift_score",
             "performance_degraded",
-            "current_mae",
-            "reference_mae",
+            "current_median_ape",
+            "reference_median_ape",
             "degradation_pct",
             "report_html",
             "timestamp",
@@ -315,9 +315,9 @@ def test_drift_result_dataclass():
         drifted_features=["living_area", "price_per_sqm"],
         drift_score=0.35,
         performance_degraded=False,
-        current_mae=250000.0,
-        reference_mae=240000.0,
-        degradation_pct=4.17,
+        current_median_ape=0.062,
+        reference_median_ape=0.058,
+        degradation_pct=6.9,
         report_html="<html>Test Report</html>",
         timestamp="2025-12-24T10:00:00",
         num_drifted_features=2,

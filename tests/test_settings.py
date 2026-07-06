@@ -14,8 +14,8 @@ from src.estate_value_index.utils.settings import (
     get_cloud_run_service_name,
     get_cv_folds,
     get_data_source,
-    get_mae_threshold,
     get_max_pages,
+    get_median_ape_threshold,
     get_model_output_dir,
     get_model_prefix,
     get_random_state,
@@ -80,7 +80,7 @@ class TestYamlConfig:
     def test_load_yaml_config_existing_file(self):
         yaml_content = """
 training:
-  mae_threshold: 300000
+  median_ape_threshold: 0.07
   random_state: 123
   cv_folds: 3
   test_size: 0.3
@@ -101,7 +101,7 @@ scraping:
             try:
                 config = load_yaml_config(f.name)
 
-                assert config["training"]["mae_threshold"] == 300000
+                assert config["training"]["median_ape_threshold"] == 0.07
                 assert config["training"]["random_state"] == 123
                 assert config["training"]["cv_folds"] == 3
                 assert config["training"]["test_size"] == 0.3
@@ -124,20 +124,20 @@ class TestHelperFunctions:
     def test_bq_table(self):
         assert bq_table("project", "dataset", "table") == "project.dataset.table"
 
-    def test_get_mae_threshold_from_env(self):
-        with patch.dict(os.environ, {"MAX_MAE_THRESHOLD": "300000"}):
-            assert get_mae_threshold() == 300000
+    def test_get_median_ape_threshold_from_env(self):
+        with patch.dict(os.environ, {"MAX_MEDIAN_APE_THRESHOLD": "0.09"}):
+            assert get_median_ape_threshold() == 0.09
 
-    def test_get_mae_threshold_from_yaml(self):
-        with patch.dict(os.environ, {"MAX_MAE_THRESHOLD": ""}):
+    def test_get_median_ape_threshold_from_yaml(self):
+        with patch.dict(os.environ, {"MAX_MEDIAN_APE_THRESHOLD": ""}):
             with patch("src.estate_value_index.utils.settings.load_yaml_config") as mock_load:
-                mock_load.return_value = {"training": {"mae_threshold": 350000}}
-                assert get_mae_threshold() == 350000
+                mock_load.return_value = {"training": {"median_ape_threshold": 0.07}}
+                assert get_median_ape_threshold() == 0.07
 
-    def test_get_mae_threshold_default(self):
+    def test_get_median_ape_threshold_default(self):
         with patch.dict(os.environ, {}, clear=True):
             with patch("src.estate_value_index.utils.settings.load_yaml_config", return_value={}):
-                assert get_mae_threshold() == 260000
+                assert get_median_ape_threshold() == 0.08
 
     def test_get_random_state_from_yaml(self):
         with patch("src.estate_value_index.utils.settings.load_yaml_config") as mock_load:
@@ -320,7 +320,7 @@ class TestConfigSummary:
         with patch.dict(os.environ, env_vars):
             with patch("src.estate_value_index.utils.settings.load_yaml_config") as mock_load:
                 mock_load.return_value = {
-                    "training": {"mae_threshold": 300000},
+                    "training": {"median_ape_threshold": 0.07},
                     "bigquery": {"batch_size": 2000},
                     "scraping": {"default_max_pages": 20},
                 }

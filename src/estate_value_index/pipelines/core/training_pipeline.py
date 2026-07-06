@@ -23,7 +23,7 @@ from pathlib import Path
 from prefect import flow, get_run_logger
 
 from estate_value_index.ml.training_workflow import TrainingConfig, run_training
-from estate_value_index.pipelines.constants import DEFAULT_MAE_THRESHOLD
+from estate_value_index.pipelines.constants import DEFAULT_MEDIAN_APE_THRESHOLD
 
 # Import training tasks from new focused modules
 from estate_value_index.pipelines.tasks import (
@@ -122,11 +122,13 @@ def _run_local_training(config: TrainingFlowConfig, results: dict, logger: Logge
     metrics_file = Path(config.local_model_dir) / f"{config.model_prefix}_metrics_lgbm.json"
     if metrics_file.exists():
         validation_results = validate_model_performance_task(
-            metrics_path=metrics_file, max_mae=config.max_mae, max_rmse=config.max_rmse
+            metrics_path=metrics_file,
+            max_median_ape=config.max_median_ape,
+            max_rmse=config.max_rmse,
         )
         results["steps"]["validation"] = validation_results
         results["validation_passed"] = validation_results["validation_passed"]
-        results["validation_mae_passed"] = validation_results["validation_passed"]
+        results["validation_median_ape_passed"] = validation_results["validation_passed"]
         results["metrics"] = {
             "mae": validation_results["mae"],
             "rmse": validation_results.get("rmse"),
@@ -411,16 +413,18 @@ def _validate_and_promote_stage(
     if not metrics_path.exists():
         logger.warning(f"Metrics file not found: {metrics_path}")
         results["validation_passed"] = False
-        results["validation_mae_passed"] = False
+        results["validation_median_ape_passed"] = False
         return
 
     validation_results = validate_model_performance_task(
-        metrics_path=metrics_path, max_mae=config.max_mae, max_rmse=config.max_rmse
+        metrics_path=metrics_path,
+        max_median_ape=config.max_median_ape,
+        max_rmse=config.max_rmse,
     )
     results["steps"]["validation"] = validation_results
     results["validation_passed"] = validation_results["validation_passed"]
     # ml-pipeline.yml reads this key; without it the workflow defaulted to True.
-    results["validation_mae_passed"] = validation_results["validation_passed"]
+    results["validation_median_ape_passed"] = validation_results["validation_passed"]
     results["metrics"] = {
         "mae": validation_results["mae"],
         "rmse": validation_results.get("rmse"),
@@ -608,7 +612,7 @@ def vertex_training_flow(config: TrainingFlowConfig | None = None) -> dict:
             "tune": config.tune,
             "machine_type": config.machine_type,
             "importance_threshold": config.importance_threshold,
-            "max_mae": config.max_mae,
+            "max_median_ape": config.max_median_ape,
         },
         "steps": {},
         "start_time": flow_start_time.isoformat(),
@@ -705,7 +709,7 @@ def production_vertex_training_flow(rebuild: bool = False, register: bool = True
         register_to_vertex=register,
         stream_logs=True,
         use_vertex=True,
-        max_mae=DEFAULT_MAE_THRESHOLD,
+        max_median_ape=DEFAULT_MEDIAN_APE_THRESHOLD,
     )
     return vertex_training_flow(config)
 

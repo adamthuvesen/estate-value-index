@@ -6,7 +6,7 @@
 # ==============================================================================
 training:
   # Performance thresholds
-  mae_threshold: 260000  # Maximum acceptable MAE in SEK
+  median_ape_threshold: 0.08  # Maximum acceptable MdAPE (median absolute % error)
   max_training_time_minutes: 120  # Timeout for training jobs
 
   # Feature engineering
@@ -138,7 +138,7 @@ monitoring:
     drift_threshold:
       wasserstein_distance: 0.1  # Statistical test threshold for numeric features
       chi_square_alpha: 0.05  # Significance level for categorical features
-      performance_degradation_pct: 10.0  # % MAE increase triggering retraining
+      performance_degradation_pct: 10.0  # % MdAPE increase triggering retraining
       min_drifted_features: 3  # Minimum drifted features for alert
 
     # Auto-retraining settings
