@@ -18,17 +18,17 @@ export function RoomFilterComponent({
   }
 
   const filters: { key: RoomFilter; label: string }[] = [
-    { key: "all", label: "ALL" },
-    { key: "2", label: "2R" },
-    { key: "3", label: "3R" },
-    { key: "4+", label: "4+R" },
+    { key: "all", label: "All" },
+    { key: "2", label: "2 rooms" },
+    { key: "3", label: "3 rooms" },
+    { key: "4+", label: "4+ rooms" },
   ];
 
   return (
     <div className="mx-auto mb-6 max-w-3xl">
-      <div className="flex items-center gap-4 rounded-tactical border border-tactical-border bg-tactical-elevated px-4 py-3">
+      <div className="flex items-center gap-4 rounded-xl border border-tactical-border bg-tactical-elevated px-4 py-3">
         <div>
-          <label className="tactical-label text-[10px]">ROOMS</label>
+          <span className="text-[11px] font-semibold uppercase tracking-tactical-wide text-tactical-dimmed">Rooms</span>
         </div>
         <div className="flex flex-1 flex-wrap gap-1.5">
           {filters.map(({ key, label }) => {
@@ -42,21 +42,21 @@ export function RoomFilterComponent({
               onClick={() => !isDisabled && onFilterChange(key)}
               disabled={isDisabled}
               className={`
-                flex items-center gap-1.5 rounded-tactical border px-3 py-1.5 font-mono text-[10px] font-semibold uppercase tracking-tactical transition-all duration-tactical
+                flex items-center gap-1.5 rounded-pill border px-3 py-1.5 text-[13px] font-medium transition-colors
                 ${
                   isActive
-                    ? "border-tactical-accent bg-tactical-accent text-tactical-bg shadow-[0_0_15px_rgba(255,51,51,0.2)]"
+                    ? "border-tactical-text bg-tactical-text text-white"
                     : isDisabled
-                    ? "cursor-not-allowed border-tactical-border bg-tactical-surface text-tactical-dimmed opacity-30"
-                    : "border-tactical-border bg-tactical-surface text-tactical-text hover:border-tactical-accent-hover hover:text-tactical-accent-hover"
+                    ? "cursor-not-allowed border-tactical-border bg-tactical-surface text-tactical-dimmed opacity-40"
+                    : "border-tactical-border bg-tactical-surface text-tactical-muted hover:border-tactical-border-emphasis hover:text-tactical-text"
                 }
               `}
             >
               <span>{label}</span>
               {stats && (
                 <span
-                  className={`text-[9px] font-normal ${
-                    isActive ? "text-tactical-bg/70" : "text-tactical-muted"
+                  className={`num text-[12px] font-normal ${
+                    isActive ? "text-white/70" : "text-tactical-dimmed"
                   }`}
                 >
                   ({stats.property_count})

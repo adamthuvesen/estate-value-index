@@ -12,8 +12,8 @@ const sections = [
   { id: "value", label: "Value" },
   { id: "size", label: "Size" },
   { id: "characteristics", label: "Characteristics" },
-  { id: "similar", label: "Similar Areas" },
-  { id: "recent", label: "Recent Sales" },
+  { id: "similar", label: "Similar areas" },
+  { id: "recent", label: "Recent sales" },
 ];
 
 export function SectionNavigation({ areaName }: SectionNavigationProps) {
@@ -60,10 +60,10 @@ export function SectionNavigation({ areaName }: SectionNavigationProps) {
   return (
     <div className="sticky top-4 z-40 mb-6">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="tactical-card p-4">
+        <div className="tactical-card p-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <h3 className="tactical-label text-tactical-text">{areaName}</h3>
+              <h3 className="text-[13px] font-semibold text-tactical-text">{areaName}</h3>
             </div>
             <nav className="hidden md:block">
               <ul className="flex gap-1">
@@ -71,10 +71,10 @@ export function SectionNavigation({ areaName }: SectionNavigationProps) {
                   <li key={section.id}>
                     <button
                       onClick={() => scrollToSection(section.id)}
-                      className={`rounded-tactical px-3 py-1.5 text-xs font-mono font-medium transition-all duration-tactical uppercase ${
+                      className={`rounded-pill px-3 py-1.5 text-[13px] font-medium transition-colors ${
                         activeSection === section.id
-                          ? "bg-tactical-accent text-tactical-bg border border-tactical-accent"
-                          : "text-tactical-muted hover:bg-tactical-elevated hover:text-tactical-text border border-tactical-border"
+                          ? "bg-tactical-text text-white"
+                          : "text-tactical-muted hover:bg-tactical-elevated hover:text-tactical-text"
                       }`}
                     >
                       {section.label}
@@ -84,7 +84,7 @@ export function SectionNavigation({ areaName }: SectionNavigationProps) {
               </ul>
             </nav>
             <div className="md:hidden">
-              <button className="tactical-btn-primary px-3 py-1.5 text-xs uppercase">
+              <button className="tactical-btn-primary px-3 py-1.5 text-[13px]">
                 Jump to section
               </button>
             </div>

@@ -54,7 +54,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.variable} ${jetbrainsMono.variable} bg-tactical-bg min-h-screen font-mono antialiased`}>
+      <body className={`${inter.variable} ${jetbrainsMono.variable} bg-tactical-bg min-h-screen font-sans antialiased`}>
         <div className="relative flex min-h-screen flex-col">
           <SiteHeader />
           <main className="flex-1">

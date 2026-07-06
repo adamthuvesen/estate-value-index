@@ -35,26 +35,18 @@ export function SimilarAreas({ currentArea, currentPriceTier, avgSoldPrice, allA
     return null;
   }
 
-  const getPriceTierBadgeClass = (tier: string) => {
-    switch (tier) {
-      case "premium":
-        return "bg-tactical-accent/10 text-tactical-accent border-tactical-accent/30";
-      case "upper":
-        return "bg-tactical-accent-hover/10 text-tactical-accent-hover border-tactical-accent-hover/30";
-      case "medium":
-        return "bg-tactical-success/10 text-tactical-success border-tactical-success/30";
-      case "budget":
-        return "bg-tactical-elevated text-tactical-muted border-tactical-border";
-      default:
-        return "bg-tactical-elevated text-tactical-muted border-tactical-border";
-    }
+  const tierLabel: Record<string, string> = {
+    premium: "Premium",
+    upper: "Upper",
+    medium: "Medium",
+    budget: "Budget",
   };
 
   return (
     <div>
       <div className="mb-6">
-        <h3 className="text-lg font-semibold tracking-tactical text-tactical-text font-mono uppercase">Similar Areas</h3>
-        <p className="text-xs text-tactical-muted font-mono tracking-tactical">COMPARABLE NEIGHBORHOODS BASED ON PRICE TIER AND MARKET CHARACTERISTICS</p>
+        <h3 className="text-[17px] font-semibold tracking-tight text-tactical-text">Similar areas</h3>
+        <p className="text-[13px] text-tactical-muted">Comparable neighbourhoods based on price tier and market characteristics</p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
@@ -62,38 +54,34 @@ export function SimilarAreas({ currentArea, currentPriceTier, avgSoldPrice, allA
           <Link
             key={area.area_name}
             href={`/area/${area.area_name}`}
-            className="group block overflow-hidden rounded-tactical border border-tactical-border bg-tactical-elevated transition-all duration-tactical hover:border-tactical-accent"
+            className="tactical-focus-ring group block overflow-hidden rounded-xl border border-tactical-border bg-tactical-surface shadow-elev-1 transition-all hover:-translate-y-0.5 hover:border-tactical-border-emphasis hover:shadow-elev-2"
           >
             <div className="p-5">
-              <div className="mb-3 flex items-start justify-between">
-                <h4 className="text-lg font-bold text-tactical-text font-mono transition-colors duration-tactical group-hover:text-tactical-accent">
+              <div className="mb-3 flex items-start justify-between gap-2">
+                <h4 className="text-[17px] font-semibold text-tactical-text transition-colors group-hover:text-tactical-accent">
                   {area.display_name}
                 </h4>
-                <span
-                  className={`inline-flex rounded-tactical border px-2.5 py-0.5 text-xs font-mono font-semibold uppercase ${getPriceTierBadgeClass(
-                    area.price_tier
-                  )}`}
-                >
-                  {area.price_tier}
+                <span className="inline-flex shrink-0 rounded-pill border border-tactical-border bg-tactical-elevated px-2.5 py-0.5 text-[12px] font-medium text-tactical-muted">
+                  {tierLabel[area.price_tier] ?? area.price_tier}
                 </span>
               </div>
 
               <div className="space-y-2">
-                <div className="flex items-center justify-between text-xs font-mono">
-                  <span className="text-tactical-muted uppercase">Avg Price</span>
-                  <span className="font-semibold text-tactical-text">{formatSek(area.avg_sold_price)}</span>
+                <div className="flex items-center justify-between text-[13px]">
+                  <span className="text-tactical-muted">Avg price</span>
+                  <span className="num font-medium text-tactical-text">{formatSek(area.avg_sold_price)}</span>
                 </div>
-                <div className="flex items-center justify-between text-xs font-mono">
-                  <span className="text-tactical-muted uppercase">Properties</span>
-                  <span className="font-semibold text-tactical-text">{formatNumber(area.listing_count)}</span>
+                <div className="flex items-center justify-between text-[13px]">
+                  <span className="text-tactical-muted">Properties</span>
+                  <span className="num font-medium text-tactical-text">{formatNumber(area.listing_count)}</span>
                 </div>
-                <div className="flex items-center justify-between text-xs font-mono">
-                  <span className="text-tactical-muted uppercase">Undervalued</span>
-                  <span className="font-semibold text-tactical-success">{formatNumberOrDash(area.undervalued_pct, 1)}%</span>
+                <div className="flex items-center justify-between text-[13px]">
+                  <span className="text-tactical-muted">Undervalued</span>
+                  <span className="num font-medium text-val-exc">{formatNumberOrDash(area.undervalued_pct, 1)}%</span>
                 </div>
               </div>
 
-              <div className="mt-4 flex items-center text-xs font-mono font-medium text-tactical-accent group-hover:text-tactical-accent-hover transition-colors duration-tactical uppercase">
+              <div className="mt-4 flex items-center text-[13px] font-medium text-tactical-accent transition-colors">
                 <span>View area details</span>
                 <svg
                   className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1"

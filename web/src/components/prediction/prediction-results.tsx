@@ -20,95 +20,94 @@ export function PredictionResults({
   isAboveAsking,
 }: PredictionResultsProps) {
   return (
-    <aside className="tactical-section-gap lg:col-span-1">
-      <div className="tactical-card p-6 tactical-corners">
-        <header className="mb-4 space-y-1">
-          <p className="tactical-label">PREDICTION OUTPUT</p>
-          <h3 className="text-2xl font-bold text-tactical-text tracking-tactical">RESULT</h3>
-        </header>
+    <aside className="space-y-4 lg:col-span-1">
+      <div className="tactical-card p-6 lg:sticky lg:top-20">
+        <h3 className="text-[15px] font-semibold text-tactical-text">Estimated value</h3>
 
         {prediction ? (
-          <div className="space-y-5">
-            <div className="border border-tactical-border-emphasis bg-tactical-elevated p-4">
-              <p className="tactical-label mb-2">PREDICTED SELLING PRICE</p>
-              <p className="text-3xl font-bold text-tactical-text font-mono tracking-tactical">
+          <div className="mt-4 space-y-5">
+            <div>
+              <p className="num text-[34px] font-semibold leading-none tracking-tight text-tactical-text">
                 {currencyFormatter.format(prediction.predicted_price)}
               </p>
+              <p className="mt-2 text-[13px] text-tactical-muted">Model estimate of market value</p>
             </div>
 
             {priceDifference !== null && (
               <div
-                className={`border p-4 ${
+                className={`rounded-xl border p-4 ${
                   isAboveAsking
-                    ? "border-tactical-success bg-tactical-elevated"
-                    : "border-tactical-accent bg-tactical-elevated"
+                    ? "border-val-exc-line bg-val-exc-tint"
+                    : "border-val-high-line bg-val-high-tint"
                 }`}
               >
-                <div className="flex items-center gap-2 tactical-label mb-2">
-                  {isAboveAsking ? "▲ ABOVE ASKING" : "▼ BELOW ASKING"}
-                </div>
-                <div
-                  className={`text-2xl font-bold font-mono tracking-tactical ${
-                    isAboveAsking ? "text-tactical-success" : "text-tactical-accent"
-                  }`}
-                >
-                  {priceDifference > 0 ? "+" : ""}
-                  {currencyFormatter.format(priceDifference).replace("kr", "kr")}
+                <p className={`text-[12px] font-medium ${isAboveAsking ? "text-val-exc" : "text-val-high"}`}>
+                  {isAboveAsking ? "Above listing price" : "Below listing price"}
+                </p>
+                <p className={`num mt-1 text-2xl font-semibold ${isAboveAsking ? "text-val-exc" : "text-val-high"}`}>
+                  {priceDifference > 0 ? "+" : "−"}
+                  {currencyFormatter.format(Math.abs(priceDifference))}
                   {differencePercent !== null && (
-                    <span className="ml-2 text-sm">
-                      ({priceDifference > 0 ? "+" : ""}
+                    <span className="ml-1.5 text-[15px] font-medium">
+                      ({differencePercent > 0 ? "+" : ""}
                       {differencePercent.toFixed(1)}%)
                     </span>
                   )}
-                </div>
+                </p>
               </div>
             )}
 
-            <dl className="space-y-3 text-xs font-mono">
-              <div className="flex items-baseline justify-between border-b border-tactical-border pb-2">
-                <dt className="tactical-label">LISTING PRICE</dt>
-                <dd className="text-sm font-bold text-tactical-text">
+            <dl className="space-y-0 text-[13px]">
+              <Row label="Listing price">
+                <span className="num font-semibold text-tactical-text">
                   {currencyFormatter.format(prediction.input_data.listing_price)}
-                </dd>
-              </div>
-              <div className="flex items-baseline justify-between border-b border-tactical-border pb-2">
-                <dt className="tactical-label">MODEL</dt>
-                <dd className="tactical-badge border-tactical-border-emphasis text-tactical-text">
-                  {modelLabel.toUpperCase()}
-                </dd>
-              </div>
-              <div className="flex items-baseline justify-between border-b border-tactical-border pb-2">
-                <dt className="tactical-label">CONFIDENCE</dt>
-                <dd className="text-tactical-muted">{prediction.confidence}</dd>
-              </div>
-              <div className="flex items-baseline justify-between border-b border-tactical-border pb-2">
-                <dt className="tactical-label">LISTING ID</dt>
-                <dd className="text-tactical-text font-semibold">{prediction.listing_id}</dd>
-              </div>
-              <div className="flex items-baseline justify-between">
-                <dt className="tactical-label">TIMESTAMP</dt>
-                <dd className="text-tactical-muted text-[10px]">
-                  {new Date(prediction.timestamp).toLocaleString()}
-                </dd>
-              </div>
+                </span>
+              </Row>
+              <Row label="Model">
+                <span className="font-medium text-tactical-text">{modelLabel}</span>
+              </Row>
+              <Row label="Confidence">
+                <span className="text-tactical-muted">{prediction.confidence}</span>
+              </Row>
+              <Row label="Listing ID">
+                <span className="num text-tactical-text">{prediction.listing_id}</span>
+              </Row>
+              <Row label="Estimated" last>
+                <span className="text-tactical-muted">
+                  {new Date(prediction.timestamp).toLocaleString("en-GB")}
+                </span>
+              </Row>
             </dl>
           </div>
         ) : (
-          <div className="tactical-border-dashed p-6 text-center">
-            <p className="text-xs font-mono text-tactical-muted tracking-tactical leading-relaxed">
-              AWAITING INPUT // EXECUTE PREDICTION TO GENERATE RESULTS
+          <div className="mt-4 rounded-xl border border-dashed border-tactical-border-emphasis px-5 py-10 text-center">
+            <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-tactical-elevated">
+              <svg className="h-5 w-5 text-tactical-dimmed" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+              </svg>
+            </div>
+            <p className="mt-3 text-[13px] leading-relaxed text-tactical-muted">
+              Fill in the details and estimate to see a valuation here.
             </p>
           </div>
         )}
       </div>
 
-      <div className="tactical-card p-5 border-tactical-success">
-        <p className="tactical-label mb-2 text-tactical-success">TACTICAL BRIEFING</p>
-        <p className="text-xs font-mono text-tactical-muted leading-relaxed tracking-tactical">
-          ADJUST PARAMETERS (ROOMS / AREA / CONSTRUCTION YEAR) TO RUN COMPARATIVE SCENARIOS //
-          MINOR VARIATIONS CAN SHIFT VALUATION BY 100K+ SEK
+      <div className="rounded-xl border border-tactical-border bg-tactical-elevated/50 p-5">
+        <p className="text-[13px] leading-relaxed text-tactical-muted">
+          <span className="font-medium text-tactical-text">Tip.</span> Small changes to rooms, area, or
+          build year can move the estimate by 100k+ kr — adjust and re-run to compare scenarios.
         </p>
       </div>
     </aside>
+  );
+}
+
+function Row({ label, children, last = false }: { label: string; children: React.ReactNode; last?: boolean }) {
+  return (
+    <div className={`flex items-baseline justify-between py-2.5 ${last ? "" : "border-b border-tactical-border"}`}>
+      <dt className="text-tactical-muted">{label}</dt>
+      <dd className="text-right">{children}</dd>
+    </div>
   );
 }

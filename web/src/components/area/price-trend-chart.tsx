@@ -86,8 +86,8 @@ export function PriceTrendChart({ median_price_3m, median_price_6m, median_price
 
   if (baseData.length === 0) {
     return (
-      <div className="flex items-center justify-center rounded-tactical bg-tactical-elevated border border-tactical-border p-8">
-        <p className="text-xs font-mono text-tactical-muted uppercase">Insufficient historical price data</p>
+      <div className="flex items-center justify-center rounded-xl border border-tactical-border bg-tactical-elevated p-8">
+        <p className="text-[13px] text-tactical-muted">Not enough historical price data.</p>
       </div>
     );
   }
@@ -124,44 +124,44 @@ export function PriceTrendChart({ median_price_3m, median_price_6m, median_price
     <div>
       <div className="mb-4 flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold tracking-tactical text-tactical-text font-mono uppercase">Price Trend</h3>
-          <p className="text-xs text-tactical-muted font-mono tracking-tactical">
-            {showPerSqm ? "MEDIAN PRICE PER M² OVER TIME" : "MEDIAN SOLD PRICES OVER TIME"}
+          <h3 className="text-[17px] font-semibold tracking-tight text-tactical-text">Price trend</h3>
+          <p className="text-[13px] text-tactical-muted">
+            {showPerSqm ? "Median price per m² over time" : "Median sold prices over time"}
           </p>
         </div>
         <div className="flex items-center gap-4">
           {avgLivingArea && (
-            <div className="flex items-center gap-2 rounded-tactical bg-tactical-elevated border border-tactical-border p-1">
+            <div className="flex items-center gap-1 rounded-pill border border-tactical-border bg-tactical-elevated p-1">
               <button
                 onClick={() => setShowPerSqm(true)}
-                className={`rounded-tactical px-3 py-1.5 text-xs font-mono font-medium transition-all duration-tactical uppercase ${
+                className={`rounded-pill px-3 py-1.5 text-[13px] font-medium transition-colors ${
                   showPerSqm
-                    ? "bg-tactical-accent text-tactical-bg border border-tactical-accent"
-                    : "text-tactical-muted hover:text-tactical-text border border-transparent"
+                    ? "bg-tactical-text text-white"
+                    : "text-tactical-muted hover:text-tactical-text"
                 }`}
               >
                 Price/m²
               </button>
               <button
                 onClick={() => setShowPerSqm(false)}
-                className={`rounded-tactical px-3 py-1.5 text-xs font-mono font-medium transition-all duration-tactical uppercase ${
+                className={`rounded-pill px-3 py-1.5 text-[13px] font-medium transition-colors ${
                   !showPerSqm
-                    ? "bg-tactical-accent text-tactical-bg border border-tactical-accent"
-                    : "text-tactical-muted hover:text-tactical-text border border-transparent"
+                    ? "bg-tactical-text text-white"
+                    : "text-tactical-muted hover:text-tactical-text"
                 }`}
               >
-                Total Price
+                Total price
               </button>
             </div>
           )}
           {actualDataPoints.length >= 2 && (
             <div className="text-right">
-              <p className="tactical-label">
+              <p className="text-[11px] font-semibold uppercase tracking-tactical-wide text-tactical-dimmed">
                 {actualDataPoints[actualDataPoints.length - 1].monthsAgo === 1 && actualDataPoints[0].monthsAgo === 12
-                  ? "12-Month Change"
-                  : `${actualDataPoints[0].monthsAgo}-Month Change`}
+                  ? "12-month change"
+                  : `${actualDataPoints[0].monthsAgo}-month change`}
               </p>
-              <p className={`text-2xl font-bold font-mono ${isPositive ? "text-tactical-success" : "text-tactical-accent"}`}>
+              <p className={`num text-2xl font-semibold ${isPositive ? "text-val-exc" : "text-val-high"}`}>
                 {isPositive ? "+" : ""}
                 {priceChange.toFixed(1)}%
               </p>
@@ -172,38 +172,39 @@ export function PriceTrendChart({ median_price_3m, median_price_6m, median_price
 
       <ResponsiveContainer width="100%" height={320}>
         <LineChart data={data} margin={{ top: 5, right: 20, bottom: 20, left: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" />
+          <CartesianGrid strokeDasharray="3 3" stroke="#EDEDE9" />
           <XAxis
             dataKey="month"
-            stroke="#808080"
-            style={{ fontSize: "10px", fontFamily: "JetBrains Mono, monospace" }}
+            stroke="#E9E9E4"
+            tick={{ fill: "#63666E", fontSize: 11 }}
             interval={0}
             angle={-45}
             textAnchor="end"
             height={60}
           />
-          <YAxis tickFormatter={formatPrice} stroke="#808080" style={{ fontSize: "10px", fontFamily: "JetBrains Mono, monospace" }} width={80} />
+          <YAxis tickFormatter={formatPrice} stroke="#E9E9E4" tick={{ fill: "#63666E", fontSize: 11 }} width={80} />
           <Tooltip
             contentStyle={{
-              backgroundColor: "#0f0f0f",
-              border: "1px solid #404040",
-              borderRadius: "4px",
-              boxShadow: "0 0 15px rgba(255,51,51,0.2)",
-              fontFamily: "JetBrains Mono, monospace",
+              backgroundColor: "#FFFFFF",
+              border: "1px solid #E9E9E4",
+              borderRadius: "10px",
+              boxShadow: "0 4px 14px rgba(16,17,20,0.08)",
+              color: "#16171A",
             }}
-            formatter={(value: number) => [formatTooltipPrice(value), showPerSqm ? "MEDIAN PRICE/M²" : "MEDIAN PRICE"]}
+            formatter={(value: number) => [formatTooltipPrice(value), showPerSqm ? "Median price/m²" : "Median price"]}
             labelFormatter={(label) => {
               const point = data.find((d) => d.month === label);
               return point ? `${label} (${point.label})` : label;
             }}
-            labelStyle={{ fontWeight: 600, color: "#e0e0e0", fontSize: "10px", textTransform: "uppercase" }}
+            labelStyle={{ fontWeight: 600, color: "#63666E", fontSize: 12 }}
+            itemStyle={{ color: "#16171A", fontSize: 13 }}
           />
           <Line
             type="monotone"
             dataKey="displayValue"
-            stroke="#00ff88"
+            stroke="#0B62FF"
             strokeWidth={2}
-            dot={{ fill: "#00ff88", r: 3 }}
+            dot={{ fill: "#0B62FF", r: 3 }}
             activeDot={{ r: 6 }}
             name={showPerSqm ? "Median Price/m²" : "Median Price"}
             connectNulls={false}

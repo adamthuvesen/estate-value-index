@@ -62,10 +62,8 @@ export function PredictionApp({ sampleListings, defaultAreas, modelLabels }: Pre
           />
 
           {error && (
-            <div className="tactical-card p-4 border-tactical-accent">
-              <p className="text-xs font-mono text-tactical-accent tracking-tactical flex items-center gap-2">
-                <span className="text-lg">⚠</span> {error.toUpperCase()}
-              </p>
+            <div className="rounded-xl border border-val-high-line bg-val-high-tint p-4">
+              <p className="text-[13px] font-medium text-val-high">{error}</p>
             </div>
           )}
         </section>
