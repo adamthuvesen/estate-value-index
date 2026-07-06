@@ -22,6 +22,7 @@ from estate_value_index.ml import (
     get_feature_lists,
     handle_missing_values,
 )
+from estate_value_index.ml.ask_price import mask_ask_price_signals
 from estate_value_index.ml.training import LGBMTrainer
 from estate_value_index.ml.training_workflow.config import TrainingConfig
 from estate_value_index.ml.training_workflow.data import (
@@ -34,11 +35,7 @@ from estate_value_index.ml.training_workflow.reporting import (
     generate_area_performance_report,
     generate_price_tier_analysis,
 )
-from estate_value_index.monitoring.constants import (
-    BASELINE_DATA_PATH,
-    CRITICAL_CATEGORICAL_FEATURES,
-    CRITICAL_NUMERIC_FEATURES,
-)
+from estate_value_index.monitoring.constants import BASELINE_DATA_PATH
 from estate_value_index.utils.gcs import (
     get_gcs_bucket,
     is_gcs_enabled,
@@ -130,15 +127,18 @@ def _load_and_split(config: TrainingConfig) -> SplitData:
     test_size = get_test_size()
     if not skip_feature_engineering:
         df = df_or_engineered
+        requires_listing_price = _feature_set_requires_listing_price(config.feature_set)
         df_filtered = filter_valid_listings(
             df,
             min_price=3000000,
             drop_na_features=False,
-            require_listing_price=_feature_set_requires_listing_price(config.feature_set),
+            require_listing_price=requires_listing_price,
         )
         logger.info("After filtering: %d listings", len(df_filtered))
         # The temporal split needs sold_date as datetime before feature engineering.
         df_filtered = df_filtered.copy()
+        if not requires_listing_price:
+            df_filtered = mask_ask_price_signals(df_filtered)
         df_filtered["sold_date"] = pd.to_datetime(df_filtered["sold_date"], errors="coerce")
         if df_filtered["sold_date"].isna().any():
             n_bad = int(df_filtered["sold_date"].isna().sum())
@@ -155,15 +155,10 @@ def _load_and_split(config: TrainingConfig) -> SplitData:
         logger.info("Transforming holdout fold via training-only context...")
         test_engineered = create_optimized_features(test_df_raw, context=feature_context)
     else:
-        # BigQuery features path: features are pre-materialised. We still
-        # split temporally and rebuild the context against the train fold
-        # so handle_missing_values uses train-only fill values.
-        df_engineered = df_or_engineered
-        logger.info("Creating temporal train/test split on materialised features...")
-        train_engineered, test_engineered = create_temporal_holdout_split(
-            df_engineered, test_size=test_size, date_column="sold_date"
+        raise ValueError(
+            "Materialized features cannot be used for holdout evaluation yet; "
+            "use raw listings so holdout rows are engineered with train-only context."
         )
-        feature_context = build_feature_context(train_engineered)
 
     # Concatenate views for downstream column discovery only — the actual
     # train/test slices below come from the separate engineered frames.
@@ -758,6 +753,8 @@ def _upload_evaluation_artifacts(
     resolved_model_dir: Path,
     prefix: str,
     train_df: pd.DataFrame,
+    numeric_features: list[str],
+    categorical_features: list[str],
 ) -> None:
     """Push evaluation artifacts and a drift baseline to GCS when enabled."""
     logger.info("Uploading model artifacts to GCS...")
@@ -769,7 +766,7 @@ def _upload_evaluation_artifacts(
     # Save training data as drift detection baseline
     logger.info("Saving training data as drift detection baseline...")
     baseline_columns = []
-    for col in CRITICAL_NUMERIC_FEATURES + CRITICAL_CATEGORICAL_FEATURES + ["sold_price"]:
+    for col in numeric_features + categorical_features + ["sold_price"]:
         if col in train_df.columns:
             baseline_columns.append(col)
         else:
@@ -918,7 +915,13 @@ def run_training(config: TrainingConfig) -> float:
     )
 
     if is_gcs_enabled():
-        _upload_evaluation_artifacts(resolved_model_dir, prefix, split.train_engineered)
+        _upload_evaluation_artifacts(
+            resolved_model_dir,
+            prefix,
+            split.train_engineered,
+            final_results["numeric_features"],
+            final_results["categorical_features"],
+        )
 
     if config.production_mode and production_results:
         _persist_production_model(

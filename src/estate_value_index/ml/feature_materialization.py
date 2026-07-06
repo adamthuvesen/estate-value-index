@@ -20,6 +20,7 @@ import pandas as pd
 
 from estate_value_index.exceptions import BigQueryError, exception_context
 from estate_value_index.ml import create_optimized_features, filter_valid_listings
+from estate_value_index.ml.ask_price import mask_ask_price_signals
 from estate_value_index.ml.data_loader import load_from_bigquery
 from estate_value_index.ml.features import CATEGORICAL_FEATURE_NAMES, NUMERIC_FEATURE_NAMES
 from estate_value_index.ml.features.micro_area import normalize_coordinate_columns
@@ -438,6 +439,7 @@ def materialize_features(
         require_listing_price=False,
     )
     logger.info("After filtering: %d listings", len(df_filtered))
+    df_filtered = mask_ask_price_signals(df_filtered)
 
     logger.info("Engineering features")
     df_engineered = create_optimized_features(df_filtered)

@@ -37,6 +37,8 @@ def fake_env(monkeypatch):
     raw_df = pd.DataFrame(
         {
             "listing_id": ["1", "2", "3"],
+            "listing_price": [3_900_000, 4_900_000, 5_900_000],
+            "price_per_sqm": [78_000, 81_000, 84_000],
             "sold_price": [4_000_000, 5_000_000, 6_000_000],
             "sold_date": ["2024-01-01", "2024-02-01", "2024-03-01"],
             "address": ["A", "B", "C"],
@@ -310,3 +312,19 @@ def test_truncate_path_raises_on_row_count_mismatch(monkeypatch, fake_env):
     assert not any("CREATE OR REPLACE TABLE" in q.upper() for q in queries)
     assert not any("DELETE FROM" in q.upper() for q in queries)
     assert client.delete_table.called
+
+
+def test_materialization_masks_ask_price_signals_before_engineering(monkeypatch, fake_env):
+    captured = {}
+
+    def capture_engineering_input(df: pd.DataFrame) -> pd.DataFrame:
+        captured["listing_price"] = df["listing_price"].copy()
+        captured["price_per_sqm"] = df["price_per_sqm"].copy()
+        return df
+
+    monkeypatch.setattr(feature_materialization, "create_optimized_features", capture_engineering_input)
+
+    feature_materialization.materialize_features(dry_run=True)
+
+    assert captured["listing_price"].isna().all()
+    assert captured["price_per_sqm"].isna().all()

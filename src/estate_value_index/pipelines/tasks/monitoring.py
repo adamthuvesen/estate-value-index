@@ -129,6 +129,7 @@ def monitor_model_drift_task(
     current_data_path: str | Path,
     reference_data_path: str | Path,
     model_version: str,
+    feature_metadata_path: str | Path | None = None,
     alert_on_drift: bool = True,
     upload_to_gcs: bool = True,
     gcs_bucket: str | None = None,
@@ -139,6 +140,7 @@ def monitor_model_drift_task(
         current_data_path: Path to current production data (parquet)
         reference_data_path: Path to baseline training data (parquet, can be gs:// URI)
         model_version: Model version identifier
+        feature_metadata_path: Optional production metrics/context JSON with monitored features
         alert_on_drift: If True, log alerts when drift detected
         upload_to_gcs: If True, upload drift reports to GCS
         gcs_bucket: GCS bucket for report storage
@@ -198,6 +200,7 @@ def monitor_model_drift_task(
     monitor = ModelMonitor(
         reference_data_path=reference_data_path,
         model_version=model_version,
+        feature_metadata_path=feature_metadata_path,
     )
 
     # Detect drift

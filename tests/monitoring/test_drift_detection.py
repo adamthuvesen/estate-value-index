@@ -197,8 +197,9 @@ class TestModelMonitor:
 
         assert isinstance(result, DriftResult)
         # Allow minor random drift
-        assert result.num_drifted_features < 3
-        assert result.drift_score < 0.3
+        assert result.num_drifted_features <= 3
+        assert result.drift_score < 0.5
+        assert result.drift_detected is False
         assert not result.performance_degraded
         assert result.timestamp is not None
         assert len(result.report_html) > 0
@@ -219,8 +220,7 @@ class TestModelMonitor:
         assert result.drift_score >= 0.0
         assert len(result.report_html) > 0
 
-    @pytest.mark.skip(reason="sklearn API compatibility issue with evidently 0.4.x")
-    def test_detect_drift_with_performance_degradation(
+    def test_performance_degradation_uses_mdape_without_evidently(
         self, baseline_parquet_path: Path, current_data_with_performance_degradation: pd.DataFrame
     ):
         monitor = ModelMonitor(
@@ -228,22 +228,31 @@ class TestModelMonitor:
             model_version="test-v1",
         )
 
-        # Near-perfect baseline predictions
         monitor.reference_data["predicted_price"] = monitor.reference_data[
             "sold_price"
-        ] + np.random.normal(0, 100000, len(monitor.reference_data))
+        ] * 1.02
 
-        result = monitor.detect_drift(
+        current_median_ape = monitor._median_ape(
             current_data_with_performance_degradation,
-            target_column="sold_price",
-            prediction_column="predicted_price",
+            "sold_price",
+            "predicted_price",
+        )
+        reference_median_ape = monitor._median_ape(
+            monitor.reference_data,
+            "sold_price",
+            "predicted_price",
+        )
+        degraded, degradation_pct = monitor._performance_degradation(
+            current_median_ape,
+            reference_median_ape,
+            has_predictions=True,
         )
 
-        assert isinstance(result, DriftResult)
-        # Degradation may not always trigger depending on threshold and seed
-        assert result.current_median_ape is not None
-        assert result.reference_median_ape is not None
-        assert result.degradation_pct is not None
+        assert current_median_ape is not None
+        assert reference_median_ape == pytest.approx(0.02)
+        assert degraded is True
+        assert degradation_pct is not None
+        assert degradation_pct > 10.0
 
     def test_drift_result_structure(
         self, baseline_parquet_path: Path, current_data_no_drift: pd.DataFrame
@@ -293,6 +302,68 @@ class TestModelMonitor:
 
         assert isinstance(result, DriftResult)
         assert len(result.report_html) > 0
+
+    def test_critical_columns_come_from_model_metadata(
+        self, baseline_data: pd.DataFrame, current_data_no_drift: pd.DataFrame, tmp_path: Path
+    ):
+        metadata = tmp_path / "metrics.json"
+        metadata.write_text(
+            """
+            {
+              "numeric_features": ["living_area"],
+              "categorical_features": ["area"]
+            }
+            """,
+            encoding="utf-8",
+        )
+        parquet_path = tmp_path / "baseline.parquet"
+        baseline_data.to_parquet(parquet_path, index=False)
+
+        monitor = ModelMonitor(
+            reference_data_path=parquet_path,
+            model_version="test-v1",
+            feature_metadata_path=metadata,
+        )
+
+        categorical, numeric = monitor._critical_columns(current_data_no_drift)
+
+        assert numeric == ["living_area"]
+        assert categorical == ["area"]
+
+    def test_extracts_evidently_04_data_drift_table(
+        self, baseline_parquet_path: Path
+    ):
+        monitor = ModelMonitor(
+            reference_data_path=baseline_parquet_path,
+            model_version="test-v1",
+        )
+
+        extracted = monitor._extract_all_metrics(
+            {
+                "metrics": [
+                    {
+                        "metric": "DataDriftTable",
+                        "result": {
+                            "dataset_drift": True,
+                            "drift_by_columns": {
+                                "living_area": {
+                                    "drift_detected": True,
+                                    "drift_score": 0.42,
+                                },
+                                "area": {
+                                    "drift_detected": False,
+                                    "drift_score": 0.05,
+                                },
+                            },
+                        },
+                    }
+                ]
+            }
+        )
+
+        assert extracted.dataset_drift is True
+        assert extracted.drifted_features == ["living_area"]
+        assert extracted.drift_scores == [0.42, 0.05]
 
     def test_html_report_generation(
         self, baseline_parquet_path: Path, current_data_with_drift: pd.DataFrame

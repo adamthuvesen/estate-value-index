@@ -67,6 +67,7 @@ from estate_value_index.ml import (
     create_temporal_holdout_split,
     filter_valid_listings,
 )
+from estate_value_index.ml.ask_price import mask_ask_price_signals
 from estate_value_index.ml.features.context import FeatureEngineeringContext
 from estate_value_index.ml.training_workflow.data import load_training_dataframe
 from estate_value_index.ml.training_workflow.runner import _context_payload
@@ -87,7 +88,6 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_NO_LIST_FEATURE_SET = "no_list_price_v1"
 DEFAULT_LISTING_FEATURE_SET = "with_list_price_v1"
-ASK_PRICE_COLUMNS = ("listing_price", "price_per_sqm", "relative_area_price", "price_change")
 
 # Residual calibration is applied only to the no_list_price model, and only to high
 # predictions where the tiered model still underpredicts. Offline proof showed
@@ -408,6 +408,8 @@ def fit_tiered_production_model(
         tier_specs,
         weight_step,
         min_segment_rows,
+        gate_low_max=gate_low_max,
+        gate_high_min=gate_high_min,
         include_calibration_features=fit_calibrator,
     )
 
@@ -483,8 +485,7 @@ def persist_production_model(
 def _prepare_raw_for_model(raw_frame: pd.DataFrame, *, requires_listing_price: bool) -> pd.DataFrame:
     raw = raw_frame.copy()
     if not requires_listing_price:
-        for column in ASK_PRICE_COLUMNS:
-            raw[column] = np.nan
+        raw = mask_ask_price_signals(raw)
     return raw
 
 
@@ -571,6 +572,8 @@ def _select_blend(
     tier_specs: tuple[TierSpec, ...],
     weight_step: float,
     min_segment_rows: int,
+    gate_low_max: float = DEFAULT_INFERENCE_GATE_LOW_MAX,
+    gate_high_min: float = DEFAULT_INFERENCE_GATE_HIGH_MIN,
     include_calibration_features: bool = False,
 ) -> dict[str, object]:
     oof = _build_oof_training_data(
@@ -604,7 +607,11 @@ def _select_blend(
         weight_step=weight_step,
         model_names=MODEL_NAMES,
     )
-    oof_gate = prediction_tier_labels(oof_global_blend)
+    oof_gate = prediction_tier_labels(
+        oof_global_blend,
+        low_max=gate_low_max,
+        high_min=gate_high_min,
+    )
     gated_selection = select_gated_expert_weights(
         oof["actual_price"].to_numpy(),
         oof_predictions,
@@ -702,6 +709,8 @@ def _metrics_payload(
         "market_blend_weight": model.market_blend_weight,
         "overall_weights": model.overall_weights,
         "gated_weights_by_gate": model.gated_weights_by_gate,
+        "gate_low_max": model.gate_low_max,
+        "gate_high_min": model.gate_high_min,
     }
 
 

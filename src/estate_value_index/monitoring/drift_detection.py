@@ -2,18 +2,20 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pandas as pd
 
-from estate_value_index.monitoring.constants import (
-    CRITICAL_CATEGORICAL_FEATURES,
-    CRITICAL_NUMERIC_FEATURES,
-    PERFORMANCE_DEGRADATION_THRESHOLD,
-)
+from estate_value_index.monitoring.constants import PERFORMANCE_DEGRADATION_THRESHOLD
+
+if TYPE_CHECKING:
+    from evidently import ColumnMapping
+    from evidently.report import Report
 
 logger = logging.getLogger(__name__)
 
@@ -56,12 +58,41 @@ class ModelMonitor:
         self,
         reference_data_path: str | Path,
         model_version: str,
+        feature_metadata_path: str | Path | None = None,
     ) -> None:
         self.reference_data = pd.read_parquet(reference_data_path)
         self.model_version = model_version
+        self._metadata_features = self._load_metadata_features(feature_metadata_path)
 
         if "sold_price" not in self.reference_data.columns:
             logger.warning("Reference data missing 'sold_price' - performance monitoring disabled")
+
+    def _load_metadata_features(
+        self,
+        feature_metadata_path: str | Path | None,
+    ) -> tuple[list[str] | None, list[str] | None]:
+        if feature_metadata_path is None:
+            return None, None
+
+        path = Path(feature_metadata_path)
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        numeric = payload.get("numeric_features")
+        categorical = payload.get("categorical_features")
+        if numeric is not None or categorical is not None:
+            return list(numeric or []), list(categorical or [])
+
+        features = payload.get("features_used")
+        if features:
+            feature_list = list(features)
+            numeric = [
+                feature
+                for feature in feature_list
+                if feature in self.reference_data.columns
+                and pd.api.types.is_numeric_dtype(self.reference_data[feature])
+            ]
+            categorical = [feature for feature in feature_list if feature not in numeric]
+            return numeric, categorical
+        return None, None
 
     def detect_drift(
         self,
@@ -160,10 +191,20 @@ class ModelMonitor:
     def _critical_columns(self, current_data: pd.DataFrame) -> tuple[list[str], list[str]]:
         ref_cols = self.reference_data.columns
         cur_cols = current_data.columns
-        categorical_cols = [
-            f for f in CRITICAL_CATEGORICAL_FEATURES if f in ref_cols and f in cur_cols
-        ]
-        numeric_cols = [f for f in CRITICAL_NUMERIC_FEATURES if f in ref_cols and f in cur_cols]
+        metadata_numeric, metadata_categorical = self._metadata_features
+        if metadata_numeric is None and metadata_categorical is None:
+            excluded = {"sold_price", "predicted_price"}
+            common = [col for col in ref_cols if col in cur_cols and col not in excluded]
+            numeric_candidates = [
+                col for col in common if pd.api.types.is_numeric_dtype(self.reference_data[col])
+            ]
+            categorical_candidates = [col for col in common if col not in numeric_candidates]
+        else:
+            numeric_candidates = metadata_numeric or []
+            categorical_candidates = metadata_categorical or []
+
+        categorical_cols = [f for f in categorical_candidates if f in ref_cols and f in cur_cols]
+        numeric_cols = [f for f in numeric_candidates if f in ref_cols and f in cur_cols]
         return categorical_cols, numeric_cols
 
     def _column_mapping(
@@ -256,6 +297,17 @@ class ModelMonitor:
                 if score == 0.0 and drifted:
                     score = 1.0
                 drift_scores.append(score)
+
+            elif metric_type == "DataDriftTable":
+                dataset_drift = result.get("dataset_drift", dataset_drift)
+                for column_name, column_result in result.get("drift_by_columns", {}).items():
+                    drifted = column_result.get("drift_detected", False)
+                    if drifted:
+                        drifted_features.append(column_name)
+                    score = column_result.get("drift_score", 0.0)
+                    if score == 0.0 and drifted:
+                        score = 1.0
+                    drift_scores.append(score)
 
         return _ExtractedMetrics(
             dataset_drift=dataset_drift,

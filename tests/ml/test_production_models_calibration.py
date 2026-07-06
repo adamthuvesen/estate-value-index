@@ -5,10 +5,12 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from estate_value_index.analytics.tiered_ensemble import TierSpec
 from estate_value_index.ml.production_models import (
     LISTING_MODEL_ID,
     NO_LIST_MODEL_ID,
     TieredProductionModel,
+    _select_blend,
 )
 
 
@@ -83,3 +85,65 @@ def test_no_list_without_calibrator_is_unchanged() -> None:
     out = model._apply_calibration(_engineered().head(1), gated)
 
     assert out.tolist() == gated.tolist()
+
+
+def test_select_blend_uses_custom_gate_thresholds(monkeypatch) -> None:
+    captured = {}
+    oof = pd.DataFrame(
+        {
+            "actual_price": [4_000_000.0, 6_000_000.0, 11_000_000.0],
+            "base_prediction": [4_000_000.0, 6_000_000.0, 11_000_000.0],
+            "normalized_prediction": [4_000_000.0, 6_000_000.0, 11_000_000.0],
+            "low_prediction": [4_000_000.0, 6_000_000.0, 11_000_000.0],
+            "mid_prediction": [4_000_000.0, 6_000_000.0, 11_000_000.0],
+            "high_prediction": [4_000_000.0, 6_000_000.0, 11_000_000.0],
+        }
+    )
+
+    monkeypatch.setattr(
+        "estate_value_index.ml.production_models._build_oof_training_data",
+        lambda *args, **kwargs: oof,
+    )
+    monkeypatch.setattr(
+        "estate_value_index.ml.production_models.select_best_market_blend_weight",
+        lambda *args, **kwargs: {"normalized_weight": 0.0},
+    )
+    monkeypatch.setattr(
+        "estate_value_index.ml.production_models.select_best_expert_weights",
+        lambda *args, **kwargs: {
+            "weights": {"global": 1.0, "low": 0.0, "mid": 0.0, "high": 0.0}
+        },
+    )
+
+    def capture_gated_selection(y_true, predictions, gate_labels, **kwargs):
+        captured["gate_labels"] = list(gate_labels)
+        return {
+            "weights_by_gate": {},
+            "segments": {},
+            "oof_mae": 0.0,
+            "weight_step": 1.0,
+            "min_segment_rows": 1,
+        }
+
+    monkeypatch.setattr(
+        "estate_value_index.ml.production_models.select_gated_expert_weights",
+        capture_gated_selection,
+    )
+
+    _select_blend(
+        pd.DataFrame({"sold_date": pd.to_datetime(["2024-01-01"])}),
+        "no_list_price_v1",
+        2,
+        42,
+        (
+            TierSpec("low", None, 5_000_000.0),
+            TierSpec("mid", 5_000_000.0, 10_000_000.0),
+            TierSpec("high", 8_000_000.0, None),
+        ),
+        1.0,
+        1,
+        gate_low_max=7_000_000.0,
+        gate_high_min=9_000_000.0,
+    )
+
+    assert captured["gate_labels"] == ["low", "low", "high"]
