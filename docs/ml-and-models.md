@@ -46,15 +46,16 @@ intentionally git-ignored.
 ## Current production models
 
 - Serving uses two production artifacts:
-  `price_prediction_model_no_list.joblib` and
-  `price_prediction_model_listing.joblib`.
-- `/predict` defaults to `model: auto`: it uses the listing-aware model only
-  when a positive `listing_price` is supplied, otherwise it uses the no-list
-  model.
-- The no-list model uses `no_list_price_h3_market_street_rfe25`.
-- The listing-aware model uses `listing_price_h3_market_street_aligned30`.
-- Both artifacts are tiered/max ensembles: base price model, market-normalized
-  model, and low/mid/high experts with OOF-selected gated blending.
+  `price_prediction_model_no_list_price.joblib` and
+  `price_prediction_model_with_list_price.joblib`.
+- `/predict` defaults to `model: auto`: it uses the `with_list_price` model only
+  when a positive `listing_price` is supplied, otherwise it uses the
+  `no_list_price` model.
+- The `no_list_price` model uses feature set `no_list_price_v1`.
+- The `with_list_price` model uses feature set `with_list_price_v1`.
+- Both artifacts are `price_tiered_ensemble` models: base price model,
+  market-normalized model, and low/mid/high experts with OOF-selected gated
+  blending.
 - Keep detailed model-quality numbers and feature-selection rationale in
   `docs/internal/`, not the public docs tree.
 

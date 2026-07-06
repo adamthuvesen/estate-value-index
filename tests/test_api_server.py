@@ -99,17 +99,17 @@ def test_predict_500_hides_exception_message(caplog: pytest.LogCaptureFixture) -
 
     with caplog.at_level(logging.ERROR), TestClient(api_server.app) as client:
         api_server.MODEL_CACHE.clear()
-        api_server.MODEL_CACHE["no_list"] = {
+        api_server.MODEL_CACHE["no_list_price"] = {
             "model": mock_model,
             "path": Path("dummy.joblib"),
-            "model_type": "tiered_max",
+            "model_type": "price_tiered_ensemble",
         }
 
         response = client.post(
             "/predict",
             json={
                 "living_area": 65.0,
-                "model": "no_list",
+                "model": "no_list_price",
             },
         )
 
@@ -129,11 +129,11 @@ def test_predict_accepts_optional_coordinates() -> None:
 
     with TestClient(api_server.app) as client:
         api_server.MODEL_CACHE.clear()
-        api_server.MODEL_CACHE["listing"] = {
+        api_server.MODEL_CACHE["with_list_price"] = {
             "model": mock_model,
             "path": Path("dummy.joblib"),
             "requires_listing_price": True,
-            "model_type": "tiered_max",
+            "model_type": "price_tiered_ensemble",
         }
 
         response = client.post(
@@ -143,7 +143,7 @@ def test_predict_accepts_optional_coordinates() -> None:
                 "living_area": 65.0,
                 "latitude": 59.315,
                 "longitude": 18.07,
-                "model": "listing",
+                "model": "with_list_price",
             },
         )
 
@@ -160,11 +160,11 @@ def test_predict_auto_routes_to_no_list_without_listing_price() -> None:
 
     with TestClient(api_server.app) as client:
         api_server.MODEL_CACHE.clear()
-        api_server.MODEL_CACHE["no_list"] = {
+        api_server.MODEL_CACHE["no_list_price"] = {
             "model": mock_model,
-            "path": Path("price_prediction_model_no_list.joblib"),
+            "path": Path("price_prediction_model_no_list_price.joblib"),
             "requires_listing_price": False,
-            "model_type": "tiered_max",
+            "model_type": "price_tiered_ensemble",
         }
 
         response = client.post(
@@ -177,7 +177,7 @@ def test_predict_auto_routes_to_no_list_without_listing_price() -> None:
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["model_id"] == "no_list"
+    assert payload["model_id"] == "no_list_price"
     assert payload["requires_listing_price"] is False
 
 
@@ -185,18 +185,18 @@ def test_predict_auto_routes_to_no_list_without_listing_price() -> None:
 def test_listing_model_requires_listing_price() -> None:
     with TestClient(api_server.app) as client:
         api_server.MODEL_CACHE.clear()
-        api_server.MODEL_CACHE["listing"] = {
+        api_server.MODEL_CACHE["with_list_price"] = {
             "model": MagicMock(),
-            "path": Path("price_prediction_model_listing.joblib"),
+            "path": Path("price_prediction_model_with_list_price.joblib"),
             "requires_listing_price": True,
-            "model_type": "tiered_max",
+            "model_type": "price_tiered_ensemble",
         }
 
         response = client.post(
             "/predict",
             json={
                 "living_area": 65.0,
-                "model": "listing",
+                "model": "with_list_price",
             },
         )
 
@@ -239,14 +239,14 @@ def test_health_responds_while_predicts_in_flight() -> None:
 
     transport = ASGITransport(app=api_server.app)
     api_server.MODEL_CACHE.clear()
-    api_server.MODEL_CACHE["listing"] = {
+    api_server.MODEL_CACHE["with_list_price"] = {
         "model": mock_model,
         "path": Path("dummy.joblib"),
         "requires_listing_price": True,
-        "model_type": "tiered_max",
+        "model_type": "price_tiered_ensemble",
     }
 
-    body = {"listing_price": 5_000_000.0, "living_area": 65.0, "model": "listing"}
+    body = {"listing_price": 5_000_000.0, "living_area": 65.0, "model": "with_list_price"}
 
     async def _run() -> None:
         async with AsyncClient(transport=transport, base_url="http://test") as client:

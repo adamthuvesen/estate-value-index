@@ -154,7 +154,7 @@ def calculate_value_metrics(
     ]
     df["rank_suppressed_reason"] = [
         None if ok else f"missing_{missing[0]}"
-        for ok, missing in zip(is_rankable, df["missing_core_fields"])
+        for ok, missing in zip(is_rankable, df["missing_core_fields"], strict=True)
     ]
 
     # Mark as undervalued only for rankable rows that clear the threshold
@@ -327,7 +327,7 @@ def generate_summary_statistics(df: pd.DataFrame, metrics: dict) -> dict:
 
 def generate_value_analysis(
     data_file: Path,
-    model_type: str = "no_list",
+    model_type: str = "no_list_price",
     output_file: Path | None = None,
     models_dir: Path | None = None,
     model_prefix: str = "price_prediction_model",
@@ -341,7 +341,7 @@ def generate_value_analysis(
 
     Args:
         data_file: Path to production data JSON file
-        model_type: Model type (no_list, listing)
+        model_type: Model type (no_list_price, with_list_price)
         output_file: Output path for value analysis JSON
         models_dir: Directory containing trained models
         model_prefix: Model file prefix

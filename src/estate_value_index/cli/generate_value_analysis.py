@@ -33,8 +33,8 @@ def main(argv: list[str] | None = None, *, args=None) -> int:
         parser.add_argument(
             "--model-type",
             type=str,
-            default="no_list",
-            choices=["no_list", "listing"],
+            default="no_list_price",
+            choices=["no_list_price", "with_list_price"],
             help="Model type to use for predictions",
         )
         parser.add_argument(

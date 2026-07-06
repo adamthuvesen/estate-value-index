@@ -487,7 +487,7 @@ def _generate_enrichment_stage(config: TrainingFlowConfig, results: dict, logger
         value_analysis_result = generate_value_analysis_task(
             output_file=value_analysis_path,
             data_file=Path("data/raw/booli/booli_listings_prod.json"),
-            model_type="no_list",
+            model_type="no_list_price",
             apply_training_filters=False,
         )
         results["steps"]["value_analysis"] = value_analysis_result

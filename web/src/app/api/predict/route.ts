@@ -57,7 +57,7 @@ function parseOptionalBoolean(value: unknown): boolean | null {
 }
 
 function predictionRange(predictedPrice: number, modelId: string) {
-  const roundToStep = modelId === 'no_list' ? Math.ceil : Math.round;
+  const roundToStep = modelId === 'no_list_price' ? Math.ceil : Math.round;
   const roundedPrediction = roundToStep(predictedPrice / PRICE_RANGE_STEP) * PRICE_RANGE_STEP;
   return {
     rounded_predicted_price: roundedPrediction,
@@ -192,7 +192,7 @@ export async function GET() {
     usage: 'POST to this endpoint with property details to get price predictions',
     required_fields: ['living_area'],
     optional_fields: ['listing_price', 'rooms', 'monthly_fee', 'days_on_market', 'construction_year', 'property_type', 'municipality', 'area', 'model', 'floor', 'elevator', 'balcony', 'latitude', 'longitude'],
-    allowed_models: ['auto', 'no_list', 'listing'],
+    allowed_models: ['auto', 'no_list_price', 'with_list_price'],
     note: 'Feature engineering is handled internally by SimplePredictionPipeline - send only raw features',
     backend: 'FastAPI',
     api_url: API_BASE_URL

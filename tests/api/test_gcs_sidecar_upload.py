@@ -67,7 +67,7 @@ class _FakeGCSClient:
 @pytest.fixture
 def fake_model_dir(tmp_path: Path) -> Path:
     """Lay out the four artefacts that ``upload_model_artifacts`` looks for."""
-    prefix = "price_prediction_model_no_list"
+    prefix = "price_prediction_model_no_list_price"
     model_dir = tmp_path / "models"
     model_dir.mkdir()
     joblib.dump({"kind": "no_list"}, model_dir / f"{prefix}.joblib")
@@ -89,11 +89,11 @@ def test_upload_writes_sidecar_alongside_joblib(
     monkeypatch.setattr(gcs_module, "is_gcs_enabled", lambda: True)
     monkeypatch.setattr(gcs_module, "GCSClient", lambda *a, **kw: fake_client)
 
-    artefacts = gcs_module.upload_model_artifacts(fake_model_dir, "price_prediction_model_no_list")
+    artefacts = gcs_module.upload_model_artifacts(fake_model_dir, "price_prediction_model_no_list_price")
 
     # Both artefact and sidecar end up in the fake bucket layout.
-    uploaded_joblib = bucket_dir / "models" / "price_prediction_model_no_list.joblib"
-    uploaded_sidecar = bucket_dir / "models" / "price_prediction_model_no_list.joblib.sha256"
+    uploaded_joblib = bucket_dir / "models" / "price_prediction_model_no_list_price.joblib"
+    uploaded_sidecar = bucket_dir / "models" / "price_prediction_model_no_list_price.joblib.sha256"
 
     assert uploaded_joblib.exists(), "model file must be uploaded"
     assert uploaded_sidecar.exists(), "sidecar file must be uploaded"
@@ -105,8 +105,8 @@ def test_upload_writes_sidecar_alongside_joblib(
     assert digest == expected
 
     # The returned artefacts mapping references both URIs.
-    assert artefacts["model"].endswith("price_prediction_model_no_list.joblib")
-    assert artefacts["model_sha256"].endswith("price_prediction_model_no_list.joblib.sha256")
+    assert artefacts["model"].endswith("price_prediction_model_no_list_price.joblib")
+    assert artefacts["model_sha256"].endswith("price_prediction_model_no_list_price.joblib.sha256")
 
 
 def test_sidecar_upload_failure_rolls_back_artefact(
@@ -131,10 +131,10 @@ def test_sidecar_upload_failure_rolls_back_artefact(
     monkeypatch.setattr(gcs_module, "GCSClient", lambda *a, **kw: fake_client)
 
     # The helper currently swallows GCS exceptions and returns {} on failure.
-    result = gcs_module.upload_model_artifacts(fake_model_dir, "price_prediction_model_no_list")
+    result = gcs_module.upload_model_artifacts(fake_model_dir, "price_prediction_model_no_list_price")
 
-    uploaded_joblib = bucket_dir / "models" / "price_prediction_model_no_list.joblib"
-    uploaded_sidecar = bucket_dir / "models" / "price_prediction_model_no_list.joblib.sha256"
+    uploaded_joblib = bucket_dir / "models" / "price_prediction_model_no_list_price.joblib"
+    uploaded_sidecar = bucket_dir / "models" / "price_prediction_model_no_list_price.joblib.sha256"
 
     assert not uploaded_joblib.exists(), (
         "partial joblib upload must be rolled back when the sidecar fails"

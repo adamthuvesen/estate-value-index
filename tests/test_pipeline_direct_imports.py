@@ -151,10 +151,12 @@ class TestUnifiedCliSubcommands:
         monkeypatch.setattr(cli_main, "_load_handler", lambda command: fake_value_analysis_main)
         output = tmp_path / "value.json"
 
-        result = cli_main.main(["value-analysis", "--output", str(output), "--model-type", "no_list"])
+        result = cli_main.main(
+            ["value-analysis", "--output", str(output), "--model-type", "no_list_price"]
+        )
 
         assert result == 0
-        assert captured["argv"] == ["--output", str(output), "--model-type", "no_list"]
+        assert captured["argv"] == ["--output", str(output), "--model-type", "no_list_price"]
 
     def test_area_metrics_dispatches_with_parsed_args(self, monkeypatch):
         from estate_value_index.cli import __main__ as cli_main

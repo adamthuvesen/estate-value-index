@@ -6,8 +6,8 @@ from estate_value_index.analytics import model_suite
 
 
 def test_model_suite_defaults_use_compressed_feature_sets() -> None:
-    assert model_suite.DEFAULT_NO_LIST_FEATURE_SET == "no_list_price_h3_market_street_rfe25"
-    assert model_suite.DEFAULT_LISTING_FEATURE_SET == "listing_price_h3_market_street_aligned30"
+    assert model_suite.DEFAULT_NO_LIST_FEATURE_SET == "no_list_price_v1"
+    assert model_suite.DEFAULT_LISTING_FEATURE_SET == "with_list_price_v1"
 
 
 def test_run_model_suite_experiment_writes_four_variant_summary(monkeypatch, tmp_path) -> None:

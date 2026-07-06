@@ -2,10 +2,10 @@
 #
 # `--feature-set <key>` selects a subset; omitting it uses `default` below.
 # Production defaults are the aligned two-model family:
-# - no-list serving: `no_list_price_h3_market_street_rfe25`
-# - listing-aware serving: `listing_price_h3_market_street_aligned30`
+# - no_list_price serving: `no_list_price_v1`
+# - with_list_price serving: `with_list_price_v1`
 
-default: no_list_price_h3_market_street_rfe25
+default: no_list_price_v1
 
 # Published-listing experiment that hides current asking price and any same-row
 # feature derived from it. Use this to measure how much the model can recover
@@ -275,7 +275,11 @@ no_list_price_h3_market_street:
     - has_balcony
     - floor_tier
 
-no_list_price_h3_market_street_rfe25:
+# Production no_list_price serving default. 21 numeric + 4 categorical features
+# (25 total), selected via Recursive Feature Elimination from the broader
+# no_list_price_h3_market_street set below. Formerly named
+# no_list_price_h3_market_street_rfe25.
+no_list_price_v1:
   numeric:
     - living_area
     - rooms_per_sqm
@@ -442,7 +446,11 @@ listing_price_h3_market_street_aligned26:
     - h3_res9
     - street_name
 
-listing_price_h3_market_street_aligned30:
+# Production with_list_price serving default. The no_list_price_v1 21 numeric
+# features plus 5 listing-price-derived features (26 numeric + 4 categorical =
+# 30 total), aligned to the same base set so the two production models stay
+# comparable. Formerly named listing_price_h3_market_street_aligned30.
+with_list_price_v1:
   numeric:
     - living_area
     - rooms_per_sqm

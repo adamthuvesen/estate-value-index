@@ -2,8 +2,8 @@
 
 The public serving contract has two model ids:
 
-- ``no_list``: does not use asking price.
-- ``listing``: uses asking price when it is available.
+- ``no_list_price``: does not use the listing (asking) price.
+- ``with_list_price``: uses the listing price when it is available.
 
 ``TieredProductionModel`` wraps the tier-spec, gating, and blend-selection
 helpers from ``analytics.tiered_ensemble`` — the experiment track that won
@@ -80,13 +80,13 @@ from estate_value_index.utils.settings import get_random_state, get_test_size
 logger = logging.getLogger(__name__)
 
 DEFAULT_MODEL_PREFIX = "price_prediction_model"
-NO_LIST_MODEL_ID = "no_list"
-LISTING_MODEL_ID = "listing"
-DEFAULT_NO_LIST_FEATURE_SET = "no_list_price_h3_market_street_rfe25"
-DEFAULT_LISTING_FEATURE_SET = "listing_price_h3_market_street_aligned30"
+NO_LIST_MODEL_ID = "no_list_price"
+LISTING_MODEL_ID = "with_list_price"
+DEFAULT_NO_LIST_FEATURE_SET = "no_list_price_v1"
+DEFAULT_LISTING_FEATURE_SET = "with_list_price_v1"
 ASK_PRICE_COLUMNS = ("listing_price", "price_per_sqm", "relative_area_price", "price_change")
 
-# Residual calibration is applied only to the no_list model, and only to high
+# Residual calibration is applied only to the no_list_price model, and only to high
 # predictions where the tiered model still underpredicts. Offline proof showed
 # global calibration worsened aggregate bias by nudging the well-calibrated
 # mid-market down; restricting to the tail improves MAE, bias, and the high-end
@@ -112,7 +112,7 @@ class ProductionTrainingResult:
 
 @dataclass
 class TieredProductionModel:
-    """Serializable max/tiered production model."""
+    """Serializable price-tiered gated-ensemble production model."""
 
     model_id: str
     feature_set: str
@@ -137,7 +137,7 @@ class TieredProductionModel:
 
     @property
     def model_type(self) -> str:
-        return "tiered_max"
+        return "price_tiered_ensemble"
 
     def predict(self, X_raw: pd.DataFrame, *, apply_calibration: bool = True) -> np.ndarray:
         raw = _prepare_raw_for_model(X_raw, requires_listing_price=self.requires_listing_price)

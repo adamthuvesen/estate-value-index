@@ -82,7 +82,7 @@ def generate_area_statistics_task(
 def generate_value_analysis_task(
     output_file: Path | None = None,
     data_file: Path | None = None,
-    model_type: str = "no_list",
+    model_type: str = "no_list_price",
     apply_training_filters: bool = False,
 ) -> AnalyticsResult:
     """Generate value analysis by running predictions on all properties.

@@ -140,6 +140,6 @@ export const DEFAULT_AREAS = [
 
 export const MODEL_LABELS: Record<string, string> = {
   auto: "Auto",
-  no_list: "No listing price",
-  listing: "Listing-aware",
+  no_list_price: "No listing price",
+  with_list_price: "Listing-aware",
 };

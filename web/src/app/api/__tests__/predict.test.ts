@@ -9,15 +9,15 @@ function makeRequest(body: unknown): NextRequest {
   })
 }
 
-function mockFastApiPrediction(predictedPrice: number, modelId = 'no_list') {
+function mockFastApiPrediction(predictedPrice: number, modelId = 'no_list_price') {
   jest.spyOn(global, 'fetch').mockResolvedValue(
     new Response(
       JSON.stringify({
         predicted_price: predictedPrice,
         model_used: `price_prediction_model_${modelId}.joblib`,
         model_id: modelId,
-        model_type: 'tiered_max',
-        requires_listing_price: modelId === 'listing',
+        model_type: 'price_tiered_ensemble',
+        requires_listing_price: modelId === 'with_list_price',
         status: 'success',
       }),
       {
@@ -43,8 +43,8 @@ describe('/api/predict', () => {
       expect(data.required_fields).toContain('living_area')
       expect(data.optional_fields).toContain('listing_price')
       expect(data.allowed_models).toContain('auto')
-      expect(data.allowed_models).toContain('no_list')
-      expect(data.allowed_models).toContain('listing')
+      expect(data.allowed_models).toContain('no_list_price')
+      expect(data.allowed_models).toContain('with_list_price')
     })
   })
 
@@ -64,7 +64,7 @@ describe('/api/predict', () => {
     })
 
     it('keeps listing-aware predictions rounded to the nearest 100k', async () => {
-      mockFastApiPrediction(2_136_441, 'listing')
+      mockFastApiPrediction(2_136_441, 'with_list_price')
 
       const response = await POST(makeRequest({ living_area: 55, listing_price: 2_000_000 }))
       const data = await response.json()

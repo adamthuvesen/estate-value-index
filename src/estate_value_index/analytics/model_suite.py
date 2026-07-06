@@ -14,8 +14,8 @@ from estate_value_index.analytics.tiered_ensemble import run_tiered_ensemble_exp
 from estate_value_index.utils.settings import get_random_state
 
 DEFAULT_OUTPUT_DIR = Path("reports/model_suite_experiments")
-DEFAULT_NO_LIST_FEATURE_SET = "no_list_price_h3_market_street_rfe25"
-DEFAULT_LISTING_FEATURE_SET = "listing_price_h3_market_street_aligned30"
+DEFAULT_NO_LIST_FEATURE_SET = "no_list_price_v1"
+DEFAULT_LISTING_FEATURE_SET = "with_list_price_v1"
 
 
 def run_model_suite_experiment(

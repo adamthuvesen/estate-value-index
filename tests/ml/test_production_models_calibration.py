@@ -1,11 +1,15 @@
-"""Phase 3: predict() applies the residual calibrator only for no_list high predictions."""
+"""Phase 3: predict() applies the residual calibrator only for no_list_price high predictions."""
 
 from __future__ import annotations
 
 import numpy as np
 import pandas as pd
 
-from estate_value_index.ml.production_models import TieredProductionModel
+from estate_value_index.ml.production_models import (
+    LISTING_MODEL_ID,
+    NO_LIST_MODEL_ID,
+    TieredProductionModel,
+)
 
 
 class _StubCalibrator:
@@ -22,7 +26,7 @@ def _model(*, model_id: str, calibrator: object | None) -> TieredProductionModel
     return TieredProductionModel(
         model_id=model_id,
         feature_set="fs",
-        requires_listing_price=(model_id == "listing"),
+        requires_listing_price=(model_id == LISTING_MODEL_ID),
         numeric_features=[],
         categorical_features=[],
         context=None,
@@ -44,7 +48,7 @@ def _engineered() -> pd.DataFrame:
 
 
 def test_no_list_calibrates_only_high_predictions() -> None:
-    model = _model(model_id="no_list", calibrator=_StubCalibrator(500_000.0))
+    model = _model(model_id=NO_LIST_MODEL_ID, calibrator=_StubCalibrator(500_000.0))
     gated = np.array([10_000_000.0, 5_000_000.0])
 
     out = model._apply_calibration(_engineered(), gated)
@@ -54,7 +58,7 @@ def test_no_list_calibrates_only_high_predictions() -> None:
 
 
 def test_no_list_correction_is_clipped() -> None:
-    model = _model(model_id="no_list", calibrator=_StubCalibrator(5_000_000.0))
+    model = _model(model_id=NO_LIST_MODEL_ID, calibrator=_StubCalibrator(5_000_000.0))
     gated = np.array([10_000_000.0])
 
     out = model._apply_calibration(_engineered().head(1), gated)
@@ -64,7 +68,7 @@ def test_no_list_correction_is_clipped() -> None:
 
 
 def test_listing_model_is_never_calibrated() -> None:
-    model = _model(model_id="listing", calibrator=_StubCalibrator(500_000.0))
+    model = _model(model_id=LISTING_MODEL_ID, calibrator=_StubCalibrator(500_000.0))
     gated = np.array([10_000_000.0, 12_000_000.0])
 
     out = model._apply_calibration(_engineered(), gated)
@@ -73,7 +77,7 @@ def test_listing_model_is_never_calibrated() -> None:
 
 
 def test_no_list_without_calibrator_is_unchanged() -> None:
-    model = _model(model_id="no_list", calibrator=None)
+    model = _model(model_id=NO_LIST_MODEL_ID, calibrator=None)
     gated = np.array([10_000_000.0])
 
     out = model._apply_calibration(_engineered().head(1), gated)

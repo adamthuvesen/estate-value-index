@@ -55,8 +55,8 @@ except ImportError:
 DEFAULT_PREFIX = "price_prediction_model"
 MODELS_DIR = Path("web/models")
 AUTO_MODEL = "auto"
-NO_LIST_MODEL = "no_list"
-LISTING_MODEL = "listing"
+NO_LIST_MODEL = "no_list_price"
+LISTING_MODEL = "with_list_price"
 PRODUCTION_MODEL_FILES = {
     NO_LIST_MODEL: f"{DEFAULT_PREFIX}_{NO_LIST_MODEL}.joblib",
     LISTING_MODEL: f"{DEFAULT_PREFIX}_{LISTING_MODEL}.joblib",
@@ -194,7 +194,9 @@ class PredictionRequest(BaseModel):
     municipality: str = Field(default="Stockholm", description="Municipality name")
     property_type: str = Field(default="Lägenhet", description="Property type")
     area: str = Field(default="Södermalm", description="Area/neighborhood name")
-    model: str = Field(default=AUTO_MODEL, description="Model id to use: auto, no_list, listing")
+    model: str = Field(
+        default=AUTO_MODEL, description="Model id to use: auto, no_list_price, with_list_price"
+    )
     floor: float | None = Field(default=None, description="Floor number")
     elevator: bool | None = Field(default=None, description="Has elevator")
     balcony: bool | None = Field(default=None, description="Has balcony")
@@ -425,13 +427,13 @@ def _resolve_prediction_model(requested_model: str, listing_price: float | None)
     else:
         raise HTTPException(
             status_code=400,
-            detail=f"Unknown model '{requested_model}'. Use auto, no_list, or listing.",
+            detail=f"Unknown model '{requested_model}'. Use auto, no_list_price, or with_list_price.",
         )
 
     if model_type == LISTING_MODEL and not has_listing_price:
         raise HTTPException(
             status_code=400,
-            detail="The listing model requires listing_price.",
+            detail="The with_list_price model requires listing_price.",
         )
     if model_type not in MODEL_CACHE:
         raise HTTPException(status_code=503, detail=f"Model '{model_type}' is not loaded")

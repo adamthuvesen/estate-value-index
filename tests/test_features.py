@@ -252,10 +252,10 @@ class TestFeatureConfiguration:
     @pytest.mark.unit
     def test_production_variants_are_explicit_about_asking_price(self):
         no_list_numeric, no_list_categorical = load_feature_subset(
-            "no_list_price_h3_market_street_rfe25"
+            "no_list_price_v1"
         )
         listing_numeric, listing_categorical = load_feature_subset(
-            "listing_price_h3_market_street_aligned30"
+            "with_list_price_v1"
         )
 
         blocked_no_list = {
@@ -276,7 +276,7 @@ class TestFeatureConfiguration:
     @pytest.mark.unit
     def test_comparison_feature_subsets_isolate_h3(self):
         listing_numeric, listing_categorical = load_feature_subset(
-            "listing_price_h3_market_street_aligned30"
+            "with_list_price_v1"
         )
         no_h3_numeric, no_h3_categorical = load_feature_subset("no_list_price_22_no_h3")
         core_numeric, core_categorical = load_feature_subset("no_list_price_h3_core")
@@ -340,7 +340,7 @@ class TestFeatureConfiguration:
     @pytest.mark.unit
     def test_rfe_compact_feature_subsets_are_registered(self):
         no_list_numeric, no_list_categorical = load_feature_subset(
-            "no_list_price_h3_market_street_rfe25"
+            "no_list_price_v1"
         )
         listing_numeric, listing_categorical = load_feature_subset(
             "listing_price_h3_market_street_rfe15"
@@ -374,13 +374,13 @@ class TestFeatureConfiguration:
     @pytest.mark.unit
     def test_aligned_listing_feature_sets_extend_no_list_backbone(self):
         no_list_numeric, no_list_categorical = load_feature_subset(
-            "no_list_price_h3_market_street_rfe25"
+            "no_list_price_v1"
         )
         aligned26_numeric, aligned26_categorical = load_feature_subset(
             "listing_price_h3_market_street_aligned26"
         )
         aligned30_numeric, aligned30_categorical = load_feature_subset(
-            "listing_price_h3_market_street_aligned30"
+            "with_list_price_v1"
         )
 
         assert set(no_list_numeric).issubset(aligned26_numeric)
