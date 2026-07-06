@@ -436,7 +436,7 @@ def _value_insights(value_properties: list[dict]) -> dict[str, Any]:
     # Rows missing core fields are held out of the ranking: their value_score is
     # null and is_rankable is False. Score/rate stats cover ranked rows only so a
     # suppressed row can't drag an area's average toward the fill value.
-    rankable = [p for p in value_properties if p.get("is_rankable", True)]
+    rankable = [p for p in value_properties if p["is_rankable"]]
     undervalued_count = sum(1 for p in rankable if p.get("is_undervalued", False))
     value_scores = [
         score for p in rankable if (score := p.get("value_score")) is not None
