@@ -17,7 +17,7 @@ Training uses engineered listing features and LightGBM. Keep training, feature c
 - Keep inference feature context aligned with training, especially area normalization and categorical handling.
 - Use `normalize_area_for_model()` for Booli-style `Property - Area - City` area handling.
 - Follow the trainer's pandas `category` + LightGBM categorical contract.
-- If production retraining fits on all engineered data, treat holdout metrics as bounded evidence, not automatic live generalization, without a fresh temporal backtest.
+- If production retraining fits on all engineered data, treat holdout metrics as bounded evidence. Run a fresh temporal backtest before treating them as live-generalization evidence.
 - Some engineered signals are heuristic and hand-tuned. Re-check feature importances after retrains.
 - Current priority: keep the 2026 chronological split behavior intact, retrain when changing the feature set, and re-baseline `MAX_MAE_THRESHOLD` against honest temporal MAE.
 

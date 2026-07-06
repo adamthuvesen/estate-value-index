@@ -1,6 +1,9 @@
 # Data pipeline
 
-The data path is authorized listing ingestion output into BigQuery raw listings, engineered feature materialization, then model training or serving artifacts. The public repo contains code and synthetic fixtures only, not redistributable scraped listing data.
+The data path starts with authorized listing ingestion output, lands raw listings in BigQuery,
+materializes engineered features, then feeds model training or serving artifacts. The public
+repo contains code and synthetic fixtures only. It does not include redistributable scraped
+listing data.
 
 ## Main flow
 
@@ -49,12 +52,12 @@ The public HTML spider exists for parser development and local experiments only.
 not use it to bypass access controls or source terms; use permissioned API or export
 access for real training data. The API path writes the same raw-listing JSONL schema.
 
-Precedence: environment → `config/pipeline_config.yaml` → code defaults.
+Precedence: environment -> `config/pipeline_config.yaml` -> code defaults.
 
 BigQuery datasets:
 
-- **booli_raw** — raw listings (e.g. `listings`, partitioned)
-- **booli_features** — engineered features (e.g. `engineered_features`, partitioned)
+- **booli_raw:** raw listings (e.g. `listings`, partitioned)
+- **booli_features:** engineered features (e.g. `engineered_features`, partitioned)
 
 ## BigQuery rules
 

@@ -7,8 +7,8 @@ Permissioned listing source -> BigQuery raw listings -> engineered features -> L
   -> Next.js API/routes + FastAPI prediction service
 ```
 
-The public repo intentionally excludes real listing data, geocodes, trained
-models, model metrics, and property-level prediction artifacts. Use
+The public repo excludes real listing data, geocodes, trained models, model
+metrics, and property-level prediction artifacts. Use
 `tests/fixtures/` for synthetic shapes and provide private artifacts through
 your own lawful data source, BigQuery, GCS, or local environment.
 
@@ -63,7 +63,7 @@ Imports flow one way, top to bottom. Keep it that way:
 ```text
 cli / pipelines        (entry points, orchestration)
    -> analytics / ml / ingestion / monitoring / ops   (domain logic)
-      -> utils         (settings, clients, gcs, bigquery_safety — no domain imports)
+      -> utils         (settings, clients, gcs, bigquery_safety; no domain imports)
 ```
 
 - `utils/` is the bottom layer: it must not import from `ml/`, `ingestion/`, `pipelines/`, etc.
@@ -73,8 +73,8 @@ cli / pipelines        (entry points, orchestration)
 ## Shared conventions
 
 - **Config:** `utils/settings.py` is the raw env/flag/YAML layer (`EnvConfig`, `load_env_config()`, `get_*`/`is_*`). Pipeline-shaped, typed config objects (`BigQueryConfig`, `TrainingFlowConfig`) live in `pipelines/utils/config.py` and build on top of it.
-- **GCP clients:** create BigQuery / Storage clients via the cached factory in `utils/clients.py` (`get_bq_client`, `get_storage_client`) — do not instantiate `bigquery.Client()` / `storage.Client()` ad hoc.
-- **Errors:** raise the domain exceptions in `exceptions.py` (`DataError`, `ModelError`, `InfrastructureError`, …) rather than swallowing failures in the data path.
+- **GCP clients:** create BigQuery / Storage clients via the cached factory in `utils/clients.py` (`get_bq_client`, `get_storage_client`). Do not instantiate `bigquery.Client()` / `storage.Client()` ad hoc.
+- **Errors:** raise the domain exceptions in `exceptions.py` (`DataError`, `ModelError`, `InfrastructureError`, etc.) rather than swallowing failures in the data path.
 - **Logging:** `logging.getLogger(__name__)` per module; no decorative emoji in log output.
 
 ## Runtime shape
@@ -95,7 +95,7 @@ cli / pipelines        (entry points, orchestration)
 
 - `web/models/` is generated training output, ignored by git, and not included in the public repo. Do not hand-edit it.
 - GCS can provide model/enrichment artifacts at runtime through `scripts/startup.sh`.
-- Analysis images and generated reports should stay out of the public docs tree unless they are intentionally curated.
+- Analysis images and generated reports should stay out of the public docs tree unless they are curated for readers.
 
 ## Related guides
 
