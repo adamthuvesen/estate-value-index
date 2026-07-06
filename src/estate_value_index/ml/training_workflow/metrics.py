@@ -13,6 +13,11 @@ def regression_metrics(y_true: pd.Series, y_pred: np.ndarray) -> dict[str, float
     rmse = np.sqrt(mean_squared_error(y_true, y_pred))
     mape = mean_absolute_percentage_error(y_true, y_pred)
     absolute_pct_error = np.abs((np.asarray(y_pred) - y_true.to_numpy()) / y_true.to_numpy())
+    # A zero (or missing) sold_price divides to inf; drop those rows from the
+    # population instead of letting one bad row poison median_ape, which now
+    # gates model acceptance and drift. Mirrors residual_calibration.py's
+    # _prediction_metrics so both metrics paths agree on edge cases.
+    absolute_pct_error = np.where(np.isinf(absolute_pct_error), np.nan, absolute_pct_error)
     within_10_pct = np.mean(absolute_pct_error <= 0.10) * 100
     within_20_pct = np.mean(absolute_pct_error <= 0.20) * 100
     return {
@@ -21,7 +26,7 @@ def regression_metrics(y_true: pd.Series, y_pred: np.ndarray) -> dict[str, float
         "mape": float(mape),
         # Median absolute % error — the AVM-standard headline metric (what Zillow
         # reports). Robust to the fat right tail that inflates the mean-based mape.
-        "median_ape": float(np.median(absolute_pct_error)),
+        "median_ape": float(np.nanmedian(absolute_pct_error)),
         # PPE10 / PPE20 — hit-rate within 10% / 20%, reported alongside MdAPE.
         "within_10_pct": float(within_10_pct),
         "within_20_pct": float(within_20_pct),

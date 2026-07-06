@@ -18,3 +18,15 @@ def test_regression_metrics_include_core_accuracy_metrics() -> None:
     # Median of abs % errors [0.05, 0.09, 0.15] — robust to the 0.15 tail.
     assert metrics["median_ape"] == pytest.approx(0.09)
     assert metrics["within_10_pct"] == pytest.approx(200 / 3)
+
+
+def test_regression_metrics_ignores_zero_sold_price_rows() -> None:
+    # Zero-price rows divide to inf; median_ape must skip them rather than
+    # collapsing to inf and failing the acceptance gate outright.
+    y_true = pd.Series([0.0, 0.0, 0.0, 1_000_000.0])
+    y_pred = np.array([500_000.0, 0.0, 0.0, 1_100_000.0])
+
+    metrics = regression_metrics(y_true, y_pred)
+
+    assert metrics["median_ape"] == pytest.approx(0.1)
+    assert np.isfinite(metrics["median_ape"])
