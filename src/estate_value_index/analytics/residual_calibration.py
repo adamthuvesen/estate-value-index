@@ -12,7 +12,6 @@ from lightgbm import LGBMRegressor
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import HistGradientBoostingRegressor
 from sklearn.impute import SimpleImputer
-from sklearn.metrics import mean_absolute_error, mean_absolute_percentage_error, mean_squared_error
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder
@@ -31,6 +30,7 @@ from estate_value_index.ml.training_workflow.data import (
     load_feature_subset,
     load_training_dataframe,
 )
+from estate_value_index.ml.training_workflow.metrics import regression_metrics
 from estate_value_index.utils.settings import get_random_state, get_test_size
 
 CENTRAL_AREAS = frozenset({"ostermalm", "vasastan", "sodermalm", "kungsholmen"})
@@ -452,22 +452,21 @@ def _build_result_payload(
 
 
 def _prediction_metrics(y_true: pd.Series, y_pred: np.ndarray) -> dict[str, float]:
+    """regression_metrics's mae/rmse/mape/median_ape/within_X_pct, plus the
+    signed-bias fields the calibration gate needs (mean/median bias,
+    underprediction rate). Delegates the core computation instead of
+    reimplementing it, so the two can't quietly drift out of sync again.
+    """
     error = pd.Series(np.asarray(y_pred, dtype=float) - y_true.to_numpy(), index=y_true.index)
-    abs_pct = (error.abs() / y_true).replace([np.inf, -np.inf], np.nan)
-    return {
-        "mae": float(mean_absolute_error(y_true, y_pred)),
-        "rmse": float(np.sqrt(mean_squared_error(y_true, y_pred))),
-        "mape": float(mean_absolute_percentage_error(y_true, y_pred)),
-        # Median absolute % error — the AVM-standard headline metric (what Zillow
-        # reports). Robust to the fat right tail that inflates the mean-based mape.
-        "median_ape": float(abs_pct.median()),
-        # PPE10 / PPE20 — hit-rate within 10% / 20%, reported alongside MdAPE.
-        "within_10_pct": float((abs_pct <= 0.10).mean() * 100),
-        "within_20_pct": float((abs_pct <= 0.20).mean() * 100),
-        "mean_bias": float(error.mean()),
-        "median_bias": float(error.median()),
-        "underprediction_rate": float((error < 0).mean() * 100),
-    }
+    metrics = regression_metrics(y_true, y_pred)
+    metrics.update(
+        {
+            "mean_bias": float(error.mean()),
+            "median_bias": float(error.median()),
+            "underprediction_rate": float((error < 0).mean() * 100),
+        }
+    )
+    return metrics
 
 
 def _metric_delta(
