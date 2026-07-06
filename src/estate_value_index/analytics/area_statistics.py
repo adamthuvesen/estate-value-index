@@ -47,7 +47,9 @@ def _latest_sold_date(raw_listings: list[dict]) -> str | None:
     return max(dates) if dates else None
 
 
-def resolve_generated_at(raw_listings: list[dict], feature_context: dict, value_analysis: dict) -> str:
+def resolve_generated_at(
+    raw_listings: list[dict], feature_context: dict, value_analysis: dict
+) -> str:
     """Resolve a best-effort "data as of" date for metadata.
 
     Prefer the newest sold_date in the data — that is what "Updated" and the
