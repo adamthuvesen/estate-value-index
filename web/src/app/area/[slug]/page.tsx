@@ -14,7 +14,7 @@ import {
 } from "@/lib/format";
 import { PriceTrendChart } from "@/components/area/price-trend-chart";
 import { ValueDistributionChart } from "@/components/area/value-distribution-chart";
-import { RoomComparisonChart } from "@/components/area/room-comparison-chart";
+import { SizePriceChart } from "@/components/area/size-price-chart";
 import { ConstructionEraChart } from "@/components/area/construction-era-chart";
 import { SimilarAreas } from "@/components/area/similar-areas";
 import { SectionNavigation } from "@/components/area/section-navigation";
@@ -168,12 +168,12 @@ export default function AreaDetailPage() {
             <span className="font-medium text-tactical-text">{data.display_name}</span>
           </nav>
 
-          <div className="mb-12 text-center animate-fade-in-up">
+          <div className="mb-8 text-center animate-fade-in-up">
             <p className="text-[11px] font-semibold uppercase tracking-tactical-wide text-tactical-accent">
               Area report
             </p>
-            <div className="mt-3 mb-4 flex flex-wrap items-center justify-center gap-3">
-              <h1 className="text-4xl font-semibold leading-[1.06] tracking-tight text-tactical-text sm:text-[46px]">
+            <div className="mt-2 mb-3 flex flex-wrap items-center justify-center gap-3">
+              <h1 className="text-3xl font-semibold leading-[1.06] tracking-tight text-tactical-text sm:text-4xl">
                 {data.display_name}
               </h1>
               <span className="inline-flex rounded-pill border border-tactical-border bg-tactical-elevated px-3 py-1 text-[13px] font-medium text-tactical-muted">
@@ -203,41 +203,39 @@ export default function AreaDetailPage() {
             roomData={data.by_room_count}
           />
 
-          <div id="overview" className="mx-auto mb-10 max-w-3xl">
+          <div id="overview" className="mx-auto mb-6 max-w-3xl">
             <dl className="grid grid-cols-1 divide-y divide-tactical-border overflow-hidden rounded-2xl border border-tactical-border bg-tactical-surface shadow-elev-1 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-              <div className="px-5 py-6">
+              <div className="px-5 py-4">
                 <dt className="text-[11px] font-semibold uppercase tracking-tactical-wide text-tactical-dimmed">Average price per m²</dt>
-                <dd className="num mt-1.5 text-3xl font-semibold text-tactical-text">
+                <dd className="num mt-1 text-2xl font-semibold text-tactical-text">
                   {(filteredData?.overview.avg_price_per_sqm ?? data.overview.avg_price_per_sqm)
                     ? formatNumber(filteredData?.overview.avg_price_per_sqm ?? data.overview.avg_price_per_sqm)
                     : "—"}
                 </dd>
-                <p className="mt-1 text-[12px] text-tactical-muted">
+                <p className="mt-0.5 text-[12px] text-tactical-muted">
                   Sold: <span className="num">{formatSek(filteredData?.overview.avg_sold_price ?? data.overview.avg_sold_price)}</span>
                 </p>
               </div>
-              <div className="px-5 py-6">
+              <div className="px-5 py-4">
                 <dt className="text-[11px] font-semibold uppercase tracking-tactical-wide text-tactical-dimmed">Market activity</dt>
-                <dd className="num mt-1.5 text-3xl font-semibold text-tactical-text">
+                <dd className="num mt-1 text-2xl font-semibold text-tactical-text">
                   {formatNumber(filteredData?.overview.listing_count ?? data.overview.listing_count)}
                 </dd>
-                <p className="mt-1 text-[12px] text-tactical-muted">Total properties</p>
+                <p className="mt-0.5 text-[12px] text-tactical-muted">Total properties</p>
               </div>
-              <div className="px-5 py-6">
+              <div className="px-5 py-4">
                 <dt className="text-[11px] font-semibold uppercase tracking-tactical-wide text-tactical-dimmed">Days on market</dt>
-                <dd className="num mt-1.5 text-3xl font-semibold text-tactical-text">
+                <dd className="num mt-1 text-2xl font-semibold text-tactical-text">
                   {formatNumber(filteredData?.market_dynamics.days_on_market_median ?? data.market_dynamics.days_on_market_median)}
                 </dd>
-                <p className="mt-1 text-[12px] text-tactical-muted">Median listing duration</p>
+                <p className="mt-0.5 text-[12px] text-tactical-muted">Median listing duration</p>
               </div>
             </dl>
           </div>
+          <div id="market" className="mb-6 tactical-card p-5 sm:p-6">
+        <h2 className="mb-4 text-lg font-semibold tracking-tight text-tactical-text">Market dynamics</h2>
 
-          <div className="tactical-section-separator"></div>
-          <div id="market" className="mb-8 tactical-card p-6 sm:p-8">
-        <h2 className="mb-6 text-2xl font-semibold tracking-tight text-tactical-text">Market dynamics</h2>
-
-        <div className="mb-8">
+        <div className="mb-5">
           <PriceTrendChart
             median_price_3m={data.overview.median_price_3m}
             median_price_6m={data.overview.median_price_6m}
@@ -285,14 +283,12 @@ export default function AreaDetailPage() {
           </div>
         </div>
       </div>
-
-          <div className="tactical-section-separator"></div>
-          <div id="value" className="mb-8 tactical-card p-6 sm:p-8">
-        <h2 className="mb-6 text-2xl font-semibold tracking-tight text-tactical-text">Value insights</h2>
-        <div className="mb-6 grid gap-4 sm:grid-cols-3">
+          <div id="value" className="mb-6 tactical-card p-5 sm:p-6">
+        <h2 className="mb-4 text-lg font-semibold tracking-tight text-tactical-text">Value insights</h2>
+        <div className="mb-5 grid gap-3 sm:grid-cols-3">
           <div className="rounded-xl border border-val-exc-line bg-val-exc-tint p-4">
             <p className="text-[11px] font-semibold uppercase tracking-tactical-wide text-val-exc">Undervalued properties</p>
-            <p className="num mt-2 text-3xl font-semibold text-val-exc">
+            <p className="num mt-1.5 text-2xl font-semibold text-val-exc">
               {formatPercent(filteredData?.value_insights.undervalued_pct ?? data.value_insights.undervalued_pct)}
             </p>
             <p className="mt-1 text-[12px] text-val-exc">
@@ -301,7 +297,7 @@ export default function AreaDetailPage() {
           </div>
           <div className="rounded-xl border border-tactical-border bg-tactical-elevated p-4">
             <p className="text-[11px] font-semibold uppercase tracking-tactical-wide text-tactical-dimmed">Avg value score</p>
-            <p className="num mt-2 text-3xl font-semibold text-tactical-text">
+            <p className="num mt-1.5 text-2xl font-semibold text-tactical-text">
               {formatNumberOrDash(filteredData?.value_insights.avg_value_score ?? data.value_insights.avg_value_score, 1)}
             </p>
             <p className="mt-1 text-[12px] text-tactical-muted">
@@ -329,21 +325,19 @@ export default function AreaDetailPage() {
           />
         </div>
       </div>
+          <div id="size" className="mb-6 tactical-card p-5 sm:p-6">
+        <h2 className="mb-4 text-lg font-semibold tracking-tight text-tactical-text">Size analysis</h2>
 
-          <div className="tactical-section-separator"></div>
-          <div id="size" className="mb-8 tactical-card p-6 sm:p-8">
-        <h2 className="mb-6 text-2xl font-semibold tracking-tight text-tactical-text">Size analysis</h2>
-
-        <div className="mb-8">
-          <RoomComparisonChart price_per_sqm_by_rooms={data.size_analysis.price_per_sqm_by_rooms} />
+        <div className="mb-5">
+          <SizePriceChart price_by_size={data.size_analysis.price_by_size} />
         </div>
 
         <div>
-          <h3 className="mb-4 text-[17px] font-semibold tracking-tight text-tactical-text">Property size distribution</h3>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="rounded-xl border border-tactical-border bg-tactical-elevated p-4">
+          <h3 className="mb-3 text-[14px] font-semibold tracking-tight text-tactical-text">Property size distribution</h3>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-lg border border-tactical-border bg-tactical-elevated p-4">
               <p className="text-[11px] font-semibold uppercase tracking-tactical-wide text-tactical-dimmed">Living area (m²)</p>
-              <p className="num mt-2 text-2xl font-semibold text-tactical-text">
+              <p className="num mt-1.5 text-xl font-semibold text-tactical-text">
                 {formatNumber(data.size_analysis.size_distribution.living_area.median)} m²
               </p>
               <div className="mt-2 space-y-1 text-[12px] text-tactical-muted">
@@ -374,16 +368,14 @@ export default function AreaDetailPage() {
           </div>
         </div>
       </div>
+          <div id="characteristics" className="mb-6 tactical-card p-5 sm:p-6">
+        <h2 className="mb-4 text-lg font-semibold tracking-tight text-tactical-text">Property characteristics</h2>
 
-          <div className="tactical-section-separator"></div>
-          <div id="characteristics" className="mb-8 tactical-card p-6 sm:p-8">
-        <h2 className="mb-6 text-2xl font-semibold tracking-tight text-tactical-text">Property characteristics</h2>
-
-        <div className="mb-8 grid gap-4 sm:grid-cols-2">
-          <div className="rounded-xl border border-tactical-border bg-tactical-elevated p-6">
+        <div className="mb-5 grid gap-3 sm:grid-cols-2">
+          <div className="rounded-xl border border-tactical-border bg-tactical-elevated p-4">
             <div className="flex items-center justify-between">
               <p className="text-[11px] font-semibold uppercase tracking-tactical-wide text-tactical-dimmed">Elevator</p>
-              <span className="num text-3xl font-semibold text-tactical-text">
+              <span className="num text-2xl font-semibold text-tactical-text">
                 {formatPercent(
                   filteredData?.property_characteristics.elevator_pct ?? data.property_characteristics.elevator_pct
                 )}
@@ -391,10 +383,10 @@ export default function AreaDetailPage() {
             </div>
             <p className="mt-2 text-[12px] text-tactical-muted">of properties have elevator access</p>
           </div>
-          <div className="rounded-xl border border-tactical-border bg-tactical-elevated p-6">
+          <div className="rounded-xl border border-tactical-border bg-tactical-elevated p-4">
             <div className="flex items-center justify-between">
               <p className="text-[11px] font-semibold uppercase tracking-tactical-wide text-tactical-dimmed">Balcony</p>
-              <span className="num text-3xl font-semibold text-tactical-text">
+              <span className="num text-2xl font-semibold text-tactical-text">
                 {formatPercent(
                   filteredData?.property_characteristics.balcony_pct ?? data.property_characteristics.balcony_pct
                 )}
@@ -412,9 +404,7 @@ export default function AreaDetailPage() {
       </div>
 
           {allAreas.length > 0 && (
-            <>
-              <div className="tactical-section-separator"></div>
-              <div id="similar" className="mb-8 tactical-card p-6 sm:p-8">
+            <>              <div id="similar" className="mb-6 tactical-card p-5 sm:p-6">
                 <SimilarAreas
                   currentArea={data.area_name}
                   currentPriceTier={data.price_tier}
@@ -424,9 +414,7 @@ export default function AreaDetailPage() {
               </div>
             </>
           )}
-
-          <div className="tactical-section-separator"></div>
-          <div id="recent" className="mb-8 tactical-card p-6 sm:p-8">
+          <div id="recent" className="mb-6 tactical-card p-5 sm:p-6">
         <div className="mb-6 flex items-center justify-between gap-3">
           <h2 className="text-2xl font-semibold tracking-tight text-tactical-text">Recent sales</h2>
           <Link
@@ -436,36 +424,34 @@ export default function AreaDetailPage() {
             View all
           </Link>
         </div>
-        <div className="space-y-3">
+        <div className="divide-y divide-tactical-border overflow-hidden rounded-xl border border-tactical-border">
           {(filteredData?.recent_properties ?? data.recent_properties).map((property) => (
             <div
               key={property.listing_id}
-              className="flex items-center justify-between gap-4 rounded-xl border border-tactical-border bg-tactical-elevated p-4 transition-colors hover:border-tactical-border-emphasis"
+              className="flex items-center justify-between gap-3 px-3 py-2 transition-colors hover:bg-tactical-elevated/50"
             >
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[14px] font-medium text-tactical-text">{property.address}</p>
-                <p className="mt-1 text-[12px] text-tactical-muted">
+                <p className="truncate text-[13px] font-medium text-tactical-text">{property.address}</p>
+                <p className="truncate text-[11px] text-tactical-muted">
                   <span className="num">{formatNumber(property.living_area)}</span> m² · <span className="num">{property.rooms}</span> rooms · sold {property.sold_date}
                 </p>
               </div>
-              <div className="text-right">
-                <p className="num text-[15px] font-semibold text-tactical-text">{formatSek(property.sold_price)}</p>
-                <p className="num text-[12px] text-tactical-muted">{formatSek(property.price_per_sqm)}/m²</p>
+              <div className="shrink-0 text-right">
+                <p className="num text-[13px] font-semibold text-tactical-text">{formatSek(property.sold_price)}</p>
+                <p className="num text-[11px] text-tactical-muted">{formatSek(property.price_per_sqm)}/m²</p>
               </div>
             </div>
           ))}
         </div>
       </div>
-
-          <div className="tactical-section-separator"></div>
-          <div className="tactical-card p-8 text-center">
-        <h3 className="text-xl font-semibold tracking-tight text-tactical-text">Find properties in {data.display_name}</h3>
-        <p className="mt-3 text-[14px] text-tactical-muted">
+          <div className="tactical-card p-6 text-center">
+        <h3 className="text-lg font-semibold tracking-tight text-tactical-text">Find properties in {data.display_name}</h3>
+        <p className="mt-2 text-[14px] text-tactical-muted">
           Browse all <span className="num">{formatNumber(data.overview.listing_count)}</span> properties and discover undervalued opportunities.
         </p>
         <Link
           href={`/value-finder?area=${data.area_name}`}
-          className="tactical-btn-primary tactical-focus-ring mt-6 inline-flex text-[13px]"
+          className="tactical-btn-primary tactical-focus-ring mt-4 inline-flex text-[13px]"
         >
           Explore {data.display_name} properties
         </Link>

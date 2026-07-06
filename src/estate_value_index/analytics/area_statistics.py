@@ -37,9 +37,28 @@ def load_json(filepath: Path) -> dict:
         return json.load(f)
 
 
-def resolve_generated_at(feature_context: dict, value_analysis: dict) -> str:
-    """Resolve a best-effort generated_at timestamp for metadata."""
+def _latest_sold_date(raw_listings: list[dict]) -> str | None:
+    """Newest sold_date (YYYY-MM-DD) across the listings, or None if undated."""
+    dates = [
+        normalized
+        for listing in raw_listings
+        if (normalized := _normalize_sold_date(listing.get("sold_date")))
+    ]
+    return max(dates) if dates else None
+
+
+def resolve_generated_at(
+    raw_listings: list[dict], feature_context: dict, value_analysis: dict
+) -> str:
+    """Resolve a best-effort "data as of" date for metadata.
+
+    Prefer the newest sold_date in the data — that is what "Updated" and the
+    staleness banner mean. The model's reference_date is the training cutoff and
+    lags the data whenever listings are refreshed without a retrain, so it's only
+    a fallback.
+    """
     candidates = [
+        _latest_sold_date(raw_listings),
         feature_context.get("reference_date"),
         value_analysis.get("metadata", {}).get("generated_at"),
     ]
@@ -155,6 +174,50 @@ def calculate_amenity_prevalence(properties: list[dict]) -> dict[str, float]:
         "elevator_pct": round(elevator_count / total * 100, 1),
         "balcony_pct": round(balcony_count / total * 100, 1),
     }
+
+
+# Living-area buckets (m²) for the size -> price histogram: inclusive lower,
+# exclusive upper, with an open-ended final bucket.
+_SIZE_BUCKETS: list[tuple[str, float, float]] = [
+    ("<40", 0, 40),
+    ("40–50", 40, 50),
+    ("50–60", 50, 60),
+    ("60–70", 60, 70),
+    ("70–80", 70, 80),
+    ("80–90", 80, 90),
+    ("90–100", 90, 100),
+    ("100–120", 100, 120),
+    ("120+", 120, float("inf")),
+]
+
+
+def calculate_price_by_size(properties: list[dict]) -> list[dict]:
+    """Median sold price per living-area bucket, for the size -> price histogram.
+
+    Returns an ordered list of ``{bucket, median_price, count}`` for the buckets
+    that hold at least one property, so the x-axis reads small -> large m².
+    """
+    bucket_prices: dict[str, list[float]] = {label: [] for label, _, _ in _SIZE_BUCKETS}
+
+    for prop in properties:
+        living_area = prop.get("living_area")
+        sold_price = prop.get("sold_price")
+        if not living_area or not sold_price:
+            continue
+        for label, low, high in _SIZE_BUCKETS:
+            if low <= living_area < high:
+                bucket_prices[label].append(sold_price)
+                break
+
+    return [
+        {
+            "bucket": label,
+            "median_price": round(statistics.median(bucket_prices[label])),
+            "count": len(bucket_prices[label]),
+        }
+        for label, _, _ in _SIZE_BUCKETS
+        if bucket_prices[label]
+    ]
 
 
 def calculate_size_distribution(properties: list[dict]) -> dict[str, Any]:
@@ -582,6 +645,7 @@ def _area_statistics_entry(
         "value_insights": _value_insights(value_props),
         "size_analysis": {
             "price_per_sqm_by_rooms": calculate_price_per_sqm_by_rooms(raw_props),
+            "price_by_size": calculate_price_by_size(raw_props),
             "size_distribution": calculate_size_distribution(raw_props),
         },
         "property_characteristics": calculate_amenity_prevalence(raw_props),
@@ -633,7 +697,7 @@ def _area_statistics_output(
 ) -> dict[str, Any]:
     return {
         "metadata": {
-            "generated_at": resolve_generated_at(feature_context, value_analysis),
+            "generated_at": resolve_generated_at(raw_listings, feature_context, value_analysis),
             "total_areas": len(area_stats),
             "total_properties": len(raw_listings),
             "data_sources": {

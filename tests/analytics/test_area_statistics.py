@@ -2,7 +2,29 @@ from __future__ import annotations
 
 import json
 
-from estate_value_index.analytics.area_statistics import generate_area_statistics
+from estate_value_index.analytics.area_statistics import (
+    calculate_price_by_size,
+    generate_area_statistics,
+)
+
+
+def test_calculate_price_by_size_buckets_by_living_area():
+    properties = [
+        {"living_area": 45, "sold_price": 4_000_000},
+        {"living_area": 48, "sold_price": 4_400_000},  # same 40-50 bucket
+        {"living_area": 55, "sold_price": 5_800_000},
+        {"living_area": 130, "sold_price": 12_000_000},
+        {"living_area": 60, "sold_price": None},  # dropped: no price
+        {"living_area": None, "sold_price": 5_000_000},  # dropped: no area
+    ]
+
+    result = calculate_price_by_size(properties)
+
+    # Ordered small -> large, empty buckets omitted.
+    assert [row["bucket"] for row in result] == ["40–50", "50–60", "120+"]
+    first = result[0]
+    assert first["count"] == 2
+    assert first["median_price"] == 4_200_000  # median of 4.0M and 4.4M
 
 
 def test_generate_area_statistics_builds_and_writes_area_payload(tmp_path):
@@ -103,7 +125,9 @@ def test_generate_area_statistics_builds_and_writes_area_payload(tmp_path):
     assert json.loads(output_path.read_text(encoding="utf-8")) == result
     assert result["metadata"]["total_areas"] == 1
     assert result["metadata"]["total_properties"] == 2
-    assert result["metadata"]["generated_at"] == "2026-06-01"
+    # "Updated" tracks the newest sold_date in the data (2026-05-15), not the
+    # model's reference_date (2026-06-01) — the training cutoff lags the data.
+    assert result["metadata"]["generated_at"] == "2026-05-15"
 
     area = result["areas"]["sodermalm"]
     assert area["overview"]["avg_listing_price"] == 5_000_000

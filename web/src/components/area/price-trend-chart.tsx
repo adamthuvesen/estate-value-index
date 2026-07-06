@@ -122,10 +122,10 @@ export function PriceTrendChart({ median_price_3m, median_price_6m, median_price
 
   return (
     <div>
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-3 flex items-center justify-between">
         <div>
-          <h3 className="text-[17px] font-semibold tracking-tight text-tactical-text">Price trend</h3>
-          <p className="text-[13px] text-tactical-muted">
+          <h3 className="text-[14px] font-semibold tracking-tight text-tactical-text">Price trend</h3>
+          <p className="text-[12px] text-tactical-muted">
             {showPerSqm ? "Median price per m² over time" : "Median sold prices over time"}
           </p>
         </div>
@@ -161,7 +161,7 @@ export function PriceTrendChart({ median_price_3m, median_price_6m, median_price
                   ? "12-month change"
                   : `${actualDataPoints[0].monthsAgo}-month change`}
               </p>
-              <p className={`num text-2xl font-semibold ${isPositive ? "text-val-exc" : "text-val-high"}`}>
+              <p className={`num text-lg font-semibold ${isPositive ? "text-val-exc" : "text-val-high"}`}>
                 {isPositive ? "+" : ""}
                 {priceChange.toFixed(1)}%
               </p>
@@ -170,7 +170,7 @@ export function PriceTrendChart({ median_price_3m, median_price_6m, median_price
         </div>
       </div>
 
-      <ResponsiveContainer width="100%" height={320}>
+      <ResponsiveContainer width="100%" height={210}>
         <LineChart data={data} margin={{ top: 5, right: 20, bottom: 20, left: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#EDEDE9" />
           <XAxis

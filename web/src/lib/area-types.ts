@@ -104,8 +104,15 @@ export interface SizeDistribution {
   room_distribution: Record<string, number>;
 }
 
+export interface PriceBySizeBucket {
+  bucket: string;
+  median_price: number;
+  count: number;
+}
+
 export interface AreaSizeAnalysis {
   price_per_sqm_by_rooms: PricePerSqmByRooms;
+  price_by_size: PriceBySizeBucket[];
   size_distribution: SizeDistribution;
 }
 

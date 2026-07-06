@@ -15,6 +15,7 @@ from pathlib import Path
 import joblib
 import numpy as np
 import pandas as pd
+from scipy.stats import norm
 
 # Import preprocessing functions to match training pipeline
 from estate_value_index.ml import drop_outliers_quantile, filter_valid_listings
@@ -32,19 +33,17 @@ def load_production_data(data_path: Path, apply_training_filters: bool = True) -
     """
     logger.info("Loading data from: %s", data_path)
 
-    # Try loading as JSONL first (newline-delimited JSON)
-    try:
-        data = []
-        with open(data_path, encoding="utf-8") as f:
-            for line in f:
-                if line.strip():  # Skip empty lines
-                    data.append(json.loads(line))
-        logger.info("Loaded %s listings (JSONL format)", f"{len(data):,}")
-    except json.JSONDecodeError:
-        # Fall back to regular JSON array
-        with open(data_path, encoding="utf-8") as f:
-            data = json.load(f)
-        logger.info("Loaded %s listings (JSON format)", f"{len(data):,}")
+    # Support both a JSON array (single- or multi-line) and JSONL. Sniff the
+    # first non-whitespace char: a single-line array parses as one "line", so
+    # trying JSONL first would silently wrap the whole array in one row.
+    with open(data_path, encoding="utf-8") as f:
+        content = f.read()
+    if content.lstrip().startswith("["):
+        data = json.loads(content)
+        logger.info("Loaded %s listings (JSON array)", f"{len(data):,}")
+    else:
+        data = [json.loads(line) for line in content.splitlines() if line.strip()]
+        logger.info("Loaded %s listings (JSONL)", f"{len(data):,}")
 
     df = pd.DataFrame(data)
 
@@ -107,7 +106,7 @@ def calculate_value_metrics(
       (positive = over-predicted = potential undervalued property)
     - prediction_delta_percentage: (predicted_price - sold_price) / sold_price * 100
     - is_undervalued: True if delta exceeds threshold (5% OR 200K SEK by default)
-    - value_score: Custom score to rank properties (0-100)
+    - value_score: Custom score to rank properties (1-100)
       Higher score = better value
 
     Args:
@@ -129,32 +128,25 @@ def calculate_value_metrics(
         df["prediction_delta_absolute"] >= undervalue_threshold_abs
     )
 
-    # Calculate value score (0-100 scale) using standard deviation normalization
-    # This creates a normal distribution centered at 50
-    # Formula: Use z-scores (standard deviations from mean) for natural distribution
-
-    # Use percentage delta as primary metric (more fair across price ranges)
+    # Value score (1-100): quantile-normalize undervaluation into a bell curve
+    # centered at 50. Rank properties by percentage delta (higher delta = sold
+    # further below the model = better value), map the rank through the inverse
+    # normal CDF to get a standard-normal spread, then scale. This uses the full
+    # 1-100 range — unlike a raw z-score clipped at ±3, which collapses every
+    # extreme into a spike at 95.
     pct_delta = df["prediction_delta_percentage"]
+    n = len(df)
 
-    # Calculate z-score (standard deviations from mean)
-    # Positive delta = undervalued (sold below predicted)
-    pct_mean = pct_delta.mean()
-    pct_std = pct_delta.std()
-
-    if pct_std > 0:
-        z_score = (pct_delta - pct_mean) / pct_std
+    if n > 1:
+        # Ranks -> (0, 1) open interval; the +1 denominator keeps the extremes
+        # finite, and norm.ppf turns the uniform ranks into a standard normal.
+        percentile = pct_delta.rank(method="average") / (n + 1)
+        z_norm = pd.Series(norm.ppf(percentile), index=df.index)
     else:
-        z_score = pd.Series([0] * len(pct_delta), index=pct_delta.index)
+        z_norm = pd.Series([0.0] * n, index=df.index)
 
-    # Convert z-score to 0-100 scale using sigmoid-like transformation
-    # Z-scores typically range from -3 to +3 for 99.7% of data
-    # We'll map: z=-2 -> score=15, z=0 -> score=50, z=+2 -> score=85
-    # This gives us a nice normal distribution with most scores in 30-70 range
-    z_capped = z_score.clip(-3, 3)  # Cap at ±3 standard deviations
-
-    # Linear transformation: z*15 + 50 gives us desired spread
-    # z=-3 -> 5, z=-2 -> 20, z=-1 -> 35, z=0 -> 50, z=1 -> 65, z=2 -> 80, z=3 -> 95
-    df["value_score"] = (z_capped * 15 + 50).clip(0, 100).round(1)
+    # z*15 + 50: z=0 -> 50, z=±1 -> 35/65, z=±2 -> 20/80, z=±3.3 -> 1/100.
+    df["value_score"] = (z_norm * 15 + 50).clip(1, 100).round(1)
 
     # Add value tier labels (aligned with z-score distribution)
     def get_value_tier(score: float) -> str:
