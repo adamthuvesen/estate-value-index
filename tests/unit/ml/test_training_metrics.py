@@ -15,4 +15,6 @@ def test_regression_metrics_include_core_accuracy_metrics() -> None:
 
     assert metrics["mae"] == pytest.approx(206_666.6667)
     assert metrics["mape"] == pytest.approx((0.05 + 0.15 + 0.09) / 3)
+    # Median of abs % errors [0.05, 0.09, 0.15] — robust to the 0.15 tail.
+    assert metrics["median_ape"] == pytest.approx(0.09)
     assert metrics["within_10_pct"] == pytest.approx(200 / 3)

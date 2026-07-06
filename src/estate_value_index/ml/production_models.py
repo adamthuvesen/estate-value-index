@@ -681,6 +681,7 @@ def _metrics_payload(
         "mae": heldout_metrics["mae"],
         "rmse": heldout_metrics["rmse"],
         "mape": heldout_metrics["mape"],
+        "median_ape": heldout_metrics["median_ape"],
         "within_10_pct": heldout_metrics["within_10_pct"],
         "features_used": model.numeric_features + model.categorical_features,
         "numeric_features": model.numeric_features,

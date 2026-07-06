@@ -458,6 +458,9 @@ def _prediction_metrics(y_true: pd.Series, y_pred: np.ndarray) -> dict[str, floa
         "mae": float(mean_absolute_error(y_true, y_pred)),
         "rmse": float(np.sqrt(mean_squared_error(y_true, y_pred))),
         "mape": float(mean_absolute_percentage_error(y_true, y_pred)),
+        # Median absolute % error — the AVM-standard headline metric (what Zillow
+        # reports). Robust to the fat right tail that inflates the mean-based mape.
+        "median_ape": float(abs_pct.median()),
         "within_10_pct": float((abs_pct <= 0.10).mean() * 100),
         "mean_bias": float(error.mean()),
         "median_bias": float(error.median()),

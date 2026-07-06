@@ -18,6 +18,9 @@ def regression_metrics(y_true: pd.Series, y_pred: np.ndarray) -> dict[str, float
         "mae": float(mae),
         "rmse": float(rmse),
         "mape": float(mape),
+        # Median absolute % error — the AVM-standard headline metric (what Zillow
+        # reports). Robust to the fat right tail that inflates the mean-based mape.
+        "median_ape": float(np.median(absolute_pct_error)),
         "within_10_pct": float(within_10_pct),
     }
 
