@@ -43,9 +43,11 @@ ENV PATH="/root/.local/bin:$PATH"
 COPY pyproject.toml uv.lock ./
 COPY src/ src/
 
-# Install Python packages with uv to system Python (faster than pip)
-# [ml] extras include lightgbm, xgboost, optuna — required for model loading at runtime
-RUN uv pip install --system ".[ml]"
+# Install exact locked versions from uv.lock so serving deps match training.
+RUN uv export --frozen --no-dev --no-hashes --extra ml --no-emit-project \
+        --format requirements-txt -o /tmp/requirements.txt \
+    && uv pip install --system -r /tmp/requirements.txt \
+    && uv pip install --system --no-deps .
 
 # ============================================================================
 # Stage 3: Final production image
