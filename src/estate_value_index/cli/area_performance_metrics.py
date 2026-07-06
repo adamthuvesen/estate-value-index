@@ -371,7 +371,7 @@ def analyze_area_performance():
     """Analyze model performance stratified by area."""
     _print_section("AREA-STRATIFIED PERFORMANCE ANALYSIS", char="=")
 
-    model_path = Path("web/models/price_prediction_model_lgbm.joblib")
+    model_path = Path("web/models/price_prediction_model_no_list.joblib")
     print(f"\nLoading model from {model_path}...")
     model_pipeline = joblib.load(model_path)
 

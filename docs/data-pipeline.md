@@ -10,7 +10,7 @@ listing data.
 ```text
 Permissioned listing source -> JSONL + upload path -> process_listings -> booli_raw.listings
   -> materialize_features -> booli_features.engineered_features
-  -> train_model.py / pipeline -> web/models/* -> Next /api/* -> FastAPI /predict
+  -> train-production-models -> web/models/* -> Next /api/* -> FastAPI /predict
 ```
 
 ## Where to work

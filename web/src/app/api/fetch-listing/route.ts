@@ -27,6 +27,8 @@ function toPrefill(property: ValueProperty, sourceUrl: string): ParsedBooliListi
     floor: property.floor,
     elevator: property.elevator,
     balcony: property.balcony,
+    latitude: property.latitude ?? null,
+    longitude: property.longitude ?? null,
     source_url: property.url ?? sourceUrl,
   };
 }

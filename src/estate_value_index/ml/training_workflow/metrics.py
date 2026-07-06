@@ -12,10 +12,13 @@ def regression_metrics(y_true: pd.Series, y_pred: np.ndarray) -> dict[str, float
     mae = mean_absolute_error(y_true, y_pred)
     rmse = np.sqrt(mean_squared_error(y_true, y_pred))
     mape = mean_absolute_percentage_error(y_true, y_pred)
+    absolute_pct_error = np.abs((np.asarray(y_pred) - y_true.to_numpy()) / y_true.to_numpy())
+    within_10_pct = np.mean(absolute_pct_error <= 0.10) * 100
     return {
         "mae": float(mae),
         "rmse": float(rmse),
         "mape": float(mape),
+        "within_10_pct": float(within_10_pct),
     }
 
 

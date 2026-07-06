@@ -58,11 +58,13 @@ export function PredictionResults({
             )}
 
             <dl className="space-y-0 text-[13px]">
-              <Row label="Listing price">
-                <span className="num font-semibold text-tactical-text">
-                  {currencyFormatter.format(prediction.input_data.listing_price)}
-                </span>
-              </Row>
+              {prediction.input_data.listing_price != null && (
+                <Row label="Listing price">
+                  <span className="num font-semibold text-tactical-text">
+                    {currencyFormatter.format(prediction.input_data.listing_price)}
+                  </span>
+                </Row>
+              )}
               <Row label="Model">
                 <span className="font-medium text-tactical-text">{modelLabel}</span>
               </Row>

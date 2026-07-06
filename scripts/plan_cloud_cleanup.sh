@@ -114,8 +114,10 @@ current_image="$(
 echo ""
 echo "Serving state"
 echo "KEEP: current Cloud Run image: ${current_image:-unknown}"
-echo "KEEP: serving model artifacts under gs://${BUCKET}/models/price_prediction_model_*"
-gcloud storage ls "gs://${BUCKET}/models/price_prediction_model_*" 2>/dev/null || true
+echo "KEEP: serving model artifacts under gs://${BUCKET}/models/price_prediction_model_no_list*"
+echo "KEEP: serving model artifacts under gs://${BUCKET}/models/price_prediction_model_listing*"
+gcloud storage ls "gs://${BUCKET}/models/price_prediction_model_no_list*" 2>/dev/null || true
+gcloud storage ls "gs://${BUCKET}/models/price_prediction_model_listing*" 2>/dev/null || true
 
 prune_gcs_listing \
   "Vertex model run directories (keep latest 3)" \

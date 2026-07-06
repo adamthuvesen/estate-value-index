@@ -151,10 +151,10 @@ class TestUnifiedCliSubcommands:
         monkeypatch.setattr(cli_main, "_load_handler", lambda command: fake_value_analysis_main)
         output = tmp_path / "value.json"
 
-        result = cli_main.main(["value-analysis", "--output", str(output), "--model-type", "lgbm"])
+        result = cli_main.main(["value-analysis", "--output", str(output), "--model-type", "no_list"])
 
         assert result == 0
-        assert captured["argv"] == ["--output", str(output), "--model-type", "lgbm"]
+        assert captured["argv"] == ["--output", str(output), "--model-type", "no_list"]
 
     def test_area_metrics_dispatches_with_parsed_args(self, monkeypatch):
         from estate_value_index.cli import __main__ as cli_main
@@ -171,6 +171,189 @@ class TestUnifiedCliSubcommands:
 
         assert result == 0
         assert captured["argv"] == []
+
+    def test_calibration_experiment_dispatches_with_parsed_args(self, monkeypatch, tmp_path):
+        from estate_value_index.cli import __main__ as cli_main
+
+        captured = {}
+
+        def fake_calibration_main(argv):
+            captured["argv"] = argv
+            return 0
+
+        monkeypatch.setattr(cli_main, "_load_handler", lambda command: fake_calibration_main)
+        output_dir = tmp_path / "calibration"
+
+        result = cli_main.main(
+            [
+                "calibration-experiment",
+                "--feature-set",
+                "no_list_price_h3_market",
+                "--output-dir",
+                str(output_dir),
+            ]
+        )
+
+        assert result == 0
+        assert captured["argv"] == [
+            "--feature-set",
+            "no_list_price_h3_market",
+            "--output-dir",
+            str(output_dir),
+        ]
+
+    def test_ppsqm_experiment_dispatches_with_parsed_args(self, monkeypatch, tmp_path):
+        from estate_value_index.cli import __main__ as cli_main
+
+        captured = {}
+
+        def fake_ppsqm_main(argv):
+            captured["argv"] = argv
+            return 0
+
+        monkeypatch.setattr(cli_main, "_load_handler", lambda command: fake_ppsqm_main)
+        output_dir = tmp_path / "ppsqm"
+
+        result = cli_main.main(
+            [
+                "ppsqm-experiment",
+                "--feature-set",
+                "no_list_price_h3_comps",
+                "--output-dir",
+                str(output_dir),
+            ]
+        )
+
+        assert result == 0
+        assert captured["argv"] == [
+            "--feature-set",
+            "no_list_price_h3_comps",
+            "--output-dir",
+            str(output_dir),
+        ]
+
+    def test_premium_specialist_experiment_dispatches_with_parsed_args(
+        self,
+        monkeypatch,
+        tmp_path,
+    ):
+        from estate_value_index.cli import __main__ as cli_main
+
+        captured = {}
+
+        def fake_premium_main(argv):
+            captured["argv"] = argv
+            return 0
+
+        monkeypatch.setattr(cli_main, "_load_handler", lambda command: fake_premium_main)
+        output_dir = tmp_path / "premium"
+
+        result = cli_main.main(
+            [
+                "premium-specialist-experiment",
+                "--feature-set",
+                "no_list_price_h3_market_tail",
+                "--output-dir",
+                str(output_dir),
+            ]
+        )
+
+        assert result == 0
+        assert captured["argv"] == [
+            "--feature-set",
+            "no_list_price_h3_market_tail",
+            "--output-dir",
+            str(output_dir),
+        ]
+
+    def test_tiered_ensemble_experiment_dispatches_with_parsed_args(self, monkeypatch, tmp_path):
+        from estate_value_index.cli import __main__ as cli_main
+
+        captured = {}
+
+        def fake_tiered_main(argv):
+            captured["argv"] = argv
+            return 0
+
+        monkeypatch.setattr(cli_main, "_load_handler", lambda command: fake_tiered_main)
+        output_dir = tmp_path / "tiered"
+
+        result = cli_main.main(
+            [
+                "tiered-ensemble-experiment",
+                "--feature-set",
+                "no_list_price_h3_market_street",
+                "--output-dir",
+                str(output_dir),
+            ]
+        )
+
+        assert result == 0
+        assert captured["argv"] == [
+            "--feature-set",
+            "no_list_price_h3_market_street",
+            "--output-dir",
+            str(output_dir),
+        ]
+
+    def test_model_suite_experiment_dispatches_with_parsed_args(self, monkeypatch, tmp_path):
+        from estate_value_index.cli import __main__ as cli_main
+
+        captured = {}
+
+        def fake_suite_main(argv):
+            captured["argv"] = argv
+            return 0
+
+        monkeypatch.setattr(cli_main, "_load_handler", lambda command: fake_suite_main)
+        output_dir = tmp_path / "suite"
+
+        result = cli_main.main(
+            [
+                "model-suite-experiment",
+                "--output-dir",
+                str(output_dir),
+                "--splits",
+                "3",
+            ]
+        )
+
+        assert result == 0
+        assert captured["argv"] == ["--output-dir", str(output_dir), "--splits", "3"]
+
+    def test_feature_count_experiment_dispatches_with_parsed_args(self, monkeypatch, tmp_path):
+        from estate_value_index.cli import __main__ as cli_main
+
+        captured = {}
+
+        def fake_feature_count_main(argv):
+            captured["argv"] = argv
+            return 0
+
+        monkeypatch.setattr(cli_main, "_load_handler", lambda command: fake_feature_count_main)
+        output_dir = tmp_path / "feature-count"
+
+        result = cli_main.main(
+            [
+                "feature-count-experiment",
+                "--feature-set",
+                "no_list_price_h3_market_street",
+                "--output-dir",
+                str(output_dir),
+                "--normalized-weight",
+                "0.55",
+            ]
+        )
+
+        assert result == 0
+        assert captured["argv"] == [
+            "--feature-set",
+            "no_list_price_h3_market_street",
+            "--output-dir",
+            str(output_dir),
+            "--normalized-weight",
+            "0.55",
+        ]
 
 
 if __name__ == "__main__":

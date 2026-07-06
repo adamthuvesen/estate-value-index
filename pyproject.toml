@@ -98,6 +98,7 @@ vertex = [
 # Geocoding and POI features
 geo = [
     "geopy>=2.4.0",
+    "h3>=4.0.0",
 ]
 
 # ML monitoring and drift detection

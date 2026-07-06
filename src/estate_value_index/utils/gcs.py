@@ -269,10 +269,12 @@ def _upload_json_model_artifacts(
 ) -> None:
     for key, suffix in (
         ("context", "_feature_context.json"),
-        ("metrics", "_metrics_lgbm.json"),
+        ("metrics", "_metrics.json"),
         ("importance", "_feature_importance.json"),
     ):
         path = model_dir / f"{model_prefix}{suffix}"
+        if key == "metrics" and not path.exists():
+            path = model_dir / f"{model_prefix}_metrics_lgbm.json"
         if path.exists():
             artifacts[key] = client.upload_file(path, _destination_path(resolved_prefix, path.name))
 
@@ -293,7 +295,9 @@ def upload_model_artifacts(
         client = GCSClient(bucket_name=resolved_bucket)
         artifacts: dict[str, str] = {}
 
-        model_file = model_dir / f"{model_prefix}_lgbm.joblib"
+        model_file = model_dir / f"{model_prefix}.joblib"
+        if not model_file.exists():
+            model_file = model_dir / f"{model_prefix}_lgbm.joblib"
         if model_file.exists():
             _upload_joblib_with_sidecar(client, model_file, "model", resolved_prefix, artifacts)
 

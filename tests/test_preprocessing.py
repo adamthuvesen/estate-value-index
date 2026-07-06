@@ -203,6 +203,21 @@ class TestFilterValidListings:
         # Only the last row has both prices >= 3M
         assert len(filter_valid_listings(df)) == 1
 
+    @pytest.mark.unit
+    def test_filter_valid_listings_can_skip_listing_price_requirement(self):
+        df = pd.DataFrame(
+            {
+                "listing_price": [np.nan, 2_000_000],
+                "sold_price": [3_500_000, 3_600_000],
+            }
+        )
+
+        assert len(filter_valid_listings(df)) == 0
+        result = filter_valid_listings(df, require_listing_price=False)
+
+        assert len(result) == 2
+        assert "listing_price" in result.columns
+
     @pytest.mark.integration
     def test_filter_valid_listings_with_area_processing(self):
         df = pd.DataFrame(

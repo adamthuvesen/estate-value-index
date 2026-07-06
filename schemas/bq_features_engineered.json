@@ -246,6 +246,36 @@
     "description": "True distance to Stockholm city center in meters (Sergels Torg, via Haversine formula)"
   },
   {
+    "name": "distance_to_nearest_metro",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Distance to nearest metro station in meters"
+  },
+  {
+    "name": "distance_to_nearest_train",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Distance to nearest train station in meters"
+  },
+  {
+    "name": "metro_stations_within_500m",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Number of metro stations within 500 meters"
+  },
+  {
+    "name": "metro_stations_within_1km",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Number of metro stations within 1 kilometer"
+  },
+  {
+    "name": "transit_accessibility_score",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Composite transit access score from metro, train, and center proximity"
+  },
+  {
     "name": "area_inventory",
     "type": "FLOAT64",
     "mode": "NULLABLE",
@@ -298,6 +328,318 @@
     "type": "FLOAT64",
     "mode": "NULLABLE",
     "description": "Price volatility normalized by area median (area_price_volatility / area_price_median)"
+  },
+  {
+    "name": "micro_area_ppsqm_median",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Prior local median sold price per square meter from the selected H3/area fallback"
+  },
+  {
+    "name": "micro_area_ppsqm_p75",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Prior local 75th percentile sold price per square meter from the selected H3/area fallback"
+  },
+  {
+    "name": "micro_area_ppsqm_p90",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Prior local 90th percentile sold price per square meter from the selected H3/area fallback"
+  },
+  {
+    "name": "micro_area_ppsqm_count",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Prior sample count behind the selected micro-area price per square meter median"
+  },
+  {
+    "name": "micro_area_ppsqm_premium_vs_area",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Selected micro-area median price per square meter relative to prior area median"
+  },
+  {
+    "name": "micro_area_upper_tail_ratio",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Selected micro-area p90 price per square meter divided by its median"
+  },
+  {
+    "name": "h3_neighbor_ppsqm",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Prior weighted neighboring H3 price per square meter from adjacent resolution 10 cells"
+  },
+  {
+    "name": "h3_neighbor_ppsqm_p75",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Prior weighted 75th percentile neighboring H3 price per square meter from adjacent resolution 10 cells"
+  },
+  {
+    "name": "h3_neighbor_ppsqm_p90",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Prior weighted 90th percentile neighboring H3 price per square meter from adjacent resolution 10 cells"
+  },
+  {
+    "name": "h3_neighbor_ppsqm_count",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Prior sample count behind neighboring H3 price per square meter"
+  },
+  {
+    "name": "h3_neighbor_premium_vs_micro",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Neighboring H3 price per square meter relative to selected micro-area price per square meter"
+  },
+  {
+    "name": "h3_neighbor_upper_tail_ratio",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Neighboring H3 p90 price per square meter divided by neighboring median price per square meter"
+  },
+  {
+    "name": "same_size_ppsqm_median",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Prior same-size price per square meter using H3, area, or global size-band fallback"
+  },
+  {
+    "name": "same_size_ppsqm_p75",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Prior same-size 75th percentile price per square meter using H3, area, or global size-band fallback"
+  },
+  {
+    "name": "same_size_ppsqm_p90",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Prior same-size 90th percentile price per square meter using H3, area, or global size-band fallback"
+  },
+  {
+    "name": "same_size_ppsqm_count",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Prior sample count behind same-size price per square meter"
+  },
+  {
+    "name": "same_size_premium_vs_area",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Same-size price per square meter relative to selected micro-area price per square meter"
+  },
+  {
+    "name": "same_size_upper_tail_ratio",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Same-size p90 price per square meter divided by same-size median price per square meter"
+  },
+  {
+    "name": "street_area_ppsqm_median",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Prior street-and-area median sold price per square meter, falling back to micro-area comps"
+  },
+  {
+    "name": "street_area_ppsqm_p75",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Prior street-and-area 75th percentile sold price per square meter"
+  },
+  {
+    "name": "street_area_ppsqm_p90",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Prior street-and-area 90th percentile sold price per square meter"
+  },
+  {
+    "name": "street_area_ppsqm_count",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Prior sample count behind street-and-area price per square meter features"
+  },
+  {
+    "name": "street_area_premium_vs_micro",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Street-and-area median price per square meter relative to selected micro-area median"
+  },
+  {
+    "name": "street_area_upper_tail_ratio",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Street-and-area p90 price per square meter divided by street-and-area median"
+  },
+  {
+    "name": "street_size_ppsqm_median",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Prior same-street same-size median sold price per square meter"
+  },
+  {
+    "name": "street_size_ppsqm_p75",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Prior same-street same-size 75th percentile sold price per square meter"
+  },
+  {
+    "name": "street_size_ppsqm_p90",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Prior same-street same-size 90th percentile sold price per square meter"
+  },
+  {
+    "name": "street_size_ppsqm_count",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Prior sample count behind same-street same-size price per square meter features"
+  },
+  {
+    "name": "street_size_premium_vs_street",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Same-street same-size median price per square meter relative to street median"
+  },
+  {
+    "name": "street_size_upper_tail_ratio",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Same-street same-size p90 price per square meter divided by same-street same-size median"
+  },
+  {
+    "name": "address_ppsqm_median",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Prior exact-address median sold price per square meter, falling back to street comps"
+  },
+  {
+    "name": "address_ppsqm_p75",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Prior exact-address 75th percentile sold price per square meter"
+  },
+  {
+    "name": "address_ppsqm_p90",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Prior exact-address 90th percentile sold price per square meter"
+  },
+  {
+    "name": "address_ppsqm_count",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Prior sample count behind exact-address price per square meter features"
+  },
+  {
+    "name": "address_premium_vs_street",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Exact-address median price per square meter relative to street median"
+  },
+  {
+    "name": "address_upper_tail_ratio",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Exact-address p90 price per square meter divided by exact-address median"
+  },
+  {
+    "name": "h3_market_ppsqm_ratio",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Selected H3 or fallback prior price per square meter divided by previous-month market PPSQM index"
+  },
+  {
+    "name": "same_size_market_ppsqm_ratio",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Prior same-size price per square meter divided by previous-month market PPSQM index"
+  },
+  {
+    "name": "neighbor_market_ppsqm_ratio",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Prior neighboring H3 price per square meter divided by previous-month market PPSQM index"
+  },
+  {
+    "name": "micro_luxury_score",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Inference-safe high-end proxy score from prior local PPSQM ratios, central area, and size"
+  },
+  {
+    "name": "luxury_location_flag",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Binary high-end location proxy derived from micro_luxury_score"
+  },
+  {
+    "name": "market_interest_rate",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Latest previous-month Swedish policy interest rate from local economy reference data"
+  },
+  {
+    "name": "market_interest_rate_change_3m",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Three-month change in Swedish policy interest rate"
+  },
+  {
+    "name": "market_economic_tendency",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Latest previous-month KI economic tendency indicator"
+  },
+  {
+    "name": "market_consumer_confidence",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Latest previous-month KI consumer confidence indicator"
+  },
+  {
+    "name": "market_construction_confidence",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Latest previous-month KI construction confidence indicator"
+  },
+  {
+    "name": "market_gdp_growth",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Latest available GDP growth percent from local quarterly reference data"
+  },
+  {
+    "name": "market_ppsqm_index",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Latest previous-month market price per square meter index"
+  },
+  {
+    "name": "market_ppsqm_index_change_3m",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Three-month change in market price per square meter index"
+  },
+  {
+    "name": "market_sales_volume",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Latest previous-month market sales volume from local reference data"
+  },
+  {
+    "name": "market_months_since_2020",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "As-of month index counted from January 2020"
+  },
+  {
+    "name": "market_data_age_months",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Months between the as-of month and the latest matched market reference row"
   },
   {
     "name": "construction_quality_score",
@@ -474,6 +816,72 @@
     "description": "Leave-one-out target encoding of area using sold prices"
   },
   {
+    "name": "description_length",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Normalized listing description character length"
+  },
+  {
+    "name": "description_word_count",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Normalized listing description word count"
+  },
+  {
+    "name": "is_renovated",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Flag from description text indicating renovation cues"
+  },
+  {
+    "name": "has_modern_kitchen",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Flag from description text indicating a modern or renovated kitchen"
+  },
+  {
+    "name": "has_modern_bathroom",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Flag from description text indicating a modern or renovated bathroom"
+  },
+  {
+    "name": "has_view",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Flag from description text indicating view cues"
+  },
+  {
+    "name": "is_quiet_location",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Flag from description text indicating a quiet location"
+  },
+  {
+    "name": "needs_renovation",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Flag from description text indicating renovation need"
+  },
+  {
+    "name": "luxury_keyword_count",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Count of premium description cues"
+  },
+  {
+    "name": "condition_score",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Composite condition score from description cues"
+  },
+  {
+    "name": "premium_score",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Composite premium score from description cues"
+  },
+  {
     "name": "area",
     "type": "STRING",
     "mode": "NULLABLE",
@@ -496,6 +904,60 @@
     "type": "STRING",
     "mode": "NULLABLE",
     "description": "Area price tier classification: budget, mid, premium, luxury"
+  },
+  {
+    "name": "h3_res10",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "H3 cell at resolution 10 derived from listing coordinates"
+  },
+  {
+    "name": "h3_res9",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Parent H3 cell at resolution 9 used as sparse-cell fallback"
+  },
+  {
+    "name": "micro_area_resolution_used",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Source level used for micro-area stats: h3_res10, h3_res9, area, or global"
+  },
+  {
+    "name": "same_size_scope_used",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Source level used for same-size comp stats: h3_res9_size, area_size, global_size, or global"
+  },
+  {
+    "name": "street_name",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Normalized street name extracted from listing address"
+  },
+  {
+    "name": "street_area_scope_used",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Source level used for street-area comp stats: street_area or micro_area"
+  },
+  {
+    "name": "street_size_scope_used",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Source level used for same-street same-size comp stats: street_size or street_area"
+  },
+  {
+    "name": "address_comp_scope_used",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Source level used for exact-address comp stats: address or street_area"
+  },
+  {
+    "name": "luxury_location_tier",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "High-end proxy tier derived from prior comp PPSQM ratios: standard, strong, premium, luxury"
   },
   {
     "name": "market_cycle",

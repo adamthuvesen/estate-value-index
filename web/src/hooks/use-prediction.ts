@@ -46,10 +46,12 @@ export function usePrediction({
         construction_year: "",
         property_type: "Lägenhet",
         area: defaultAreas[0] ?? "Södermalm",
-        model: "lgbm",
+        model: "auto",
         floor: "",
         elevator: "",
         balcony: "",
+        latitude: "",
+        longitude: "",
       }),
     })
   );
@@ -163,6 +165,8 @@ export function usePrediction({
           payload.balcony != null
             ? String(payload.balcony)
             : prev.balcony,
+        latitude: payload.latitude != null ? String(payload.latitude) : prev.latitude,
+        longitude: payload.longitude != null ? String(payload.longitude) : prev.longitude,
       }));
 
       if (payload.area) {
@@ -265,25 +269,22 @@ export function usePrediction({
 
 
   const resolvedModelKey = (() => {
-    const hint = prediction?.model_used?.toLowerCase();
-    if (!hint) {
-      return formData.model || "lgbm";
+    if (prediction?.model_id) {
+      return prediction.model_id;
     }
-    if (hint.includes("linear")) return "linear";
-    if (hint.includes("xgb")) return "xgb";
-    if (hint.includes("lgbm")) return "lgbm";
-    return formData.model || "lgbm";
+    return formData.model || "auto";
   })();
 
-  const modelLabel = modelLabels[resolvedModelKey] ?? modelLabels[formData.model] ?? "LightGBM";
+  const modelLabel = modelLabels[resolvedModelKey] ?? modelLabels[formData.model] ?? "Auto";
 
   const listingPriceValue = Number(formData.listing_price || 0);
   const predictedPriceValue = prediction?.predicted_price ?? null;
-  const priceDifference = predictedPriceValue !== null
-    ? predictedPriceValue - (prediction?.input_data.listing_price ?? listingPriceValue)
+  const anchorPrice = prediction?.input_data.listing_price ?? listingPriceValue;
+  const priceDifference = predictedPriceValue !== null && anchorPrice > 0
+    ? predictedPriceValue - anchorPrice
     : null;
-  const differencePercent = priceDifference !== null && (prediction?.input_data.listing_price ?? listingPriceValue) > 0
-    ? (priceDifference / (prediction?.input_data.listing_price ?? listingPriceValue)) * 100
+  const differencePercent = priceDifference !== null && anchorPrice > 0
+    ? (priceDifference / anchorPrice) * 100
     : null;
   const isAboveAsking = priceDifference !== null ? priceDifference > 0 : null;
 

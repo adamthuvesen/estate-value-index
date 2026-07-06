@@ -58,7 +58,10 @@ def load_production_data(data_path: Path, apply_training_filters: bool = True) -
 
         # Step 1: Filter valid listings (min_price=3M, same as training)
         df_filtered = filter_valid_listings(
-            df_with_price, min_price=3000000, drop_na_features=False
+            df_with_price,
+            min_price=3000000,
+            drop_na_features=False,
+            require_listing_price=False,
         )
         logger.info("After min_price filter (>= 3M SEK): %s listings", f"{len(df_filtered):,}")
 
@@ -76,7 +79,9 @@ def load_production_data(data_path: Path, apply_training_filters: bool = True) -
 def load_model(models_dir: Path, model_type: str, prefix: str = "price_prediction_model") -> tuple:
     """Load trained model and its metrics."""
     model_path = models_dir / f"{prefix}_{model_type}.joblib"
-    metrics_path = models_dir / f"{prefix}_metrics_{model_type}.json"
+    metrics_path = models_dir / f"{prefix}_{model_type}_metrics.json"
+    if not metrics_path.exists():
+        metrics_path = models_dir / f"{prefix}_metrics_{model_type}.json"
 
     if not model_path.exists():
         raise FileNotFoundError(f"Model not found: {model_path}")
@@ -196,6 +201,8 @@ def prepare_output_records(df: pd.DataFrame) -> list[dict]:
         "days_on_market",
         "listing_price",
         "price_per_sqm",
+        "latitude",
+        "longitude",
     ]
 
     # Filter to columns that exist in the dataframe
@@ -272,7 +279,7 @@ def generate_summary_statistics(df: pd.DataFrame, metrics: dict) -> dict:
 
 def run_analysis(
     data_file: Path,
-    model_type: str = "lgbm",
+    model_type: str = "no_list",
     output_file: Path | None = None,
     models_dir: Path | None = None,
     model_prefix: str = "price_prediction_model",
@@ -286,7 +293,7 @@ def run_analysis(
 
     Args:
         data_file: Path to production data JSON file
-        model_type: Model type (lgbm, xgb, linear, baseline)
+        model_type: Model type (no_list, listing, baseline)
         output_file: Output path for value analysis JSON
         models_dir: Directory containing trained models
         model_prefix: Model file prefix

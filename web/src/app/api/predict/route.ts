@@ -16,10 +16,12 @@ type PredictionRequestBody = {
   floor?: number | string;
   elevator?: boolean | string;
   balcony?: boolean | string;
+  latitude?: number | string;
+  longitude?: number | string;
 };
 
 type PredictionPayload = {
-  listing_price: number;
+  listing_price: number | null;
   living_area: number;
   rooms: number;
   monthly_fee: number;
@@ -32,12 +34,16 @@ type PredictionPayload = {
   floor?: number | null;
   elevator?: boolean | null;
   balcony?: boolean | null;
+  latitude?: number | null;
+  longitude?: number | null;
 };
 
 type FastAPIResponse = {
   predicted_price: number;
   model_used: string;
   model_type: string;
+  model_id: string;
+  requires_listing_price: boolean;
   status: string;
 };
 
@@ -70,19 +76,21 @@ export async function POST(request: NextRequest) {
       floor,
       elevator,
       balcony,
+      latitude,
+      longitude,
     } = body;
 
     // Validate required fields
-    if (!listing_price || !living_area) {
+    if (!living_area) {
       return NextResponse.json(
-        { error: 'Missing required fields: listing_price and living_area are required' },
+        { error: 'Missing required field: living_area is required' },
         { status: 400 }
       );
     }
 
     // Send raw features only; SimplePredictionPipeline does feature engineering server-side.
     const inputData: PredictionPayload = {
-      listing_price: Number(listing_price),
+      listing_price: listing_price != null && listing_price !== '' ? Number(listing_price) : null,
       living_area: Number(living_area),
       rooms: Number(rooms ?? 2),
       monthly_fee: Number(monthly_fee ?? 3000),
@@ -91,10 +99,12 @@ export async function POST(request: NextRequest) {
       municipality: municipality ?? 'Stockholm',
       property_type: property_type ?? 'Lägenhet',
       area: area ?? 'Södermalm',
-      model: model ?? 'lgbm',
+      model: model ?? 'auto',
       floor: floor != null && floor !== '' ? Number(floor) : null,
       elevator: parseOptionalBoolean(elevator),
       balcony: parseOptionalBoolean(balcony),
+      latitude: latitude != null && latitude !== '' ? Number(latitude) : null,
+      longitude: longitude != null && longitude !== '' ? Number(longitude) : null,
     };
 
     const controller = new AbortController();
@@ -122,7 +132,9 @@ export async function POST(request: NextRequest) {
         listing_id: listing_id || 'unknown',
         predicted_price: Math.round(prediction.predicted_price),
         model_used: prediction.model_used,
+        model_id: prediction.model_id,
         model_type: prediction.model_type,
+        requires_listing_price: prediction.requires_listing_price,
         status: prediction.status,
         input_data: inputData,
         confidence: 'medium',
@@ -164,9 +176,9 @@ export async function GET() {
   return NextResponse.json({
     message: 'Property Price Prediction API',
     usage: 'POST to this endpoint with property details to get price predictions',
-    required_fields: ['listing_price', 'living_area'],
-    optional_fields: ['rooms', 'monthly_fee', 'days_on_market', 'construction_year', 'property_type', 'municipality', 'area', 'model', 'floor', 'elevator', 'balcony'],
-    allowed_models: ['lgbm', 'xgb', 'linear'],
+    required_fields: ['living_area'],
+    optional_fields: ['listing_price', 'rooms', 'monthly_fee', 'days_on_market', 'construction_year', 'property_type', 'municipality', 'area', 'model', 'floor', 'elevator', 'balcony', 'latitude', 'longitude'],
+    allowed_models: ['auto', 'no_list', 'listing'],
     note: 'Feature engineering is handled internally by SimplePredictionPipeline - send only raw features',
     backend: 'FastAPI',
     api_url: API_BASE_URL

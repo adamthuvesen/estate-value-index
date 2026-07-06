@@ -23,6 +23,8 @@ export interface ValueProperty {
   days_on_market: number | null;
   listing_price: number | null;
   price_per_sqm: number | null;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 export type ValueTier =
@@ -177,4 +179,3 @@ export interface RangeFilter {
   max: number;
   step?: number;
 }
-

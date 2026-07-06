@@ -213,6 +213,8 @@ export type ParsedBooliListing = {
   floor: number | null;
   elevator: boolean | null;
   balcony: boolean | null;
+  latitude?: number | null;
+  longitude?: number | null;
   source_url: string;
 };
 

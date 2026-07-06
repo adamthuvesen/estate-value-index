@@ -580,21 +580,26 @@ def monitor_pipeline_health_task() -> dict:
     # Check model artifacts
     try:
         model_dir = Path("web/models")
-        model_files = list(model_dir.glob("price_prediction_model_*.joblib"))
+        model_files = [
+            model_dir / "price_prediction_model_no_list.joblib",
+            model_dir / "price_prediction_model_listing.joblib",
+        ]
+        missing_models = [path.name for path in model_files if not path.exists()]
 
-        if model_files:
+        if not missing_models:
             latest_model = max(model_files, key=lambda p: p.stat().st_mtime)
             age_hours = (time.time() - latest_model.stat().st_mtime) / 3600
 
             checks["model_artifacts"] = {
                 "healthy": age_hours < 168,
+                "models": [path.name for path in model_files],
                 "age_hours": round(age_hours, 1),
             }
             if age_hours > 168:
                 issues.append(f"Model is {age_hours / 24:.1f} days old")
         else:
-            checks["model_artifacts"] = {"healthy": False, "error": "No models found"}
-            issues.append("No model artifacts found")
+            checks["model_artifacts"] = {"healthy": False, "missing": missing_models}
+            issues.append(f"Missing model artifacts: {', '.join(missing_models)}")
     except Exception as e:
         checks["model_artifacts"] = {"healthy": False, "error": str(e)}
 

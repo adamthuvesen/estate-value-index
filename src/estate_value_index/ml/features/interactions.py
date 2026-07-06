@@ -7,6 +7,8 @@ from estate_value_index.ml.features.utils import _safe_divide
 
 """Interaction and composite feature builders."""
 
+CENTRAL_LUXURY_AREAS = frozenset({"ostermalm", "vasastan", "sodermalm", "kungsholmen", "norrmalm"})
+
 
 def _create_interaction_features(df: pd.DataFrame) -> pd.DataFrame:
     """Create interaction and composite features."""
@@ -98,5 +100,75 @@ def _create_interaction_features(df: pd.DataFrame) -> pd.DataFrame:
     df["demand_supply_ratio"] = _safe_divide(
         df.get("area_sales_volume_3m", 0), df.get("area_inventory", 50), df.index
     )
+    df = _create_luxury_tier_features(df)
 
     return df
+
+
+def _create_luxury_tier_features(df: pd.DataFrame) -> pd.DataFrame:
+    """Create inference-safe high-end proxy features from prior comp signals."""
+    market_ppsqm = _feature_series(df, "market_ppsqm_index")
+
+    df["h3_market_ppsqm_ratio"] = _safe_divide(
+        _feature_series(df, "micro_area_ppsqm_median"),
+        market_ppsqm,
+        df.index,
+    ).replace([np.inf, -np.inf], np.nan)
+    df["same_size_market_ppsqm_ratio"] = _safe_divide(
+        _feature_series(df, "same_size_ppsqm_median"),
+        market_ppsqm,
+        df.index,
+    ).replace([np.inf, -np.inf], np.nan)
+    df["neighbor_market_ppsqm_ratio"] = _safe_divide(
+        _feature_series(df, "h3_neighbor_ppsqm"),
+        market_ppsqm,
+        df.index,
+    ).replace([np.inf, -np.inf], np.nan)
+
+    area = _feature_series(df, "area")
+    central = area.astype("string").str.lower().isin(CENTRAL_LUXURY_AREAS)
+
+    living_area = pd.to_numeric(_feature_series(df, "living_area"), errors="coerce")
+    size_component = ((living_area - 70.0) / 70.0).clip(lower=0.0, upper=1.0).fillna(0.0)
+    micro_component = _ratio_component(df["h3_market_ppsqm_ratio"], low=0.90, high=1.35)
+    same_size_component = _ratio_component(
+        df["same_size_market_ppsqm_ratio"],
+        low=0.90,
+        high=1.35,
+    )
+    neighbor_component = _ratio_component(
+        df["neighbor_market_ppsqm_ratio"],
+        low=0.90,
+        high=1.35,
+    )
+
+    luxury_score = (
+        micro_component * 0.42
+        + same_size_component * 0.22
+        + neighbor_component * 0.14
+        + central.astype(float) * 0.12
+        + size_component * 0.10
+    )
+    df["micro_luxury_score"] = luxury_score.clip(0.0, 1.0).fillna(0.0)
+    df["luxury_location_flag"] = (df["micro_luxury_score"] >= 0.65).astype(float)
+    df["luxury_location_tier"] = pd.cut(
+        df["micro_luxury_score"],
+        bins=[-0.01, 0.25, 0.50, 0.75, 1.01],
+        labels=["standard", "strong", "premium", "luxury"],
+    ).astype("object")
+
+    return df
+
+
+def _ratio_component(values: pd.Series, *, low: float, high: float) -> pd.Series:
+    ratio = pd.to_numeric(values, errors="coerce")
+    return ((ratio - low) / (high - low)).clip(lower=0.0, upper=1.0).fillna(0.0)
+
+
+def _feature_series(df: pd.DataFrame, column: str) -> pd.Series:
+    values = df.get(column)
+    if values is None:
+        return pd.Series(np.nan, index=df.index)
+    if isinstance(values, pd.DataFrame):
+        return values.iloc[:, 0]
+    return values

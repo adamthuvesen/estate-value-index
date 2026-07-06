@@ -7,7 +7,7 @@ is a thin argparse shell that drives those helpers with verbose progress output.
 Usage:
     uv run python -m estate_value_index.cli value-analysis
     uv run python -m estate_value_index.cli value-analysis --data-file data/raw/booli/custom.json
-    uv run python -m estate_value_index.cli value-analysis --model-type lgbm
+    uv run python -m estate_value_index.cli value-analysis --model-type no_list
     uv run python -m estate_value_index.cli value-analysis --output data/custom_analysis.json
 """
 
@@ -44,8 +44,8 @@ def main(argv: list[str] | None = None, *, args=None) -> int:
         parser.add_argument(
             "--model-type",
             type=str,
-            default="lgbm",
-            choices=["lgbm", "xgb", "linear", "baseline"],
+            default="no_list",
+            choices=["no_list", "listing", "baseline"],
             help="Model type to use for predictions",
         )
         parser.add_argument(

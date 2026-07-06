@@ -52,6 +52,7 @@ data/derived/*
 !data/derived/metrics/
 data/derived/metrics/*
 !data/derived/metrics/.gitkeep
+data/enrichment/
 
 # Model artifacts (generated during training)
 web/models/*
@@ -59,6 +60,9 @@ web/models/*
 
 reports/*
 !reports/.gitkeep
+
+# Internal/private docs
+docs/internal/
 
 # Checkpoints
 /tmp/pipeline_checkpoint.json

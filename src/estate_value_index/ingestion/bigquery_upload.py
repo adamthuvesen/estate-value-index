@@ -45,6 +45,14 @@ def prepare_bq_row(item: dict[str, Any]) -> dict[str, Any]:
         except (ValueError, TypeError):
             return None
 
+    def to_float(value: Any) -> float | None:
+        if value is None:
+            return None
+        try:
+            return float(value)
+        except (ValueError, TypeError):
+            return None
+
     bq_row = {
         "listing_id": str(item.get("listing_id")),
         "url": item.get("url"),
@@ -56,6 +64,8 @@ def prepare_bq_row(item: dict[str, Any]) -> dict[str, Any]:
         "area": item.get("area"),
         "area_original": item.get("area_original"),
         "municipality": item.get("municipality"),
+        "latitude": to_float(item.get("latitude", item.get("lat"))),
+        "longitude": to_float(item.get("longitude", item.get("lon"))),
         "living_area": item.get("living_area"),
         "rooms": to_int(item.get("rooms")),
         "property_type": item.get("property_type"),
@@ -187,6 +197,8 @@ def _merge_temp_table(client: bigquery.Client, full_table_id: str, temp_table_id
         area = S.area,
         area_original = S.area_original,
         municipality = S.municipality,
+        latitude = S.latitude,
+        longitude = S.longitude,
         living_area = S.living_area,
         rooms = S.rooms,
         property_type = S.property_type,
@@ -205,13 +217,13 @@ def _merge_temp_table(client: bigquery.Client, full_table_id: str, temp_table_id
     WHEN NOT MATCHED THEN
       INSERT (
         listing_id, url, scraped_at, scraped_at_date, listing_price, sold_price,
-        address, area, area_original, municipality, living_area, rooms, property_type,
+        address, area, area_original, municipality, latitude, longitude, living_area, rooms, property_type,
         construction_year, monthly_fee, price_per_sqm, floor, elevator, balcony,
         sold_date, days_on_market, price_change, description, images, source_page
       )
       VALUES (
         S.listing_id, S.url, S.scraped_at, S.scraped_at_date, S.listing_price, S.sold_price,
-        S.address, S.area, S.area_original, S.municipality, S.living_area, S.rooms, S.property_type,
+        S.address, S.area, S.area_original, S.municipality, S.latitude, S.longitude, S.living_area, S.rooms, S.property_type,
         S.construction_year, S.monthly_fee, S.price_per_sqm, S.floor, S.elevator, S.balcony,
         S.sold_date, S.days_on_market, S.price_change, S.description, S.images, S.source_page
       )

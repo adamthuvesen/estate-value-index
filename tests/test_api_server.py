@@ -99,17 +99,17 @@ def test_predict_500_hides_exception_message(caplog: pytest.LogCaptureFixture) -
 
     with caplog.at_level(logging.ERROR), TestClient(api_server.app) as client:
         api_server.MODEL_CACHE.clear()
-        api_server.MODEL_CACHE["lgbm"] = {
+        api_server.MODEL_CACHE["no_list"] = {
             "model": mock_model,
             "path": Path("dummy.joblib"),
+            "model_type": "tiered_max",
         }
 
         response = client.post(
             "/predict",
             json={
-                "listing_price": 5_000_000.0,
                 "living_area": 65.0,
-                "model": "lgbm",
+                "model": "no_list",
             },
         )
 
@@ -120,6 +120,88 @@ def test_predict_500_hides_exception_message(caplog: pytest.LogCaptureFixture) -
 
     assert "SECRET_INTERNAL_DO_NOT_LEAK" in caplog.text
     assert "correlation_id" in caplog.text or "[" in caplog.text
+
+
+@pytest.mark.unit
+def test_predict_accepts_optional_coordinates() -> None:
+    mock_model = MagicMock()
+    mock_model.predict.return_value = [4_500_000.0]
+
+    with TestClient(api_server.app) as client:
+        api_server.MODEL_CACHE.clear()
+        api_server.MODEL_CACHE["listing"] = {
+            "model": mock_model,
+            "path": Path("dummy.joblib"),
+            "requires_listing_price": True,
+            "model_type": "tiered_max",
+        }
+
+        response = client.post(
+            "/predict",
+            json={
+                "listing_price": 5_000_000.0,
+                "living_area": 65.0,
+                "latitude": 59.315,
+                "longitude": 18.07,
+                "model": "listing",
+            },
+        )
+
+    assert response.status_code == 200
+    sent_frame = mock_model.predict.call_args.args[0]
+    assert sent_frame["latitude"].iloc[0] == pytest.approx(59.315)
+    assert sent_frame["longitude"].iloc[0] == pytest.approx(18.07)
+
+
+@pytest.mark.unit
+def test_predict_auto_routes_to_no_list_without_listing_price() -> None:
+    mock_model = MagicMock()
+    mock_model.predict.return_value = [4_250_000.0]
+
+    with TestClient(api_server.app) as client:
+        api_server.MODEL_CACHE.clear()
+        api_server.MODEL_CACHE["no_list"] = {
+            "model": mock_model,
+            "path": Path("price_prediction_model_no_list.joblib"),
+            "requires_listing_price": False,
+            "model_type": "tiered_max",
+        }
+
+        response = client.post(
+            "/predict",
+            json={
+                "living_area": 65.0,
+                "model": "auto",
+            },
+        )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["model_id"] == "no_list"
+    assert payload["requires_listing_price"] is False
+
+
+@pytest.mark.unit
+def test_listing_model_requires_listing_price() -> None:
+    with TestClient(api_server.app) as client:
+        api_server.MODEL_CACHE.clear()
+        api_server.MODEL_CACHE["listing"] = {
+            "model": MagicMock(),
+            "path": Path("price_prediction_model_listing.joblib"),
+            "requires_listing_price": True,
+            "model_type": "tiered_max",
+        }
+
+        response = client.post(
+            "/predict",
+            json={
+                "living_area": 65.0,
+                "model": "listing",
+            },
+        )
+
+    assert response.status_code == 400
+    assert "requires listing_price" in response.json()["detail"]
 
 
 @pytest.mark.unit
@@ -157,12 +239,14 @@ def test_health_responds_while_predicts_in_flight() -> None:
 
     transport = ASGITransport(app=api_server.app)
     api_server.MODEL_CACHE.clear()
-    api_server.MODEL_CACHE["lgbm"] = {
+    api_server.MODEL_CACHE["listing"] = {
         "model": mock_model,
         "path": Path("dummy.joblib"),
+        "requires_listing_price": True,
+        "model_type": "tiered_max",
     }
 
-    body = {"listing_price": 5_000_000.0, "living_area": 65.0, "model": "lgbm"}
+    body = {"listing_price": 5_000_000.0, "living_area": 65.0, "model": "listing"}
 
     async def _run() -> None:
         async with AsyncClient(transport=transport, base_url="http://test") as client:

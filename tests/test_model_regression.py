@@ -26,7 +26,7 @@ def test_model_performance_regression():
     REGRESSION_THRESHOLD = 0.10
 
     model_dir = _require_model_regression_artifacts()
-    metrics_file = model_dir / "price_prediction_model_metrics_lgbm.json"
+    metrics_file = model_dir / "price_prediction_model_no_list_metrics.json"
 
     if not metrics_file.exists():
         pytest.skip(f"Model metrics file not found: {metrics_file}")
@@ -53,7 +53,7 @@ def test_model_performance_regression():
 @pytest.mark.integration
 def test_model_metrics_exist():
     model_dir = _require_model_regression_artifacts()
-    metrics_file = model_dir / "price_prediction_model_metrics_lgbm.json"
+    metrics_file = model_dir / "price_prediction_model_no_list_metrics.json"
 
     assert metrics_file.exists(), f"Model metrics file not found: {metrics_file}"
 
@@ -74,9 +74,12 @@ def test_model_artifacts_exist():
     model_dir = _require_model_regression_artifacts()
 
     required_files = [
-        "price_prediction_model_lgbm.joblib",
-        "price_prediction_model_metrics_lgbm.json",
-        "price_prediction_model_feature_context.json",
+        "price_prediction_model_no_list.joblib",
+        "price_prediction_model_no_list_metrics.json",
+        "price_prediction_model_no_list_feature_context.json",
+        "price_prediction_model_listing.joblib",
+        "price_prediction_model_listing_metrics.json",
+        "price_prediction_model_listing_feature_context.json",
     ]
 
     missing_files = [f for f in required_files if not (model_dir / f).exists()]
@@ -84,7 +87,7 @@ def test_model_artifacts_exist():
     assert not missing_files, (
         "Missing required model artifacts:\n  "
         + "\n  ".join(missing_files)
-        + "\n\nRun training to generate artifacts: python train_model.py --use-features"
+        + "\n\nRun training to generate artifacts: uv run python -m estate_value_index.cli train-production-models --data-source bigquery"
     )
 
 

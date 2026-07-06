@@ -553,7 +553,7 @@ def _resolve_area_statistics_paths(
     project_root = Path(__file__).resolve().parents[3]
     return AreaStatisticsPaths(
         feature_context=feature_context_path
-        or project_root / "web" / "models" / "price_prediction_model_feature_context.json",
+        or project_root / "web" / "models" / "price_prediction_model_no_list_feature_context.json",
         value_analysis=value_analysis_path
         or project_root / "data" / "enrichment" / "value_analysis.json",
         raw_listings=raw_listings_path

@@ -20,6 +20,7 @@ from src.estate_value_index.ml.features.heuristics import (
     _estimate_energy_efficiency,
     _estimate_energy_efficiency_series,
 )
+from src.estate_value_index.ml.training_workflow.data import load_feature_subset
 from tests.conftest import assert_valid_dataframe
 
 
@@ -40,6 +41,20 @@ class TestFeatureEngineering:
             "rooms_per_sqm",
             "area_age_interaction",
             "luxury_score",
+            "h3_res10",
+            "micro_area_ppsqm_median",
+            "h3_neighbor_ppsqm",
+            "same_size_ppsqm_median",
+            "street_name",
+            "street_area_ppsqm_median",
+            "address_ppsqm_median",
+            "market_interest_rate",
+            "market_ppsqm_index",
+            "micro_luxury_score",
+            "luxury_location_tier",
+            "distance_to_nearest_metro",
+            "description_word_count",
+            "condition_score",
         ]
         for feature in expected_features:
             assert feature in result.columns, f"Missing feature: {feature}"
@@ -54,6 +69,19 @@ class TestFeatureEngineering:
         assert "area_avg_price" in result.columns
         assert "area_target_encoded" in result.columns
         assert result["area_avg_price"].notna().any()
+
+    @pytest.mark.unit
+    def test_create_optimized_features_tolerates_reengineering_existing_features(
+        self, sample_swedish_properties
+    ):
+        valid_data = sample_swedish_properties.dropna(subset=["sold_price"])
+        engineered = create_optimized_features(valid_data)
+        context = build_feature_context(engineered)
+
+        result = create_optimized_features(engineered, context=context)
+
+        assert "micro_luxury_score" in result.columns
+        assert result["micro_luxury_score"].notna().all()
 
     @pytest.mark.unit
     def test_create_optimized_features_temporal(self, sample_swedish_properties):
@@ -77,6 +105,28 @@ class TestFeatureEngineering:
         assert result["listed_month"].max() <= 12
         assert result["listed_quarter"].min() >= 1
         assert result["listed_quarter"].max() <= 4
+
+    @pytest.mark.unit
+    def test_create_optimized_features_description_and_poi(self, sample_swedish_properties):
+        df = sample_swedish_properties.head(2).copy()
+        df["lat"] = [59.3326, 59.334]
+        df["lon"] = [18.0649, 18.07]
+        df["description"] = [
+            "Nyrenoverad lagenhet med modernt kok, renoverat badrum, sjoutsikt och lugnt lage.",
+            "Originalskick med renoveringsbehov.",
+        ]
+
+        result = create_optimized_features(df)
+
+        assert result.loc[0, "is_renovated"] == 1
+        assert result.loc[0, "has_modern_kitchen"] == 1
+        assert result.loc[0, "has_modern_bathroom"] == 1
+        assert result.loc[0, "has_view"] == 1
+        assert result.loc[0, "is_quiet_location"] == 1
+        assert result.loc[0, "condition_score"] > result.loc[1, "condition_score"]
+        assert result.loc[1, "needs_renovation"] == 1
+        assert result["distance_to_city_center"].notna().all()
+        assert "transit_accessibility_score" in result.columns
 
     @pytest.mark.unit
     def test_create_optimized_features_edge_cases(self, edge_case_properties):
@@ -129,7 +179,21 @@ class TestFeatureConfiguration:
 
         assert "listing_price" in numeric
         assert "living_area" in numeric
+        assert "micro_area_ppsqm_median" in numeric
+        assert "micro_area_ppsqm_p90" in numeric
+        assert "h3_neighbor_ppsqm" in numeric
+        assert "h3_neighbor_ppsqm_p90" in numeric
+        assert "same_size_ppsqm_median" in numeric
+        assert "same_size_ppsqm_p90" in numeric
+        assert "street_area_ppsqm_median" in numeric
+        assert "address_ppsqm_median" in numeric
+        assert "market_interest_rate" in numeric
+        assert "distance_to_nearest_metro" in numeric
+        assert "condition_score" in numeric
         assert "area" in categorical
+        assert "h3_res10" in categorical
+        assert "same_size_scope_used" in categorical
+        assert "street_name" in categorical
         # property_type is filtered out from current feature list
         assert "property_type" not in categorical
 
@@ -138,7 +202,202 @@ class TestFeatureConfiguration:
         assert len(NUMERIC_FEATURE_NAMES) > 15
         assert len(CATEGORICAL_FEATURE_NAMES) > 0
         assert "price_per_sqm" in NUMERIC_FEATURE_NAMES
+        assert "micro_area_ppsqm_premium_vs_area" in NUMERIC_FEATURE_NAMES
+        assert "micro_area_upper_tail_ratio" in NUMERIC_FEATURE_NAMES
+        assert "h3_neighbor_premium_vs_micro" in NUMERIC_FEATURE_NAMES
+        assert "h3_neighbor_upper_tail_ratio" in NUMERIC_FEATURE_NAMES
+        assert "same_size_premium_vs_area" in NUMERIC_FEATURE_NAMES
+        assert "same_size_upper_tail_ratio" in NUMERIC_FEATURE_NAMES
+        assert "street_area_premium_vs_micro" in NUMERIC_FEATURE_NAMES
+        assert "street_size_premium_vs_street" in NUMERIC_FEATURE_NAMES
+        assert "address_premium_vs_street" in NUMERIC_FEATURE_NAMES
+        assert "market_ppsqm_index_change_3m" in NUMERIC_FEATURE_NAMES
+        assert "micro_luxury_score" in NUMERIC_FEATURE_NAMES
+        assert "h3_market_ppsqm_ratio" in NUMERIC_FEATURE_NAMES
+        assert "transit_accessibility_score" in NUMERIC_FEATURE_NAMES
+        assert "premium_score" in NUMERIC_FEATURE_NAMES
         assert "area" in CATEGORICAL_FEATURE_NAMES
+        assert "micro_area_resolution_used" in CATEGORICAL_FEATURE_NAMES
+        assert "same_size_scope_used" in CATEGORICAL_FEATURE_NAMES
+        assert "street_name" in CATEGORICAL_FEATURE_NAMES
+        assert "address_comp_scope_used" in CATEGORICAL_FEATURE_NAMES
+        assert "luxury_location_tier" in CATEGORICAL_FEATURE_NAMES
+
+    @pytest.mark.unit
+    def test_no_list_price_subset_excludes_same_row_price_features(self):
+        numeric, categorical = load_feature_subset("no_list_price_25")
+
+        blocked = {
+            "listing_price",
+            "price_per_sqm",
+            "relative_area_price",
+            "total_cost_per_sqm",
+            "fee_price_interaction",
+            "luxury_score",
+            "value_score",
+            "cost_benefit_ratio",
+            "efficiency_premium",
+        }
+
+        assert numeric is not None
+        assert blocked.isdisjoint(numeric)
+        assert len(numeric) == 25
+        assert "micro_area_ppsqm_median" in numeric
+        assert "condition_score" in numeric
+        assert "area" in categorical
+        assert "h3_res10" in categorical
+        assert "area_price_tier" not in categorical
+        assert "area_price_momentum" not in categorical
+
+    @pytest.mark.unit
+    def test_production_variants_are_explicit_about_asking_price(self):
+        no_list_numeric, no_list_categorical = load_feature_subset(
+            "no_list_price_h3_market_street_rfe25"
+        )
+        listing_numeric, listing_categorical = load_feature_subset(
+            "listing_price_h3_market_street_aligned30"
+        )
+
+        blocked_no_list = {
+            "listing_price",
+            "relative_area_price",
+            "price_per_sqm",
+            "total_cost_per_sqm",
+            "cost_benefit_ratio",
+            "efficiency_premium",
+        }
+
+        assert blocked_no_list.isdisjoint(no_list_numeric)
+        assert "listing_price" in listing_numeric
+        assert "relative_area_price" in listing_numeric
+        assert "total_cost_per_sqm" in listing_numeric
+        assert no_list_categorical == listing_categorical
+
+    @pytest.mark.unit
+    def test_comparison_feature_subsets_isolate_h3(self):
+        listing_numeric, listing_categorical = load_feature_subset(
+            "listing_price_h3_market_street_aligned30"
+        )
+        no_h3_numeric, no_h3_categorical = load_feature_subset("no_list_price_22_no_h3")
+        core_numeric, core_categorical = load_feature_subset("no_list_price_h3_core")
+        comps_numeric, comps_categorical = load_feature_subset("no_list_price_h3_comps")
+        street_numeric, street_categorical = load_feature_subset("no_list_price_h3_market_street")
+        tail_numeric, tail_categorical = load_feature_subset("no_list_price_h3_market_tail")
+        luxury_numeric, luxury_categorical = load_feature_subset("no_list_price_h3_market_luxury")
+        fee_numeric, fee_categorical = load_feature_subset("no_list_price_h3_fee")
+
+        assert "listing_price" in listing_numeric
+        assert "h3_neighbor_ppsqm" in listing_numeric
+        assert "h3_res10" in listing_categorical
+
+        assert "listing_price" not in no_h3_numeric
+        assert "micro_area_ppsqm_median" not in no_h3_numeric
+        assert "h3_res10" not in no_h3_categorical
+        assert "area" in no_h3_categorical
+
+        assert "listing_price" not in core_numeric
+        assert "micro_area_ppsqm_median" in core_numeric
+        assert "h3_res10" in core_categorical
+        assert "monthly_fee" not in core_numeric
+
+        assert "listing_price" not in comps_numeric
+        assert "h3_neighbor_ppsqm" in comps_numeric
+        assert "listing_price" not in luxury_numeric
+        assert "price_per_sqm" not in luxury_numeric
+        assert "h3_market_ppsqm_ratio" in luxury_numeric
+        assert "micro_luxury_score" in luxury_numeric
+        assert "luxury_location_tier" in luxury_categorical
+        assert "same_size_ppsqm_median" in comps_numeric
+        assert "market_interest_rate" not in comps_numeric
+        assert "same_size_scope_used" in comps_categorical
+
+        assert "listing_price" not in tail_numeric
+        assert "micro_area_ppsqm_p90" in tail_numeric
+        assert "h3_neighbor_upper_tail_ratio" in tail_numeric
+        assert "same_size_ppsqm_p90" in tail_numeric
+
+        market_numeric, market_categorical = load_feature_subset("no_list_price_h3_market")
+        assert "listing_price" not in market_numeric
+        assert "h3_neighbor_ppsqm" in market_numeric
+        assert "same_size_ppsqm_median" in market_numeric
+        assert "market_interest_rate" in market_numeric
+        assert "same_size_scope_used" in market_categorical
+        assert tail_categorical == market_categorical
+
+        assert "listing_price" not in street_numeric
+        assert "street_area_ppsqm_p90" in street_numeric
+        assert "street_size_ppsqm_median" in street_numeric
+        assert "address_ppsqm_median" in street_numeric
+        assert "street_name" in street_categorical
+        assert "address_comp_scope_used" in street_categorical
+        assert "micro_area_ppsqm_p90" not in street_numeric
+
+        assert "listing_price" not in fee_numeric
+        assert "monthly_fee" in fee_numeric
+        assert "fee_efficiency" in fee_numeric
+        assert fee_categorical == core_categorical
+
+    @pytest.mark.unit
+    def test_rfe_compact_feature_subsets_are_registered(self):
+        no_list_numeric, no_list_categorical = load_feature_subset(
+            "no_list_price_h3_market_street_rfe25"
+        )
+        listing_numeric, listing_categorical = load_feature_subset(
+            "listing_price_h3_market_street_rfe15"
+        )
+
+        no_list_blocked = {
+            "listing_price",
+            "price_per_sqm",
+            "relative_area_price",
+            "total_cost_per_sqm",
+            "fee_price_interaction",
+            "cost_benefit_ratio",
+            "efficiency_premium",
+        }
+
+        assert len(no_list_numeric) + len(no_list_categorical) == 25
+        assert no_list_blocked.isdisjoint(no_list_numeric)
+        assert {"h3_res10", "h3_res9", "street_name", "area"}.issubset(no_list_categorical)
+        assert "same_size_premium_vs_area" in no_list_numeric
+        assert "street_size_upper_tail_ratio" in no_list_numeric
+        assert set(no_list_numeric).issubset(NUMERIC_FEATURE_NAMES)
+        assert set(no_list_categorical).issubset(CATEGORICAL_FEATURE_NAMES)
+
+        assert len(listing_numeric) + len(listing_categorical) == 15
+        assert "listing_price" in listing_numeric
+        assert "relative_area_price" in listing_numeric
+        assert "street_name" in listing_categorical
+        assert set(listing_numeric).issubset(NUMERIC_FEATURE_NAMES)
+        assert set(listing_categorical).issubset(CATEGORICAL_FEATURE_NAMES)
+
+    @pytest.mark.unit
+    def test_aligned_listing_feature_sets_extend_no_list_backbone(self):
+        no_list_numeric, no_list_categorical = load_feature_subset(
+            "no_list_price_h3_market_street_rfe25"
+        )
+        aligned26_numeric, aligned26_categorical = load_feature_subset(
+            "listing_price_h3_market_street_aligned26"
+        )
+        aligned30_numeric, aligned30_categorical = load_feature_subset(
+            "listing_price_h3_market_street_aligned30"
+        )
+
+        assert set(no_list_numeric).issubset(aligned26_numeric)
+        assert set(no_list_numeric).issubset(aligned30_numeric)
+        assert aligned26_categorical == no_list_categorical
+        assert aligned30_categorical == no_list_categorical
+
+        assert set(aligned26_numeric) - set(no_list_numeric) == {"listing_price"}
+        assert set(aligned30_numeric) - set(no_list_numeric) == {
+            "listing_price",
+            "relative_area_price",
+            "total_cost_per_sqm",
+            "monthly_fee_per_sqm",
+            "efficiency_premium",
+        }
+        assert len(aligned26_numeric) + len(aligned26_categorical) == 26
+        assert len(aligned30_numeric) + len(aligned30_categorical) == 30
 
 
 class TestMissingValueHandling:
@@ -227,6 +486,43 @@ class TestFeatureContext:
         assert isinstance(context, FeatureEngineeringContext)
         assert context.global_target_mean > 0
         assert context.global_listing_price_mean > 0
+
+    @pytest.mark.unit
+    def test_build_feature_context_has_micro_area_stats(self, sample_swedish_properties):
+        df = create_optimized_features(sample_swedish_properties)
+        context = build_feature_context(df)
+
+        assert isinstance(context.micro_area_stats_res10, dict)
+        assert isinstance(context.micro_area_stats_res9, dict)
+        assert isinstance(context.same_size_stats_h3_res9, dict)
+        assert isinstance(context.same_size_stats_area, dict)
+        assert isinstance(context.same_size_stats_global, dict)
+        assert context.global_ppsqm_median is None or context.global_ppsqm_median >= 0
+
+    @pytest.mark.unit
+    def test_market_features_use_previous_month_reference_data(self):
+        df = pd.DataFrame(
+            {
+                "listing_id": ["A"],
+                "listing_price": [4_000_000],
+                "sold_price": [4_200_000],
+                "living_area": [50.0],
+                "rooms": [2.0],
+                "monthly_fee": [3000.0],
+                "days_on_market": [10],
+                "construction_year": [1970],
+                "property_type": ["Lägenhet"],
+                "municipality": ["Stockholm"],
+                "area": ["Södermalm"],
+                "scraped_at": ["2025-11-15"],
+                "sold_date": ["2025-11-20"],
+            }
+        )
+
+        result = create_optimized_features(df)
+
+        assert result.loc[0, "market_interest_rate"] == pytest.approx(1.75)
+        assert result.loc[0, "market_ppsqm_index"] == pytest.approx(112912)
 
     @pytest.mark.unit
     def test_energy_efficiency_vectorised_matches_scalar(self):

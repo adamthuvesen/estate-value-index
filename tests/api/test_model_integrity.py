@@ -80,21 +80,21 @@ def test_verify_integrity_empty_sidecar_raises(tmp_path: Path) -> None:
 
 
 def _build_model_dir_with_two_artifacts(tmp_path: Path) -> tuple[Path, Path, Path]:
-    """Create a models dir with one valid lgbm artefact and one tampered xgb artefact."""
+    """Create one valid no-list artifact and one tampered listing artifact."""
     models_dir = tmp_path / "models"
     models_dir.mkdir()
 
     valid = _write_artifact(
         models_dir,
-        "price_prediction_model_lgbm.joblib",
-        {"kind": "lgbm", "value": 1},
+        "price_prediction_model_no_list.joblib",
+        {"kind": "no_list", "value": 1},
     )
     _write_sidecar(valid)
 
     bad = _write_artifact(
         models_dir,
-        "price_prediction_model_xgb.joblib",
-        {"kind": "xgb", "value": 2},
+        "price_prediction_model_listing.joblib",
+        {"kind": "listing", "value": 2},
     )
     # Sidecar with wrong digest -> load must skip this artefact.
     _write_sidecar(bad, digest="0" * 64)
@@ -110,9 +110,9 @@ def test_load_all_models_skips_mismatched_artifact(tmp_path: Path, monkeypatch) 
 
     cache = api_server.load_all_models(models_dir)
 
-    assert "lgbm" in cache
-    assert cache["lgbm"]["path"] == valid
-    assert "xgb" not in cache, "tampered artefact must not be cached"
+    assert "no_list" in cache
+    assert cache["no_list"]["path"] == valid
+    assert "listing" not in cache, "tampered artefact must not be cached"
 
 
 def test_load_all_models_skips_missing_sidecar(tmp_path: Path, monkeypatch) -> None:
@@ -121,8 +121,8 @@ def test_load_all_models_skips_missing_sidecar(tmp_path: Path, monkeypatch) -> N
 
     artefact = _write_artifact(
         models_dir,
-        "price_prediction_model_lgbm.joblib",
-        {"kind": "lgbm"},
+        "price_prediction_model_no_list.joblib",
+        {"kind": "no_list"},
     )
     # No sidecar at all.
 
@@ -138,7 +138,7 @@ def test_load_all_models_skips_artifacts_that_fail_to_load(tmp_path: Path, monke
     """A joblib.load failure must skip the artifact, not surface a broken model."""
     models_dir = tmp_path / "models"
     models_dir.mkdir()
-    artefact = _write_artifact(models_dir, "price_prediction_model_lgbm.joblib", {})
+    artefact = _write_artifact(models_dir, "price_prediction_model_no_list.joblib", {})
     _write_sidecar(artefact)
 
     monkeypatch.setattr(api_server, "_download_models_from_gcs", lambda _dir: None)

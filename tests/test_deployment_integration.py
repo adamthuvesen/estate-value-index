@@ -85,9 +85,12 @@ def test_gcs_artifact_verification(mock_storage_client):
     bucket = client.bucket("estate-value-index-models")
 
     required_artifacts = [
-        "models/price_prediction_model_lgbm.joblib",
-        "models/price_prediction_model_metrics_lgbm.json",
-        "models/price_prediction_model_feature_context.json",
+        "models/price_prediction_model_no_list.joblib",
+        "models/price_prediction_model_no_list_metrics.json",
+        "models/price_prediction_model_no_list_feature_context.json",
+        "models/price_prediction_model_listing.joblib",
+        "models/price_prediction_model_listing_metrics.json",
+        "models/price_prediction_model_listing_feature_context.json",
     ]
 
     for artifact_path in required_artifacts:
@@ -100,9 +103,12 @@ def test_deployment_prerequisites():
     model_dir = Path(__file__).parent.parent / "web" / "models"
 
     required_files = [
-        "price_prediction_model_lgbm.joblib",
-        "price_prediction_model_metrics_lgbm.json",
-        "price_prediction_model_feature_context.json",
+        "price_prediction_model_no_list.joblib",
+        "price_prediction_model_no_list_metrics.json",
+        "price_prediction_model_no_list_feature_context.json",
+        "price_prediction_model_listing.joblib",
+        "price_prediction_model_listing_metrics.json",
+        "price_prediction_model_listing_feature_context.json",
     ]
 
     missing_files = [f for f in required_files if not (model_dir / f).exists()]
@@ -141,15 +147,15 @@ def test_deployment_dry_run(mock_subprocess):
 def test_deployment_error_handling():
     def validate_artifacts(artifacts_path):
         required_files = [
-            "models/price_prediction_model_lgbm.joblib",
-            "models/price_prediction_model_metrics_lgbm.json",
+            "models/price_prediction_model_no_list.joblib",
+            "models/price_prediction_model_listing.joblib",
         ]
         for filename in required_files:
             if filename not in str(artifacts_path):
                 return False, f"Missing: {filename}"
         return True, "All artifacts present"
 
-    valid, _ = validate_artifacts("gs://bucket/models/price_prediction_model_lgbm.joblib")
+    valid, _ = validate_artifacts("gs://bucket/models/price_prediction_model_no_list.joblib")
     assert valid is False
 
 

@@ -126,7 +126,12 @@ def _load_and_split(config: TrainingConfig) -> SplitData:
     test_size = get_test_size()
     if not skip_feature_engineering:
         df = df_or_engineered
-        df_filtered = filter_valid_listings(df, min_price=3000000, drop_na_features=False)
+        df_filtered = filter_valid_listings(
+            df,
+            min_price=3000000,
+            drop_na_features=False,
+            require_listing_price=_feature_set_requires_listing_price(config.feature_set),
+        )
         logger.info("After filtering: %d listings", len(df_filtered))
         # The temporal split needs sold_date as datetime before feature engineering.
         df_filtered = df_filtered.copy()
@@ -166,6 +171,13 @@ def _load_and_split(config: TrainingConfig) -> SplitData:
         df_engineered=combined,
         feature_context=feature_context,
     )
+
+
+def _feature_set_requires_listing_price(feature_set: str | None) -> bool:
+    subset_numeric, _ = load_feature_subset(feature_set)
+    if subset_numeric is None:
+        return True
+    return "listing_price" in subset_numeric
 
 
 def _resolve_base_features(
@@ -469,6 +481,7 @@ def _log_performance(lgbm_metrics: dict[str, object], hyperparameter_tuning: boo
     logger.info("MAE:  %s SEK", f"{lgbm_metrics['mae']:,.0f}")
     logger.info("RMSE: %s SEK", f"{lgbm_metrics['rmse']:,.0f}")
     logger.info("MAPE: %.4f", lgbm_metrics["mape"])
+    logger.info("Within 10%%: %.1f%%", lgbm_metrics["within_10_pct"])
 
 
 def _generate_evaluation_reports(
@@ -712,6 +725,7 @@ def _persist_evaluation_model(
         "mae": lgbm_metrics["mae"],
         "rmse": lgbm_metrics["rmse"],
         "mape": lgbm_metrics["mape"],
+        "within_10_pct": lgbm_metrics["within_10_pct"],
         "n_train": final_results["train_size"],
         "n_test": final_results["test_size"],
         "target_achieved": lgbm_metrics["mae"] < target_mae,
@@ -805,6 +819,7 @@ def _persist_production_model(
         "mae": "N/A - trained on full dataset",
         "rmse": "N/A - trained on full dataset",
         "mape": "N/A - trained on full dataset",
+        "within_10_pct": "N/A - trained on full dataset",
         "n_train": production_results["n_samples"],
         "n_test": 0,
         "features_used": all_features,

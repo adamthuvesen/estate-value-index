@@ -68,8 +68,8 @@ export function PredictionForm({
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <label className="flex flex-col gap-1.5">
-          <span className={fieldLabel}>Listing price (kr) *</span>
-          <input required type="number" value={formData.listing_price} onChange={(e) => onFieldChange("listing_price", e.target.value)} className={`num ${fieldControl}`} />
+          <span className={fieldLabel}>Listing price (kr)</span>
+          <input type="number" value={formData.listing_price} onChange={(e) => onFieldChange("listing_price", e.target.value)} className={`num ${fieldControl}`} />
         </label>
 
         <label className="flex flex-col gap-1.5">
@@ -150,6 +150,16 @@ export function PredictionForm({
             <option value="true">Yes</option>
             <option value="false">No</option>
           </select>
+        </label>
+
+        <label className="flex flex-col gap-1.5">
+          <span className={fieldLabel}>Latitude</span>
+          <input type="number" value={formData.latitude} onChange={(e) => onFieldChange("latitude", e.target.value)} className={`num ${fieldControl}`} />
+        </label>
+
+        <label className="flex flex-col gap-1.5">
+          <span className={fieldLabel}>Longitude</span>
+          <input type="number" value={formData.longitude} onChange={(e) => onFieldChange("longitude", e.target.value)} className={`num ${fieldControl}`} />
         </label>
 
         <label className="flex flex-col gap-1.5">

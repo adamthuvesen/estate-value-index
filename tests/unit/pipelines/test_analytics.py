@@ -189,9 +189,9 @@ class TestGenerateValueAnalysisTask:
         )
 
         generate_value_analysis_task.fn(
-            output_file=output_file, data_file=data_file, model_type="lgbm"
+            output_file=output_file, data_file=data_file, model_type="no_list"
         )
-        assert captured_args["model_type"] == "lgbm"
+        assert captured_args["model_type"] == "no_list"
 
     @pytest.mark.unit
     def test_returns_correct_structure(self, tmp_path: Path, mocker: Any) -> None:

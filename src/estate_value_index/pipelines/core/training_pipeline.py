@@ -483,7 +483,7 @@ def _generate_enrichment_stage(config: TrainingFlowConfig, results: dict, logger
         value_analysis_result = generate_value_analysis_task(
             output_file=value_analysis_path,
             data_file=Path("data/raw/booli/booli_listings_prod.json"),
-            model_type="lgbm",
+            model_type="no_list",
             apply_training_filters=False,
         )
         results["steps"]["value_analysis"] = value_analysis_result
@@ -496,7 +496,7 @@ def _generate_enrichment_stage(config: TrainingFlowConfig, results: dict, logger
             output_file=Path("data/derived/area_statistics.json"),
             data_source="bigquery",
             feature_context_path=Path(config.local_model_dir)
-            / f"{config.model_prefix}_feature_context.json",
+            / f"{config.model_prefix}_no_list_feature_context.json",
             value_analysis_path=value_analysis_path,
             raw_listings_path=Path("data/raw/booli/booli_listings_prod.json"),
         )

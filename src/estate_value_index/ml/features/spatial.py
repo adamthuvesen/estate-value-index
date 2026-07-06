@@ -3,6 +3,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from estate_value_index.ml.features.address_comps import create_address_comp_features
 from estate_value_index.ml.features.area_market import (
     _create_area_market_features,
     _create_area_temporal_metrics,
@@ -13,7 +14,8 @@ from estate_value_index.ml.features.classifiers import (
 )
 from estate_value_index.ml.features.context import FeatureEngineeringContext
 from estate_value_index.ml.features.heuristics import _calculate_distance_to_center
-from estate_value_index.ml.poi import compute_distance_to_city_center_series
+from estate_value_index.ml.features.micro_area import create_micro_area_features
+from estate_value_index.ml.poi import create_poi_features
 
 """Spatial and location-based feature builders."""
 
@@ -22,6 +24,9 @@ def _create_spatial_features(
     df: pd.DataFrame, context: FeatureEngineeringContext | None
 ) -> pd.DataFrame:
     """Create location-based and area-level market features."""
+    df = create_micro_area_features(df, context)
+    df = create_address_comp_features(df, context)
+
     # Extract postal code information
     df["postal_code"] = df.get("address", pd.Series([None] * len(df), index=df.index)).apply(
         _extract_postal_code
@@ -36,13 +41,16 @@ def _create_spatial_features(
         _calculate_distance_to_center
     )
 
-    # Distance to city center (geocoding-based, if lat/lon available)
+    # POI/transit features (geocoding-based, if lat/lon available)
     if "lat" in df.columns and "lon" in df.columns:
-        df["distance_to_city_center"] = compute_distance_to_city_center_series(df["lat"], df["lon"])
+        df = create_poi_features(df)
     else:
-        # No geocoding available - use NaN so median imputation handles it
-        # (Heuristic fallback was too noisy and hurt model performance)
         df["distance_to_city_center"] = np.nan
+        df["distance_to_nearest_metro"] = np.nan
+        df["distance_to_nearest_train"] = np.nan
+        df["metro_stations_within_500m"] = 0
+        df["metro_stations_within_1km"] = 0
+        df["transit_accessibility_score"] = np.nan
 
     # Area-level market microstructure (with leave-one-out during training)
     df = _create_area_market_features(df, context)

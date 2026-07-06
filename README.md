@@ -138,22 +138,28 @@ or production performance.
 
 ## Run locally
 
-Terminal 1:
+One command starts both servers and regenerates the web app's derived data
+(value analysis + area statistics) from the model in `web/models/` and the
+local dataset:
 
 ```bash
-uv run uvicorn api_server:app --host 0.0.0.0 --port 8000
-```
-
-Terminal 2:
-
-```bash
-cd web && npm run dev
+./scripts/dev_web.sh                 # regenerates derived data if missing
+./scripts/dev_web.sh --refresh-data  # force-regenerate (after new data/model)
+./scripts/dev_web.sh --skip-data     # servers only, reuse existing data
 ```
 
 - Web app: http://localhost:3000
 - API docs: http://localhost:8000/docs
 
-Set `PREDICTION_API_URL` if the FastAPI service is not on `http://localhost:8000`.
+Needs a trained model in `web/models/`. Produce one (writes there by default):
+
+```bash
+uv run python -m estate_value_index.cli train-production-models --data-source bigquery
+```
+
+Env overrides: `WEB_DATA_FILE`, `API_PORT`, `WEB_PORT`. To run the servers by
+hand instead, start `uvicorn api_server:app --port 8000` and `cd web && npm run
+dev`, and set `PREDICTION_API_URL` if the API is not on `http://localhost:8000`.
 
 ## Data Access
 
@@ -171,7 +177,7 @@ uv run pytest
 cd web && npm test && cd ..
 
 # Train on materialized features; add --tune for Optuna search
-uv run python train_model.py --use-features
+uv run python -m estate_value_index.cli train-production-models --data-source bigquery
 
 # Run the pipeline (see --help for all flags)
 uv run python -m estate_value_index.pipelines.core.complete_pipeline --quick      # fast local run
