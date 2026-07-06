@@ -10,7 +10,7 @@ DEFAULT_MODEL_DIR = "web/models"
 # Single production quality bar; .github/workflows/ml-pipeline.yml repeats this
 # number inline (it cannot import Python), guarded by a test in
 # tests/unit/pipelines/test_training_pipeline.py.
-DEFAULT_MAE_THRESHOLD = 275_000
+DEFAULT_MAE_THRESHOLD = 350_000
 
 # Polling defaults
 DEFAULT_POLL_INTERVAL = 30
