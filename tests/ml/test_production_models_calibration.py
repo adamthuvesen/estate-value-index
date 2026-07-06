@@ -79,14 +79,3 @@ def test_no_list_without_calibrator_is_unchanged() -> None:
     out = model._apply_calibration(_engineered().head(1), gated)
 
     assert out.tolist() == gated.tolist()
-
-
-def test_model_serialized_before_calibration_fields_still_predicts() -> None:
-    model = _model(model_id="no_list", calibrator=_StubCalibrator(500_000.0))
-    # Simulate a joblib pickle created before the calibration fields existed.
-    del model.residual_calibrator
-    gated = np.array([10_000_000.0])
-
-    out = model._apply_calibration(_engineered().head(1), gated)
-
-    assert out.tolist() == gated.tolist()

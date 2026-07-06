@@ -197,19 +197,17 @@ class TieredProductionModel:
         engineered: pd.DataFrame,
         gated_predictions: np.ndarray,
     ) -> np.ndarray:
-        # getattr guards models serialized before calibration fields existed.
-        calibrator = getattr(self, "residual_calibrator", None)
-        if calibrator is None or self.model_id != NO_LIST_MODEL_ID:
+        if self.residual_calibrator is None or self.model_id != NO_LIST_MODEL_ID:
             return gated_predictions
-        correction = calibrator.predict(build_calibration_features(engineered, gated_predictions))
+        correction = self.residual_calibrator.predict(
+            build_calibration_features(engineered, gated_predictions)
+        )
         return apply_calibration_correction(
             gated_predictions,
             correction,
-            max_abs=getattr(self, "calibration_max_abs", DEFAULT_CALIBRATION_MAX_ABS),
-            max_frac=getattr(self, "calibration_max_frac", DEFAULT_CALIBRATION_MAX_FRAC),
-            min_base_prediction=getattr(
-                self, "calibration_min_prediction", DEFAULT_CALIBRATION_MIN_PREDICTION
-            ),
+            max_abs=self.calibration_max_abs,
+            max_frac=self.calibration_max_frac,
+            min_base_prediction=self.calibration_min_prediction,
         )
 
 
@@ -713,10 +711,7 @@ def _calibration_report(
     overall and high-end MAE/bias, underprediction rate, and the correction
     distribution. ``listing`` (no calibrator) reports ``served="uncalibrated"``.
     """
-    has_calibrator = (
-        getattr(model, "residual_calibrator", None) is not None
-        and model.model_id == NO_LIST_MODEL_ID
-    )
+    has_calibrator = model.residual_calibrator is not None and model.model_id == NO_LIST_MODEL_ID
     if not has_calibrator:
         return {"served": "uncalibrated", "applied": False}
 
