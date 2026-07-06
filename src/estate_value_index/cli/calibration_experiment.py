@@ -18,7 +18,7 @@ def main(argv: list[str] | None = None, *, args=None) -> int:
     if args is None:
         parser = argparse.ArgumentParser(description="Run residual calibration experiments")
         parser.add_argument("--data-file", type=Path, default=DEFAULT_DATA_FILE)
-        parser.add_argument("--feature-set", default="no_list_price_h3_market")
+        parser.add_argument("--feature-set", default=None)
         parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
         parser.add_argument("--splits", type=int, default=4)
         parser.add_argument(
@@ -31,16 +31,17 @@ def main(argv: list[str] | None = None, *, args=None) -> int:
     if getattr(args, "production", False):
         return _run_production(args)
 
+    feature_set = args.feature_set or "no_list_price_h3_market"
     result = run_residual_calibration_experiment(
         data_file=args.data_file,
-        feature_set=args.feature_set,
+        feature_set=feature_set,
         output_dir=args.output_dir,
         n_splits=args.splits,
     )
     base = result["base"]
     calibrated = result["calibrated"]
     delta = result["delta"]
-    print(f"Residual calibration experiment complete: {args.feature_set}")
+    print(f"Residual calibration experiment complete: {feature_set}")
     print(f"Base MAE: {base['mae']:,.0f} SEK; bias: {base['mean_bias']:,.0f} SEK")
     print(
         "Calibrated MAE: "
@@ -59,11 +60,7 @@ def main(argv: list[str] | None = None, *, args=None) -> int:
 def _run_production(args) -> int:
     # The single-model default feature set is meaningless for the production model;
     # fall back to the real no_list production feature set unless the user overrode it.
-    feature_set = (
-        args.feature_set
-        if args.feature_set != "no_list_price_h3_market"
-        else DEFAULT_NO_LIST_FEATURE_SET
-    )
+    feature_set = args.feature_set or DEFAULT_NO_LIST_FEATURE_SET
     result = run_production_residual_calibration_experiment(
         data_file=args.data_file,
         feature_set=feature_set,
