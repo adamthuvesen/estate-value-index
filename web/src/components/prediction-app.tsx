@@ -3,7 +3,7 @@
 import { ListingPrefill } from "@/components/prediction/listing-prefill";
 import { PredictionForm } from "@/components/prediction/prediction-form";
 import { PredictionResults } from "@/components/prediction/prediction-results";
-import { usePrediction } from "@/hooks/use-prediction";
+import { usePredictionForm } from "@/hooks/use-prediction-form";
 import type { SampleListing } from "@/lib/prediction-types";
 
 interface PredictionAppProps {
@@ -33,7 +33,7 @@ export function PredictionApp({ sampleListings, defaultAreas, modelLabels }: Pre
     priceDifference,
     differencePercent,
     isAboveAsking,
-  } = usePrediction({ sampleListings, defaultAreas, modelLabels });
+  } = usePredictionForm({ sampleListings, defaultAreas, modelLabels });
 
   return (
     <div className="tactical-section-gap">

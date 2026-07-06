@@ -28,7 +28,7 @@ function normalizeRooms(value: number | null | undefined): string | null {
   return String(Math.round(value));
 }
 
-export function usePrediction({
+export function usePredictionForm({
   sampleListings,
   defaultAreas,
   modelLabels,
