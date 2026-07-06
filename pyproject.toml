@@ -32,6 +32,8 @@ dependencies = [
     "twisted>=22.10.0",
     "cryptography>=42.0.8",
     "w3lib>=2.1.2",
+    "curl-cffi>=0.15.0",
+    "patchright>=1.61.0",
 
     # Data processing
     "numpy>=1.24.0",
@@ -52,9 +54,6 @@ dependencies = [
     "google-cloud-bigquery-storage>=2.0.0",
     "db-dtypes>=1.4.0",
 
-    # Orchestration
-    "prefect>=3.0.0",
-
     # Utilities
     "python-dotenv>=1.0.0",
     "pyyaml>=6.0.0",
@@ -69,6 +68,14 @@ ml = [
     "optuna>=3.0.0",
 ]
 
+# Prefect pipeline orchestration (ingestion/training/analytics flows). Not
+# needed to serve predictions — api_server.py never imports
+# estate_value_index.pipelines — so keeping it out of the base dependencies
+# keeps prefect and its dependency tree out of the serving Docker image.
+pipeline = [
+    "prefect>=3.0.0",
+]
+
 # Development dependencies
 # `[dev]` pulls in every extra needed to actually run the test suite, so a
 # fresh worktree can `uv pip install -e ".[dev]"` and have pytest collect
@@ -80,7 +87,7 @@ dev = [
     "mypy>=1.5.0",
     "ruff>=0.1.0",
     "pre-commit>=4.0.0",
-    "estate-value-index[ml,viz,geo,monitoring,vertex]",
+    "estate-value-index[ml,pipeline,viz,geo,monitoring,vertex]",
 ]
 
 # Visualization dependencies
@@ -108,7 +115,7 @@ monitoring = [
 
 # All optional dependencies
 all = [
-    "estate-value-index[ml,dev,viz,vertex,geo,monitoring]",
+    "estate-value-index[ml,dev,pipeline,viz,vertex,geo,monitoring]",
 ]
 
 [project.scripts]
