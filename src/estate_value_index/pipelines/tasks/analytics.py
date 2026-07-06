@@ -108,9 +108,9 @@ def generate_value_analysis_task(
     logger.info(f"Generating value analysis from {data_file}")
 
     # Import the analysis function directly instead of using sys.argv patching
-    from estate_value_index.analytics.value_analysis import run_analysis
+    from estate_value_index.analytics.value_analysis import generate_value_analysis
 
-    run_analysis(
+    generate_value_analysis(
         data_file=data_file,
         model_type=model_type,
         output_file=output_file,

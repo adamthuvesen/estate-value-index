@@ -130,13 +130,13 @@ class TestGenerateValueAnalysisTask:
         data_file = tmp_path / "data.json"
         data_file.write_text('{"listing_id": "1"}\n')
 
-        def mock_run_analysis(*args, **kwargs):
+        def mock_generate_value_analysis(*args, **kwargs):
             kwargs["output_file"].parent.mkdir(parents=True, exist_ok=True)
             kwargs["output_file"].write_text('{"statistics": {"total_properties": 10}}')
 
         mocker.patch(
-            "estate_value_index.analytics.value_analysis.run_analysis",
-            side_effect=mock_run_analysis,
+            "estate_value_index.analytics.value_analysis.generate_value_analysis",
+            side_effect=mock_generate_value_analysis,
         )
 
         result = generate_value_analysis_task.fn(output_file=output_file, data_file=data_file)
@@ -150,12 +150,12 @@ class TestGenerateValueAnalysisTask:
         data_file = tmp_path / "data.json"
         data_file.write_text('{"listing_id": "1"}\n')
 
-        def mock_run_analysis(*args, **kwargs):
+        def mock_generate_value_analysis(*args, **kwargs):
             kwargs["output_file"].write_text(json.dumps({"statistics": {"total_properties": 150}}))
 
         mocker.patch(
-            "estate_value_index.analytics.value_analysis.run_analysis",
-            side_effect=mock_run_analysis,
+            "estate_value_index.analytics.value_analysis.generate_value_analysis",
+            side_effect=mock_generate_value_analysis,
         )
 
         result = generate_value_analysis_task.fn(output_file=output_file, data_file=data_file)
@@ -167,7 +167,7 @@ class TestGenerateValueAnalysisTask:
         data_file = tmp_path / "data.json"
         data_file.write_text('{"listing_id": "1"}\n')
 
-        mocker.patch("estate_value_index.analytics.value_analysis.run_analysis", return_value=None)
+        mocker.patch("estate_value_index.analytics.value_analysis.generate_value_analysis", return_value=None)
 
         with pytest.raises(FileNotFoundError, match="Output file not created"):
             generate_value_analysis_task.fn(output_file=output_file, data_file=data_file)
@@ -179,13 +179,13 @@ class TestGenerateValueAnalysisTask:
         data_file.write_text('{"listing_id": "1"}\n')
         captured_args = {}
 
-        def mock_run_analysis(*args, **kwargs):
+        def mock_generate_value_analysis(*args, **kwargs):
             captured_args.update(kwargs)
             kwargs["output_file"].write_text('{"statistics": {"total_properties": 0}}')
 
         mocker.patch(
-            "estate_value_index.analytics.value_analysis.run_analysis",
-            side_effect=mock_run_analysis,
+            "estate_value_index.analytics.value_analysis.generate_value_analysis",
+            side_effect=mock_generate_value_analysis,
         )
 
         generate_value_analysis_task.fn(
@@ -199,12 +199,12 @@ class TestGenerateValueAnalysisTask:
         data_file = tmp_path / "data.json"
         data_file.write_text('{"listing_id": "1"}\n')
 
-        def mock_run_analysis(*args, **kwargs):
+        def mock_generate_value_analysis(*args, **kwargs):
             kwargs["output_file"].write_text('{"statistics": {"total_properties": 0}}')
 
         mocker.patch(
-            "estate_value_index.analytics.value_analysis.run_analysis",
-            side_effect=mock_run_analysis,
+            "estate_value_index.analytics.value_analysis.generate_value_analysis",
+            side_effect=mock_generate_value_analysis,
         )
 
         result = generate_value_analysis_task.fn(output_file=output_file, data_file=data_file)

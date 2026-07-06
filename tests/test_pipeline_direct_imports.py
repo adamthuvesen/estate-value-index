@@ -36,7 +36,7 @@ class TestValueAnalysisTask:
         from estate_value_index.pipelines.tasks.analytics import generate_value_analysis_task
 
         source = inspect.getsource(generate_value_analysis_task)
-        assert "from estate_value_index.analytics.value_analysis import run_analysis" in source
+        assert "from estate_value_index.analytics.value_analysis import generate_value_analysis" in source
         assert "subprocess.run" not in source
 
 
@@ -115,7 +115,7 @@ class TestImportStructure:
             "from estate_value_index.analytics.area_statistics import generate_area_statistics"
             in source
         )
-        assert "from estate_value_index.analytics.value_analysis import run_analysis" in source
+        assert "from estate_value_index.analytics.value_analysis import generate_value_analysis" in source
 
     def test_training_pipeline_imports_training_workflow(self):
         source = Path("src/estate_value_index/pipelines/core/training_pipeline.py").read_text()

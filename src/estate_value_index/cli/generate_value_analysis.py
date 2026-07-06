@@ -16,7 +16,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from estate_value_index.analytics.value_analysis import run_analysis
+from estate_value_index.analytics.value_analysis import generate_value_analysis
 
 
 def main(argv: list[str] | None = None, *, args=None) -> int:
@@ -34,7 +34,7 @@ def main(argv: list[str] | None = None, *, args=None) -> int:
             "--model-type",
             type=str,
             default="no_list",
-            choices=["no_list", "listing", "baseline"],
+            choices=["no_list", "listing"],
             help="Model type to use for predictions",
         )
         parser.add_argument(
@@ -91,7 +91,7 @@ def main(argv: list[str] | None = None, *, args=None) -> int:
         f"{args.undervalue_threshold_abs:,.0f} SEK"
     )
 
-    output = run_analysis(
+    output = generate_value_analysis(
         data_file=args.data_file,
         model_type=args.model_type,
         output_file=args.output,

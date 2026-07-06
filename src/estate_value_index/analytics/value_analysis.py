@@ -325,7 +325,7 @@ def generate_summary_statistics(df: pd.DataFrame, metrics: dict) -> dict:
     return stats
 
 
-def run_analysis(
+def generate_value_analysis(
     data_file: Path,
     model_type: str = "no_list",
     output_file: Path | None = None,
@@ -341,7 +341,7 @@ def run_analysis(
 
     Args:
         data_file: Path to production data JSON file
-        model_type: Model type (no_list, listing, baseline)
+        model_type: Model type (no_list, listing)
         output_file: Output path for value analysis JSON
         models_dir: Directory containing trained models
         model_prefix: Model file prefix
