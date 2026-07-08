@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
+import { estimateRange, formatEstimateRange } from "@/lib/estimate-range";
 import { formatSek, titleCaseArea } from "@/lib/format";
 import { FALLBACK_TIER, VALUE_TIER_STYLES } from "@/lib/tiers";
 import type { ValueProperty, ValueTier } from "@/lib/value-finder-types";
@@ -21,10 +22,12 @@ export function PropertyCard({ property }: PropertyCardProps) {
   }
 
   const tier = VALUE_TIER_STYLES[property.value_tier as ValueTier] ?? FALLBACK_TIER;
+  const displayedEstimateRange = estimateRange(property.predicted_price);
 
-  // Backend reports prediction_delta = predicted - sold; flip so positive = sold above prediction.
-  const displayDelta = -property.prediction_delta_absolute;
-  const displayPercentage = -property.prediction_delta_percentage;
+  // Match the Predictor page: visible gaps use the rounded estimate center, not
+  // the raw point estimate from the model.
+  const displayDelta = property.sold_price - displayedEstimateRange.center;
+  const displayPercentage = (displayDelta / displayedEstimateRange.center) * 100;
   const belowPrediction = displayDelta < 0; // sold under model estimate = undervalued
 
   // Gauge: symmetric ±40% band around the model estimate (center).
@@ -86,9 +89,9 @@ export function PropertyCard({ property }: PropertyCardProps) {
           </span>
         </div>
         <div className="mt-1 flex items-baseline justify-between gap-2">
-          <span className="text-[12px] text-ledger-muted">Model estimate</span>
-          <span className="num text-[13px] font-medium text-ledger-muted">
-            {formatSek(property.predicted_price)}
+          <span className="text-[12px] text-ledger-muted">Estimate range</span>
+          <span className="num text-right text-[13px] font-medium text-ledger-muted">
+            {formatEstimateRange(displayedEstimateRange)}
           </span>
         </div>
 
