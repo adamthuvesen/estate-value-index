@@ -22,6 +22,7 @@ from estate_value_index.ml import (
     get_feature_lists,
     handle_missing_values,
 )
+from estate_value_index.ml.ask_price import mask_ask_price_signals
 from estate_value_index.ml.training import LGBMTrainer
 from estate_value_index.ml.training_workflow.config import TrainingConfig
 from estate_value_index.ml.training_workflow.data import (
@@ -34,18 +35,18 @@ from estate_value_index.ml.training_workflow.reporting import (
     generate_area_performance_report,
     generate_price_tier_analysis,
 )
-from estate_value_index.monitoring.constants import (
-    BASELINE_DATA_PATH,
-    CRITICAL_CATEGORICAL_FEATURES,
-    CRITICAL_NUMERIC_FEATURES,
-)
+from estate_value_index.monitoring.constants import BASELINE_DATA_PATH
 from estate_value_index.utils.gcs import (
     get_gcs_bucket,
     is_gcs_enabled,
     upload_blob,
     upload_model_artifacts,
 )
-from estate_value_index.utils.settings import get_mae_threshold, get_random_state, get_test_size
+from estate_value_index.utils.settings import (
+    get_median_ape_threshold,
+    get_random_state,
+    get_test_size,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -126,10 +127,18 @@ def _load_and_split(config: TrainingConfig) -> SplitData:
     test_size = get_test_size()
     if not skip_feature_engineering:
         df = df_or_engineered
-        df_filtered = filter_valid_listings(df, min_price=3000000, drop_na_features=False)
+        requires_listing_price = _feature_set_requires_listing_price(config.feature_set)
+        df_filtered = filter_valid_listings(
+            df,
+            min_price=3000000,
+            drop_na_features=False,
+            require_listing_price=requires_listing_price,
+        )
         logger.info("After filtering: %d listings", len(df_filtered))
         # The temporal split needs sold_date as datetime before feature engineering.
         df_filtered = df_filtered.copy()
+        if not requires_listing_price:
+            df_filtered = mask_ask_price_signals(df_filtered)
         df_filtered["sold_date"] = pd.to_datetime(df_filtered["sold_date"], errors="coerce")
         if df_filtered["sold_date"].isna().any():
             n_bad = int(df_filtered["sold_date"].isna().sum())
@@ -146,15 +155,10 @@ def _load_and_split(config: TrainingConfig) -> SplitData:
         logger.info("Transforming holdout fold via training-only context...")
         test_engineered = create_optimized_features(test_df_raw, context=feature_context)
     else:
-        # BigQuery features path: features are pre-materialised. We still
-        # split temporally and rebuild the context against the train fold
-        # so handle_missing_values uses train-only fill values.
-        df_engineered = df_or_engineered
-        logger.info("Creating temporal train/test split on materialised features...")
-        train_engineered, test_engineered = create_temporal_holdout_split(
-            df_engineered, test_size=test_size, date_column="sold_date"
+        raise ValueError(
+            "Materialized features cannot be used for holdout evaluation yet; "
+            "use raw listings so holdout rows are engineered with train-only context."
         )
-        feature_context = build_feature_context(train_engineered)
 
     # Concatenate views for downstream column discovery only — the actual
     # train/test slices below come from the separate engineered frames.
@@ -166,6 +170,13 @@ def _load_and_split(config: TrainingConfig) -> SplitData:
         df_engineered=combined,
         feature_context=feature_context,
     )
+
+
+def _feature_set_requires_listing_price(feature_set: str | None) -> bool:
+    subset_numeric, _ = load_feature_subset(feature_set)
+    if subset_numeric is None:
+        return True
+    return "listing_price" in subset_numeric
 
 
 def _resolve_base_features(
@@ -469,6 +480,7 @@ def _log_performance(lgbm_metrics: dict[str, object], hyperparameter_tuning: boo
     logger.info("MAE:  %s SEK", f"{lgbm_metrics['mae']:,.0f}")
     logger.info("RMSE: %s SEK", f"{lgbm_metrics['rmse']:,.0f}")
     logger.info("MAPE: %.4f", lgbm_metrics["mape"])
+    logger.info("Within 10%%: %.1f%%", lgbm_metrics["within_10_pct"])
 
 
 def _generate_evaluation_reports(
@@ -573,81 +585,6 @@ def _log_temporal_validation(
     logger.info("   Test data is strictly after training data")
 
 
-def _retrain_on_all_data(
-    split: SplitData,
-    numeric_features: list[str],
-    categorical_features: list[str],
-    all_features: list[str],
-) -> dict[str, object]:
-    """Refit on the full dataset so inference uses the latest area statistics."""
-    logger.info("Production mode: retraining on all data")
-    logger.info("Retraining on FULL dataset (train+test) for production deployment...")
-    logger.info("   This ensures inference uses most recent area statistics.")
-
-    # Use full engineered dataset (no temporal split)
-    df_engineered = split.df_engineered
-    X_full = df_engineered[all_features].copy()
-    y_full = df_engineered["sold_price"].copy()
-
-    logger.info("Full dataset size: %d samples", len(X_full))
-
-    # Handle missing values using full dataset statistics
-    X_full_train, _, numeric_fill_prod, categorical_fill_prod = handle_missing_values(
-        X_full,
-        X_full.copy(),  # Dummy test set (not used)
-        numeric_features,
-        categorical_features,
-    )
-
-    # Ensure categorical features are category dtype
-    for col in categorical_features:
-        if col in X_full_train.columns and X_full_train[col].dtype == "object":
-            X_full_train[col] = X_full_train[col].astype("category")
-
-    # Build feature context from FULL dataset
-    feature_context_prod = build_feature_context(df_engineered)
-    context_payload_prod = _context_payload(feature_context_prod)
-
-    # Log transform target
-    y_full_log = np.log1p(y_full)
-
-    # Train production model (reuse best parameters from evaluation)
-    random_state = get_random_state()
-    lgbm_trainer_prod = LGBMTrainer(random_state=random_state)
-    categorical_indices_prod = get_categorical_indices(X_full_train, categorical_features)
-
-    logger.info("Training production model with evaluation's best parameters...")
-    lgbm_model_prod = lgbm_trainer_prod.train(
-        X_full_train,
-        y_full_log,
-        hyperparameter_tuning=False,  # Use best params from evaluation
-        categorical_indices=categorical_indices_prod,
-    )
-
-    # Create production pipeline
-    pipeline_prod = SimplePredictionPipeline(
-        lgbm_model_prod,
-        numeric_features,
-        categorical_features,
-        context=feature_context_prod,
-    )
-
-    production_results = {
-        "model": lgbm_model_prod,
-        "pipeline": pipeline_prod,
-        "context": feature_context_prod,
-        "context_payload": context_payload_prod,
-        "numeric_fill_values": numeric_fill_prod,
-        "categorical_fill_values": categorical_fill_prod,
-        "n_samples": len(X_full_train),
-    }
-
-    logger.info("Production model trained on %d samples", len(X_full_train))
-    logger.info("   Context updated with latest area statistics from all data")
-
-    return production_results
-
-
 def _log_pruning_and_importance(
     dropped_feature_records: list[dict[str, object]],
     final_importance: dict[str, dict[str, float]],
@@ -700,21 +637,25 @@ def _persist_evaluation_model(
         context=feature_context,
     )
 
-    # Save model and metrics
-    joblib.dump(pipeline_lgbm, resolved_model_dir / f"{prefix}_lgbm.joblib")
+    # Save model and metrics under the canonical artifact names that
+    # upload_model_artifacts expects ({prefix}.joblib, {prefix}_metrics.json).
+    joblib.dump(pipeline_lgbm, resolved_model_dir / f"{prefix}.joblib")
 
     with open(resolved_model_dir / f"{prefix}_feature_context.json", "w", encoding="utf-8") as f:
         json.dump(context_payload, f, indent=2, ensure_ascii=False)
 
-    target_mae = get_mae_threshold()
+    target_median_ape = get_median_ape_threshold()
 
     metrics_lgbm = {
         "mae": lgbm_metrics["mae"],
         "rmse": lgbm_metrics["rmse"],
         "mape": lgbm_metrics["mape"],
+        "median_ape": lgbm_metrics["median_ape"],
+        "within_10_pct": lgbm_metrics["within_10_pct"],
+        "within_20_pct": lgbm_metrics.get("within_20_pct"),
         "n_train": final_results["train_size"],
         "n_test": final_results["test_size"],
-        "target_achieved": lgbm_metrics["mae"] < target_mae,
+        "target_achieved": lgbm_metrics["median_ape"] < target_median_ape,
         "features_used": all_features,
         "best_params": lgbm_metrics["best_params"],
         "tuning_time_seconds": lgbm_metrics["tuning_time"],
@@ -727,7 +668,7 @@ def _persist_evaluation_model(
         "note": "For production performance, run: uv run python -m estate_value_index.cli value-analysis",
     }
 
-    with open(resolved_model_dir / f"{prefix}_metrics_lgbm.json", "w", encoding="utf-8") as f:
+    with open(resolved_model_dir / f"{prefix}_metrics.json", "w", encoding="utf-8") as f:
         json.dump(metrics_lgbm, f, indent=2, ensure_ascii=False)
 
     with open(resolved_model_dir / f"{prefix}_feature_importance.json", "w", encoding="utf-8") as f:
@@ -738,6 +679,8 @@ def _upload_evaluation_artifacts(
     resolved_model_dir: Path,
     prefix: str,
     train_df: pd.DataFrame,
+    numeric_features: list[str],
+    categorical_features: list[str],
 ) -> None:
     """Push evaluation artifacts and a drift baseline to GCS when enabled."""
     logger.info("Uploading model artifacts to GCS...")
@@ -749,7 +692,7 @@ def _upload_evaluation_artifacts(
     # Save training data as drift detection baseline
     logger.info("Saving training data as drift detection baseline...")
     baseline_columns = []
-    for col in CRITICAL_NUMERIC_FEATURES + CRITICAL_CATEGORICAL_FEATURES + ["sold_price"]:
+    for col in numeric_features + categorical_features + ["sold_price"]:
         if col in train_df.columns:
             baseline_columns.append(col)
         else:
@@ -773,74 +716,6 @@ def _upload_evaluation_artifacts(
         )
 
 
-def _persist_production_model(
-    resolved_model_dir: Path,
-    prefix: str,
-    production_results: dict[str, object],
-    final_results: dict[str, object],
-    final_importance: dict[str, dict[str, float]],
-) -> None:
-    """Write and optionally upload the full-dataset production model artifacts."""
-    import joblib
-
-    all_features = final_results["all_features"]
-    lgbm_metrics = final_results["metrics"]["lgbm"]
-    train_size = final_results["train_size"]
-
-    logger.info("Saving production model")
-
-    prod_prefix = f"{prefix}_production"
-
-    # Save production pipeline
-    joblib.dump(production_results["pipeline"], resolved_model_dir / f"{prod_prefix}_lgbm.joblib")
-
-    # Save production context
-    with open(
-        resolved_model_dir / f"{prod_prefix}_feature_context.json", "w", encoding="utf-8"
-    ) as f:
-        json.dump(production_results["context_payload"], f, indent=2, ensure_ascii=False)
-
-    # Save production metrics (note: no test metrics since trained on all data)
-    production_metrics = {
-        "mae": "N/A - trained on full dataset",
-        "rmse": "N/A - trained on full dataset",
-        "mape": "N/A - trained on full dataset",
-        "n_train": production_results["n_samples"],
-        "n_test": 0,
-        "features_used": all_features,
-        "best_params": lgbm_metrics["best_params"],  # Reused from evaluation
-        "model_type": "LGBM (Production - Full Dataset)",
-        "feature_importance_normalized": final_importance["lgbm_normalized"],
-        "feature_importance_raw": final_importance["lgbm_raw"],
-        "note": "Production model trained on ALL data (train+test) for optimal inference. Use evaluation metrics for performance assessment.",
-    }
-
-    with open(resolved_model_dir / f"{prod_prefix}_metrics_lgbm.json", "w", encoding="utf-8") as f:
-        json.dump(production_metrics, f, indent=2, ensure_ascii=False)
-
-    with open(
-        resolved_model_dir / f"{prod_prefix}_feature_importance.json", "w", encoding="utf-8"
-    ) as f:
-        json.dump(final_importance, f, indent=2, ensure_ascii=False)
-
-    # Upload production artifacts to GCS if enabled
-    if is_gcs_enabled():
-        logger.info("Uploading production model artifacts to GCS...")
-        prod_gcs_artifacts = upload_model_artifacts(resolved_model_dir, prod_prefix)
-        logger.info("Uploaded %d production artifacts to Cloud Storage", len(prod_gcs_artifacts))
-        for artifact_type, uri in prod_gcs_artifacts.items():
-            logger.info("  - %s: %s", artifact_type, uri)
-
-    logger.info("Production model saved:")
-    logger.info("   Evaluation model: %s", resolved_model_dir / f"{prefix}_lgbm.joblib")
-    logger.info("   Production model: %s", resolved_model_dir / f"{prod_prefix}_lgbm.joblib")
-    logger.info(
-        "Production model uses updated context from %d samples", production_results["n_samples"]
-    )
-    logger.info("   (vs evaluation model context from %d samples)", train_size)
-    logger.info("Use evaluation metrics to assess performance, production model for deployment!")
-
-
 def run_training(config: TrainingConfig) -> float:
     _print_run_header(config)
 
@@ -860,7 +735,6 @@ def run_training(config: TrainingConfig) -> float:
         config.hyperparameter_tuning,
     )
 
-    all_features = final_results["all_features"]
     y_test = final_results["predictions"]["y_test"]
     y_pred = final_results["predictions"]["lgbm"]
     lgbm_metrics = final_results["metrics"]["lgbm"]
@@ -870,15 +744,6 @@ def run_training(config: TrainingConfig) -> float:
     _log_performance(lgbm_metrics, config.hyperparameter_tuning)
 
     _generate_evaluation_reports(split, y_test, y_pred, train_size, test_size)
-
-    production_results = None
-    if config.production_mode:
-        production_results = _retrain_on_all_data(
-            split,
-            final_results["numeric_features"],
-            final_results["categorical_features"],
-            all_features,
-        )
 
     _log_pruning_and_importance(dropped_feature_records, final_importance)
 
@@ -897,18 +762,15 @@ def run_training(config: TrainingConfig) -> float:
     )
 
     if is_gcs_enabled():
-        _upload_evaluation_artifacts(resolved_model_dir, prefix, split.train_engineered)
-
-    if config.production_mode and production_results:
-        _persist_production_model(
+        _upload_evaluation_artifacts(
             resolved_model_dir,
             prefix,
-            production_results,
-            final_results,
-            final_importance,
+            split.train_engineered,
+            final_results["numeric_features"],
+            final_results["categorical_features"],
         )
 
-    model_path = resolved_model_dir / f"{prefix}_lgbm.joblib"
+    model_path = resolved_model_dir / f"{prefix}.joblib"
     if config.hyperparameter_tuning:
         logger.info("Hyperparameter-tuned model saved to: %s (LGBM - Tuned)", model_path)
         logger.info("Hyperparameter tuning and training completed successfully")

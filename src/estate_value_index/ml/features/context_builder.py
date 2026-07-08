@@ -13,7 +13,13 @@ from estate_value_index.ml.constants import (
     PRICE_TIER_MID,
     PRICE_TIER_PREMIUM,
 )
+from estate_value_index.ml.features.address_comps import build_address_context_stats
 from estate_value_index.ml.features.context import FeatureEngineeringContext
+from estate_value_index.ml.features.micro_area import (
+    build_micro_area_context_stats,
+    build_same_size_context_stats,
+    global_observed_ppsqm_median,
+)
 from estate_value_index.ml.features.registry import (
     CATEGORICAL_FEATURE_NAMES,
     NUMERIC_FEATURE_NAMES,
@@ -89,7 +95,8 @@ def _latest_area_metric(training_frame: pd.DataFrame, column: str) -> dict[str, 
 
 def _global_median(training_frame: pd.DataFrame, column: str, default: float) -> float:
     if column in training_frame.columns:
-        median_val = training_frame[column].median()
+        valid_values = training_frame[column].dropna()
+        median_val = valid_values.median() if not valid_values.empty else pd.NA
         if pd.notna(median_val):
             return float(median_val)
     return default
@@ -103,7 +110,8 @@ def _fill_values(
 
     for col in NUMERIC_FEATURE_NAMES:
         if col in training_frame.columns:
-            median_val = training_frame[col].median()
+            valid_values = training_frame[col].dropna()
+            median_val = valid_values.median() if not valid_values.empty else pd.NA
             numeric_fill_values[col] = float(median_val) if pd.notna(median_val) else None
 
     for col in CATEGORICAL_FEATURE_NAMES:
@@ -220,4 +228,20 @@ def build_feature_context(training_frame: pd.DataFrame) -> FeatureEngineeringCon
         numeric_fill_values=numeric_fill_values,
         categorical_fill_values=categorical_fill_values,
         area_market_stats=_area_market_stats(training_frame),
+        micro_area_stats_res10=build_micro_area_context_stats(training_frame, "h3_res10"),
+        micro_area_stats_res9=build_micro_area_context_stats(training_frame, "h3_res9"),
+        area_ppsqm_stats=build_micro_area_context_stats(training_frame, "area"),
+        same_size_stats_h3_res9=build_same_size_context_stats(
+            training_frame, ["h3_res9", "_micro_area_size_band"]
+        ),
+        same_size_stats_area=build_same_size_context_stats(
+            training_frame, ["area", "_micro_area_size_band"]
+        ),
+        same_size_stats_global=build_same_size_context_stats(
+            training_frame, ["_micro_area_size_band"]
+        ),
+        street_area_ppsqm_stats=build_address_context_stats(training_frame, "_street_area_key"),
+        street_size_ppsqm_stats=build_address_context_stats(training_frame, "_street_size_key"),
+        address_ppsqm_stats=build_address_context_stats(training_frame, "_address_comp_key"),
+        global_ppsqm_median=global_observed_ppsqm_median(training_frame),
     )

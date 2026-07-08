@@ -57,6 +57,7 @@ class BooliSpider(BooliExtractionMixins, scrapy.Spider):
 
     def _load_config(self, config_file=None):
         """Load configuration from JSON file"""
+        explicit_config = config_file is not None
         if not config_file:
             # Default to booli config in ingestion/config/booli.json
             # spiders/booli.py is at .../ingestion/booli/spiders/; parents[2] is ingestion/.
@@ -67,10 +68,14 @@ class BooliSpider(BooliExtractionMixins, scrapy.Spider):
                 config = json.load(f)
                 self.logger.info(f"Loaded configuration from: {config_file}")
                 return config
-        except FileNotFoundError:
+        except FileNotFoundError as exc:
+            if explicit_config:
+                raise FileNotFoundError(f"Booli config file not found: {config_file}") from exc
             self.logger.warning(f"Config file not found: {config_file}. Using default parameters.")
             return self._default_config()
         except json.JSONDecodeError as e:
+            if explicit_config:
+                raise ValueError(f"Invalid JSON in Booli config file: {config_file}") from e
             self.logger.error(f"Invalid JSON in config file: {e}. Using default parameters.")
             return self._default_config()
 

@@ -43,9 +43,11 @@ ENV PATH="/root/.local/bin:$PATH"
 COPY pyproject.toml uv.lock ./
 COPY src/ src/
 
-# Install Python packages with uv to system Python (faster than pip)
-# [ml] extras include lightgbm, xgboost, optuna — required for model loading at runtime
-RUN uv pip install --system ".[ml]"
+# Install exact locked versions from uv.lock so serving deps match training.
+RUN uv export --frozen --no-dev --no-hashes --extra ml --extra geo --no-emit-project \
+        --format requirements-txt -o /tmp/requirements.txt \
+    && uv pip install --system -r /tmp/requirements.txt \
+    && uv pip install --system --no-deps .
 
 # ============================================================================
 # Stage 3: Final production image
@@ -71,6 +73,8 @@ RUN apt-get update && apt-get install -y \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
+RUN useradd --create-home --shell /usr/sbin/nologin appuser
+
 # Copy Python dependencies from stage 2
 COPY --from=python-deps /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=python-deps /usr/local/bin /usr/local/bin
@@ -95,8 +99,8 @@ RUN chmod +x /app/startup.sh
 COPY web/src/ /app/web/src/
 COPY web/next.config.ts /app/web/
 COPY web/tsconfig.json /app/web/
-COPY web/tailwind.config.ts /app/web/
 COPY web/postcss.config.mjs /app/web/
+COPY data/reference/ /app/data/reference/
 
 # Create directories for models and data (data loaded from GCS at runtime)
 RUN mkdir -p /app/web/models /app/data/derived
@@ -105,8 +109,8 @@ RUN mkdir -p /app/web/models /app/data/derived
 RUN mkdir -p /var/log/supervisor && \
     echo '[supervisord]' > /etc/supervisor/conf.d/supervisord.conf && \
     echo 'nodaemon=true' >> /etc/supervisor/conf.d/supervisord.conf && \
-    echo 'logfile=/var/log/supervisor/supervisord.log' >> /etc/supervisor/conf.d/supervisord.conf && \
-    echo 'pidfile=/var/run/supervisord.pid' >> /etc/supervisor/conf.d/supervisord.conf && \
+    echo 'logfile=/tmp/supervisord.log' >> /etc/supervisor/conf.d/supervisord.conf && \
+    echo 'pidfile=/tmp/supervisord.pid' >> /etc/supervisor/conf.d/supervisord.conf && \
     echo '' >> /etc/supervisor/conf.d/supervisord.conf && \
     echo '[program:nextjs]' >> /etc/supervisor/conf.d/supervisord.conf && \
     echo 'command=npm start' >> /etc/supervisor/conf.d/supervisord.conf && \
@@ -130,6 +134,8 @@ RUN mkdir -p /var/log/supervisor && \
     echo 'stderr_logfile_maxbytes=0' >> /etc/supervisor/conf.d/supervisord.conf && \
     echo 'environment=PYTHONPATH=/app' >> /etc/supervisor/conf.d/supervisord.conf
 
+RUN chown -R appuser:appuser /app /var/log/supervisor
+
 # Environment variables
 ENV PORT=8080
 ENV NODE_ENV=production
@@ -145,4 +151,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=240s --retries=3 \
     CMD curl -f http://localhost:8080/api/health || exit 1
 
 # Start with startup script (downloads models from GCS, then starts supervisor)
+USER appuser
 CMD ["/app/startup.sh"]

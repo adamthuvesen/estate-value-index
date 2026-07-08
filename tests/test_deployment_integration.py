@@ -6,6 +6,12 @@ from unittest.mock import Mock, patch
 
 import pytest
 
+from estate_value_index.model_artifacts import (
+    LISTING_MODEL_ID,
+    NO_LIST_MODEL_ID,
+    production_artifact_names,
+)
+
 
 @pytest.mark.integration
 @patch("subprocess.run")
@@ -51,7 +57,8 @@ def test_health_check_validation(mock_requests):
     mock_response.status_code = 200
     mock_response.json.return_value = {
         "status": "healthy",
-        "model_loaded": True,
+        "models_loaded": ["no_list_price", "with_list_price"],
+        "models_count": 2,
         "timestamp": "2025-10-03T10:00:00Z",
     }
     mock_response.raise_for_status = Mock()
@@ -64,7 +71,7 @@ def test_health_check_validation(mock_requests):
     assert response.status_code == 200
     health_data = response.json()
     assert health_data["status"] == "healthy"
-    assert health_data["model_loaded"] is True
+    assert health_data["models_count"] == 2
 
 
 @pytest.mark.integration
@@ -85,9 +92,9 @@ def test_gcs_artifact_verification(mock_storage_client):
     bucket = client.bucket("estate-value-index-models")
 
     required_artifacts = [
-        "models/price_prediction_model_lgbm.joblib",
-        "models/price_prediction_model_metrics_lgbm.json",
-        "models/price_prediction_model_feature_context.json",
+        f"models/{filename}"
+        for model_id in (NO_LIST_MODEL_ID, LISTING_MODEL_ID)
+        for filename in production_artifact_names(model_id).files
     ]
 
     for artifact_path in required_artifacts:
@@ -100,9 +107,9 @@ def test_deployment_prerequisites():
     model_dir = Path(__file__).parent.parent / "web" / "models"
 
     required_files = [
-        "price_prediction_model_lgbm.joblib",
-        "price_prediction_model_metrics_lgbm.json",
-        "price_prediction_model_feature_context.json",
+        filename
+        for model_id in (NO_LIST_MODEL_ID, LISTING_MODEL_ID)
+        for filename in production_artifact_names(model_id).files
     ]
 
     missing_files = [f for f in required_files if not (model_dir / f).exists()]
@@ -141,15 +148,17 @@ def test_deployment_dry_run(mock_subprocess):
 def test_deployment_error_handling():
     def validate_artifacts(artifacts_path):
         required_files = [
-            "models/price_prediction_model_lgbm.joblib",
-            "models/price_prediction_model_metrics_lgbm.json",
+            f"models/{production_artifact_names(NO_LIST_MODEL_ID).model}",
+            f"models/{production_artifact_names(LISTING_MODEL_ID).model}",
         ]
         for filename in required_files:
             if filename not in str(artifacts_path):
                 return False, f"Missing: {filename}"
         return True, "All artifacts present"
 
-    valid, _ = validate_artifacts("gs://bucket/models/price_prediction_model_lgbm.joblib")
+    valid, _ = validate_artifacts(
+        f"gs://bucket/models/{production_artifact_names(NO_LIST_MODEL_ID).model}"
+    )
     assert valid is False
 
 

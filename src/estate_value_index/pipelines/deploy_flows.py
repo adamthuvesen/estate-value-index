@@ -20,8 +20,7 @@ TRAIN_DEPLOYMENT_PARAMETERS: dict = {
     "config": asdict(
         TrainingFlowConfig(
             tune=False,
-            max_mae=350000,
-            production_mode=True,
+            max_median_ape=0.08,
         )
     ),
 }

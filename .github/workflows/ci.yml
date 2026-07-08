@@ -36,7 +36,6 @@ jobs:
               - 'pyproject.toml'
               - 'uv.lock'
               - 'src/**'
-              - 'train_model.py'
               - '.github/workflows/ci.yml'
 
   python-tests:

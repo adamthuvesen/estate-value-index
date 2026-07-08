@@ -80,10 +80,10 @@ async function checkAreaData(): Promise<CheckResult> {
       },
     };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    console.error("[HEALTH] Area data check failed:", error);
     return {
       status: "unhealthy",
-      details: { error: errorMessage },
+      details: { error_code: "AREA_DATA_UNAVAILABLE" },
     };
   }
 }

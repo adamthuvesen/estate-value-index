@@ -39,6 +39,11 @@ NUMERIC_FEATURE_NAMES: tuple[str, ...] = (
     # Phase 1: Enhanced spatial features
     "distance_to_center",
     "distance_to_city_center",  # True geocoding-based distance (meters)
+    "distance_to_nearest_metro",
+    "distance_to_nearest_train",
+    "metro_stations_within_500m",
+    "metro_stations_within_1km",
+    "transit_accessibility_score",
     "area_inventory",
     "area_price_volatility",
     "area_price_median",
@@ -48,6 +53,58 @@ NUMERIC_FEATURE_NAMES: tuple[str, ...] = (
     "area_liquidity",
     "relative_area_price",
     "area_volatility_score",
+    "micro_area_ppsqm_median",
+    "micro_area_ppsqm_p75",
+    "micro_area_ppsqm_p90",
+    "micro_area_ppsqm_count",
+    "micro_area_ppsqm_premium_vs_area",
+    "micro_area_upper_tail_ratio",
+    "h3_neighbor_ppsqm",
+    "h3_neighbor_ppsqm_p75",
+    "h3_neighbor_ppsqm_p90",
+    "h3_neighbor_ppsqm_count",
+    "h3_neighbor_premium_vs_micro",
+    "h3_neighbor_upper_tail_ratio",
+    "same_size_ppsqm_median",
+    "same_size_ppsqm_p75",
+    "same_size_ppsqm_p90",
+    "same_size_ppsqm_count",
+    "same_size_premium_vs_area",
+    "same_size_upper_tail_ratio",
+    "street_area_ppsqm_median",
+    "street_area_ppsqm_p75",
+    "street_area_ppsqm_p90",
+    "street_area_ppsqm_count",
+    "street_area_premium_vs_micro",
+    "street_area_upper_tail_ratio",
+    "street_size_ppsqm_median",
+    "street_size_ppsqm_p75",
+    "street_size_ppsqm_p90",
+    "street_size_ppsqm_count",
+    "street_size_premium_vs_street",
+    "street_size_upper_tail_ratio",
+    "address_ppsqm_median",
+    "address_ppsqm_p75",
+    "address_ppsqm_p90",
+    "address_ppsqm_count",
+    "address_premium_vs_street",
+    "address_upper_tail_ratio",
+    "h3_market_ppsqm_ratio",
+    "same_size_market_ppsqm_ratio",
+    "neighbor_market_ppsqm_ratio",
+    "micro_luxury_score",
+    "luxury_location_flag",
+    "market_interest_rate",
+    "market_interest_rate_change_3m",
+    "market_economic_tendency",
+    "market_consumer_confidence",
+    "market_construction_confidence",
+    "market_gdp_growth",
+    "market_ppsqm_index",
+    "market_ppsqm_index_change_3m",
+    "market_sales_volume",
+    "market_months_since_2020",
+    "market_data_age_months",
     # Phase 3: Advanced architectural features
     "construction_quality_score",
     "energy_efficiency_est",
@@ -78,6 +135,18 @@ NUMERIC_FEATURE_NAMES: tuple[str, ...] = (
     "area_avg_price",
     "area_listing_count",
     "area_target_encoded",
+    # Description-derived features
+    "description_length",
+    "description_word_count",
+    "is_renovated",
+    "has_modern_kitchen",
+    "has_modern_bathroom",
+    "has_view",
+    "is_quiet_location",
+    "needs_renovation",
+    "luxury_keyword_count",
+    "condition_score",
+    "premium_score",
 )
 
 CATEGORICAL_FEATURE_NAMES: tuple[str, ...] = (
@@ -86,6 +155,15 @@ CATEGORICAL_FEATURE_NAMES: tuple[str, ...] = (
     "age_bucket",
     "space_efficiency",
     "area_price_tier",
+    "h3_res10",
+    "h3_res9",
+    "micro_area_resolution_used",
+    "same_size_scope_used",
+    "street_name",
+    "street_area_scope_used",
+    "street_size_scope_used",
+    "address_comp_scope_used",
+    "luxury_location_tier",
     # Area price momentum (derived from past-only area price-change stats)
     "area_price_momentum",
     # Phase 3: Advanced architectural features
@@ -129,7 +207,8 @@ def handle_missing_values(
     numeric_fill_values = {}
     for col in numeric_features:
         if col in X_train.columns:
-            median_val = X_train[col].median()
+            valid_values = X_train[col].dropna()
+            median_val = valid_values.median() if not valid_values.empty else pd.NA
             fill_val = median_val if pd.notna(median_val) else 0
 
             # Handle Int64 (nullable integer) dtype - must use integer fill value

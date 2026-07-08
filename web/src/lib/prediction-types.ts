@@ -12,10 +12,12 @@ export interface PredictionInput {
   floor: string;
   elevator: string;
   balcony: string;
+  latitude: string;
+  longitude: string;
 }
 
 export interface PredictionPayload {
-  listing_price: number;
+  listing_price: number | null;
   living_area: number;
   rooms: number;
   monthly_fee: number;
@@ -28,15 +30,24 @@ export interface PredictionPayload {
   floor: number | null;
   elevator: boolean | null;
   balcony: boolean | null;
+  latitude: number | null;
+  longitude: number | null;
 }
 
 export interface PredictionResult {
   listing_id: string;
   predicted_price: number;
+  rounded_predicted_price: number;
+  price_range_min: number;
+  price_range_max: number;
+  price_range_step: number;
   input_data: PredictionPayload;
   confidence: string;
   timestamp: string;
   model_used?: string;
+  model_id?: string;
+  model_type?: string;
+  requires_listing_price?: boolean;
   status?: string;
 }
 
@@ -53,6 +64,8 @@ export interface ListingPrefillResponse {
   floor?: number | null;
   elevator?: boolean | null;
   balcony?: boolean | null;
+  latitude?: number | null;
+  longitude?: number | null;
   source_url?: string;
   error?: string;
 }

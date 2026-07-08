@@ -39,7 +39,7 @@ uv run pytest                  # run tests (no manual activate needed)
 cd web && npm run dev          # app on localhost:3000
 ```
 
-**Train (typical):** `uv run python train_model.py --use-features`  
+**Train (typical):** `GCS_ENABLED=false uv run python -m estate_value_index.cli train-production-models --data-source bigquery --model-dir web/models`
 **Pipeline (orchestrated):** e.g. `uv run python -m estate_value_index.pipelines.core.complete_pipeline --quick` (see [docs/data-pipeline.md](docs/data-pipeline.md) and `complete_pipeline --help`)
 **Deploy:** `./scripts/deploy_cloud_run.sh` (see [docs/api-web-deploy.md](docs/api-web-deploy.md))
 
@@ -55,7 +55,7 @@ Required `.env` vars, optional knobs, config precedence, and BigQuery dataset/ta
 
 | Path | Role |
 | ---- | ---- |
-| [train_model.py](train_model.py) | Training entry |
+| `src/estate_value_index/cli/train_production_models.py` | Production training entry |
 | [api_server.py](api_server.py) | FastAPI prediction service |
 | `src/estate_value_index/ml/` | Features, loader, training |
 | `src/estate_value_index/pipelines/core/complete_pipeline.py` | Main orchestrated pipeline |

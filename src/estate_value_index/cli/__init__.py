@@ -21,6 +21,38 @@ _EXPORTS = {
     "areas_main": ("estate_value_index.cli.generate_area_statistics", "main"),
     "value_analysis_main": ("estate_value_index.cli.generate_value_analysis", "main"),
     "area_metrics_main": ("estate_value_index.cli.area_performance_metrics", "main"),
+    "micro_areas_main": ("estate_value_index.cli.micro_areas", "main"),
+    "calibration_experiment_main": ("estate_value_index.cli.calibration_experiment", "main"),
+    "ppsqm_experiment_main": ("estate_value_index.cli.ppsqm_experiment", "main"),
+    "market_normalized_experiment_main": (
+        "estate_value_index.cli.market_normalized_experiment",
+        "main",
+    ),
+    "high_end_weighting_experiment_main": (
+        "estate_value_index.cli.high_end_weighting_experiment",
+        "main",
+    ),
+    "specialist_experiment_main": ("estate_value_index.cli.specialist_experiment", "main"),
+    "premium_specialist_experiment_main": (
+        "estate_value_index.cli.premium_specialist_experiment",
+        "main",
+    ),
+    "tiered_ensemble_experiment_main": (
+        "estate_value_index.cli.tiered_ensemble_experiment",
+        "main",
+    ),
+    "model_suite_experiment_main": (
+        "estate_value_index.cli.model_suite_experiment",
+        "main",
+    ),
+    "feature_count_experiment_main": (
+        "estate_value_index.cli.feature_count_experiment",
+        "main",
+    ),
+    "train_production_models_main": (
+        "estate_value_index.cli.train_production_models",
+        "main",
+    ),
 }
 
 __all__ = list(_EXPORTS)

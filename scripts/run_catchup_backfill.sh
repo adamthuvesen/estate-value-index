@@ -52,6 +52,14 @@ print(f"validation rate {rate:.1%}")
 PY
 }
 
+require_env() {
+  local name="$1"
+  if [[ -z "${!name:-}" ]]; then
+    echo "ERROR: $name must be set when DRY_RUN=false." >&2
+    exit 1
+  fi
+}
+
 cloud_preflight() {
   echo "Running cloud preflight..."
   gcloud config set project "$GCP_PROJECT_ID" >/dev/null
@@ -103,14 +111,14 @@ run_backfill() {
 
 RUN_ID="${RUN_ID:-$(date -u +%Y%m%dT%H%M%SZ)}"
 DRY_RUN="${DRY_RUN:-true}"
-GCP_PROJECT_ID="${GCP_PROJECT_ID:-estate-value-index}"
+GCP_PROJECT_ID="${GCP_PROJECT_ID:-}"
 BIGQUERY_PROJECT_ID="${BIGQUERY_PROJECT_ID:-$GCP_PROJECT_ID}"
 GCP_REGION="${GCP_REGION:-europe-north1}"
-GCS_BUCKET="${GCS_BUCKET:-estate-value-index-data-production}"
-BIGQUERY_DATASET_RAW="${BIGQUERY_DATASET_RAW:-booli_raw}"
-BIGQUERY_TABLE_LISTINGS="${BIGQUERY_TABLE_LISTINGS:-listings}"
-BIGQUERY_DATASET_FEATURES="${BIGQUERY_DATASET_FEATURES:-booli_features}"
-BIGQUERY_TABLE_FEATURES="${BIGQUERY_TABLE_FEATURES:-engineered_features}"
+GCS_BUCKET="${GCS_BUCKET:-}"
+BIGQUERY_DATASET_RAW="${BIGQUERY_DATASET_RAW:-}"
+BIGQUERY_TABLE_LISTINGS="${BIGQUERY_TABLE_LISTINGS:-}"
+BIGQUERY_DATASET_FEATURES="${BIGQUERY_DATASET_FEATURES:-}"
+BIGQUERY_TABLE_FEATURES="${BIGQUERY_TABLE_FEATURES:-}"
 RUN_TRAIN_DEPLOY="${RUN_TRAIN_DEPLOY:-true}"
 BACKFILL_BASE_CONFIG="${BACKFILL_BASE_CONFIG:-src/estate_value_index/ingestion/config/booli_all_locations.json}"
 BACKFILL_SOURCE="${BACKFILL_SOURCE:-spider}"
@@ -152,6 +160,13 @@ echo "  GCP project:   $GCP_PROJECT_ID"
 echo "  GCS bucket:    $GCS_BUCKET"
 
 if ! is_true "$DRY_RUN"; then
+  require_env GCP_PROJECT_ID
+  require_env BIGQUERY_PROJECT_ID
+  require_env GCS_BUCKET
+  require_env BIGQUERY_DATASET_RAW
+  require_env BIGQUERY_TABLE_LISTINGS
+  require_env BIGQUERY_DATASET_FEATURES
+  require_env BIGQUERY_TABLE_FEATURES
   require_personal_gcloud_account
   export GCS_ENABLED="${GCS_ENABLED:-true}"
   export GCP_PROJECT_ID BIGQUERY_PROJECT_ID GCP_REGION GCS_BUCKET

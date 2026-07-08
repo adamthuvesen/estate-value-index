@@ -36,8 +36,7 @@ ingestion, feature materialization, training, and deployment. The four flows und
 | `pipelines/core/data_pipeline.py` | Ingest + process + load to BigQuery |
 | `pipelines/core/training_pipeline.py` | Feature materialization + Vertex AI training |
 | `pipelines/core/deployment_pipeline.py` | Cloud Run deployment of the prediction service |
-| `uv run python -m estate_value_index.cli <cmd>` | Unified CLI dispatcher (`cli/__main__.py`): `crawl`, `batch`, `backfill`, `process`, `features`, `migrate`, `costs`, `areas`, `value-analysis`, `area-metrics` |
-| `train_model.py` | Direct training entry (wraps `ml/training_workflow`) |
+| `uv run python -m estate_value_index.cli <cmd>` | Unified CLI dispatcher (`cli/__main__.py`): `crawl`, `batch`, `backfill`, `process`, `features`, `migrate`, `costs`, `areas`, `value-analysis`, `area-metrics`, `train-production-models` |
 | `api_server.py` | FastAPI prediction service |
 
 ## System boundaries
@@ -46,7 +45,7 @@ ingestion, feature materialization, training, and deployment. The four flows und
 | ---- | ----- |
 | Ingestion | `src/estate_value_index/ingestion/`, `scrapy.cfg`, `uv run python -m estate_value_index.cli process` |
 | Pipeline orchestration | `src/estate_value_index/pipelines/core/` (flows), `pipelines/tasks/` (Prefect tasks), `prefect.yaml` |
-| Feature engineering and training | `src/estate_value_index/ml/` (incl. `ml/features/`, `ml/training_workflow/`), `train_model.py` |
+| Feature engineering and training | `src/estate_value_index/ml/` (incl. `ml/features/`, `ml/training_workflow/`, `ml/production_models.py`) |
 | Analytics generation | `src/estate_value_index/analytics/` (area statistics, value analysis) |
 | Monitoring | `src/estate_value_index/monitoring/` (drift detection) |
 | Cost/ops | `src/estate_value_index/ops/` |

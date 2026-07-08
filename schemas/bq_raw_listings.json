@@ -60,6 +60,18 @@
     "description": "Swedish municipality name where the property is located (e.g., Stockholm, Solna)"
   },
   {
+    "name": "latitude",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Listing latitude when the source provides coordinates"
+  },
+  {
+    "name": "longitude",
+    "type": "FLOAT64",
+    "mode": "NULLABLE",
+    "description": "Listing longitude when the source provides coordinates"
+  },
+  {
     "name": "living_area",
     "type": "FLOAT64",
     "mode": "NULLABLE",

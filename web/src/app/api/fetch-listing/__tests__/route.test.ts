@@ -102,7 +102,8 @@ describe('POST /api/fetch-listing', () => {
       monthly_fee: 4216,
       construction_year: 1939,
       property_type: 'Lägenhet',
-      area: 'sodermalm',
+      // Dataset area is a raw slug ("sodermalm"); the route title-cases it for display.
+      area: 'Sodermalm',
       floor: 3,
       elevator: true,
       balcony: true,

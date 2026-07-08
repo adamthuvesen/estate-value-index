@@ -112,6 +112,9 @@ def validate_price_ranges(
             passed=True,
         )
 
+    if df.empty:
+        raise ValueError("Data quality check failed: no rows available for price validation")
+
     outliers = df[(df[price_column] < min_price) | (df[price_column] > max_price)]
     outlier_count = len(outliers)
     outlier_pct = (outlier_count / len(df)) * 100
@@ -196,7 +199,7 @@ def check_required_fields(
         raise ValueError(f"Required fields missing: {missing_fields}")
 
     if null_fields:
-        logger.warning(f"Fields entirely null: {null_fields}")
+        raise ValueError(f"Required fields entirely null: {null_fields}")
 
     logger.info(f"All {len(required_fields)} required fields present")
 
@@ -204,7 +207,7 @@ def check_required_fields(
         total_fields=len(required_fields),
         missing_fields=missing_fields,
         null_fields=null_fields,
-        passed=len(missing_fields) == 0,
+        passed=True,
     )
 
 

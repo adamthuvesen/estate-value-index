@@ -1,72 +1,62 @@
 "use client";
 
-import type { RoomFilter, RoomFilteredStatistics } from "@/lib/area-types";
+import type { RoomFilter } from "@/lib/area-types";
+import { useRoomFilter } from "@/components/area/room-filter-provider";
 
-interface RoomFilterProps {
-  selectedFilter: RoomFilter;
-  onFilterChange: (filter: RoomFilter) => void;
-  roomData: Record<RoomFilter, RoomFilteredStatistics> | undefined;
-}
+const FILTERS: { key: RoomFilter; label: string }[] = [
+  { key: "all", label: "All" },
+  { key: "1", label: "1 room" },
+  { key: "2", label: "2 rooms" },
+  { key: "3", label: "3 rooms" },
+  { key: "4+", label: "4+ rooms" },
+];
 
-export function RoomFilterComponent({
-  selectedFilter,
-  onFilterChange,
-  roomData,
-}: RoomFilterProps) {
+/** Room-scope chip row. The page makes it the only sticky element on mobile. */
+export function RoomFilterComponent() {
+  const { filter, setFilter, roomData } = useRoomFilter();
+
   if (!roomData) {
     return null;
   }
 
-  const filters: { key: RoomFilter; label: string }[] = [
-    { key: "all", label: "All" },
-    { key: "2", label: "2 rooms" },
-    { key: "3", label: "3 rooms" },
-    { key: "4+", label: "4+ rooms" },
-  ];
-
   return (
-    <div className="mx-auto mb-6 max-w-3xl">
-      <div className="flex items-center gap-4 rounded-xl border border-tactical-border bg-tactical-elevated px-4 py-3">
-        <div>
-          <span className="text-[11px] font-semibold uppercase tracking-tactical-wide text-tactical-dimmed">Rooms</span>
-        </div>
-        <div className="flex flex-1 flex-wrap gap-1.5">
-          {filters.map(({ key, label }) => {
-          const stats = roomData[key];
-          const isActive = selectedFilter === key;
-          const isDisabled = !stats;
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="eyebrow text-ledger-dimmed">Rooms</span>
+      {FILTERS.map(({ key, label }) => {
+        const stats = roomData[key];
+        const isActive = filter === key;
+        const isDisabled = !stats;
 
-          return (
-            <button
-              key={key}
-              onClick={() => !isDisabled && onFilterChange(key)}
-              disabled={isDisabled}
-              className={`
-                flex items-center gap-1.5 rounded-pill border px-3 py-1.5 text-[13px] font-medium transition-colors
-                ${
-                  isActive
-                    ? "border-tactical-text bg-tactical-text text-white"
-                    : isDisabled
-                    ? "cursor-not-allowed border-tactical-border bg-tactical-surface text-tactical-dimmed opacity-40"
-                    : "border-tactical-border bg-tactical-surface text-tactical-muted hover:border-tactical-border-emphasis hover:text-tactical-text"
-                }
-              `}
-            >
-              <span>{label}</span>
-              {stats && (
-                <span
-                  className={`num text-[12px] font-normal ${
-                    isActive ? "text-white/70" : "text-tactical-dimmed"
-                  }`}
-                >
-                  ({stats.property_count})
-                </span>
-              )}
-            </button>
-          );
-        })}
-        </div>
-      </div>
+        return (
+          <button
+            key={key}
+            onClick={() => !isDisabled && setFilter(key)}
+            disabled={isDisabled}
+            aria-pressed={isActive}
+            className={`
+              focus-ring flex items-center gap-1.5 rounded-pill border px-3 py-1 text-body-sm font-medium transition-colors
+              ${
+                isActive
+                  ? "border-ledger-text bg-ledger-text text-white"
+                  : isDisabled
+                    ? "cursor-not-allowed border-ledger-border bg-ledger-surface text-ledger-dimmed opacity-40"
+                    : "border-ledger-border bg-ledger-surface text-ledger-muted hover:border-ledger-border-emphasis hover:text-ledger-text"
+              }
+            `}
+          >
+            <span>{label}</span>
+            {stats && (
+              <span
+                className={`num text-caption font-normal ${
+                  isActive ? "text-white/70" : "text-ledger-dimmed"
+                }`}
+              >
+                {stats.property_count}
+              </span>
+            )}
+          </button>
+        );
+      })}
     </div>
   );
 }

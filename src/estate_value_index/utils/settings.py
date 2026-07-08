@@ -86,12 +86,12 @@ def get_scraping_config() -> dict[str, Any]:
     return load_yaml_config().get("scraping", {})
 
 
-# env → YAML → default
-def get_mae_threshold() -> int:
-    env_threshold = os.getenv("MAX_MAE_THRESHOLD")
+# env → YAML → default. MdAPE (median absolute % error) as a fraction, e.g. 0.08.
+def get_median_ape_threshold() -> float:
+    env_threshold = os.getenv("MAX_MEDIAN_APE_THRESHOLD")
     if env_threshold:
-        return int(env_threshold)
-    return get_training_config().get("mae_threshold", 260000)
+        return float(env_threshold)
+    return get_training_config().get("median_ape_threshold", 0.08)
 
 
 def get_random_state() -> int:
@@ -118,6 +118,13 @@ def get_max_pages() -> int:
     if env_pages:
         return int(env_pages)
     return get_scraping_config().get("default_max_pages", 10)
+
+
+def get_min_scrape_validation_rate() -> float:
+    env_rate = os.getenv("SCRAPER_MIN_VALIDATION_RATE")
+    if env_rate:
+        return float(env_rate)
+    return float(get_scraping_config().get("min_validation_rate", 0.5))
 
 
 def is_debug() -> bool:
@@ -214,7 +221,7 @@ def print_config_summary():
     else:
         print("No YAML configuration found")
 
-    print(f"MAE Threshold: {get_mae_threshold():,} SEK")
+    print(f"MdAPE Threshold: {get_median_ape_threshold():.2%}")
     print(f"Random State: {get_random_state()}")
     print(f"CV Folds: {get_cv_folds()}")
     print(f"Test Size: {get_test_size()}")

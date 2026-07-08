@@ -17,6 +17,9 @@ from estate_value_index.ml.features.utils import _coerce_nullable_bool, _safe_di
 
 def _create_basic_features(df: pd.DataFrame, current_year: int) -> pd.DataFrame:
     """Create basic property features (ratios, age, polynomials)."""
+    if "price_per_sqm" in df.columns and "_observed_price_per_sqm" not in df.columns:
+        df["_observed_price_per_sqm"] = pd.to_numeric(df["price_per_sqm"], errors="coerce")
+
     # Coerce key numeric columns for robust downstream math
     numeric_cols = [
         "listing_price",

@@ -432,8 +432,7 @@ class TestHealthCheckTask:
         assert result["status_code"] == 200
 
     @pytest.mark.unit
-    def test_degraded_503_is_considered_alive(self) -> None:
-        # 503 = degraded but still alive
+    def test_503_is_not_deploy_ready(self) -> None:
         with patch("estate_value_index.pipelines.tasks.deployment.requests.get") as mock_get:
             mock_response = MagicMock()
             mock_response.status_code = 503
@@ -441,7 +440,7 @@ class TestHealthCheckTask:
 
             result = health_check_task.fn(service_url="https://example.com/health")
 
-            assert result["healthy"] is True
+            assert result["healthy"] is False
             assert result["status_code"] == 503
 
     @pytest.mark.unit

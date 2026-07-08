@@ -349,7 +349,7 @@ def prediction_input():
         "municipality": "Stockholm",
         "property_type": "Lägenhet",
         "area": "Södermalm",
-        "model": "lgbm",
+        "model": "auto",
     }
 
 

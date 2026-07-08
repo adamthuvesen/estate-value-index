@@ -15,6 +15,7 @@ import time
 import warnings
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Literal
 from uuid import uuid4
 
 import joblib
@@ -23,9 +24,17 @@ import uvicorn
 from cachetools import TTLCache
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from estate_value_index.ml.preprocessing import normalize_area_for_model
+from estate_value_index.model_artifacts import (
+    DEFAULT_MODEL_PREFIX,
+    LISTING_MODEL_ID,
+    NO_LIST_MODEL_ID,
+    production_model_files,
+    required_production_artifact_files,
+)
 from estate_value_index.utils.settings import (
     get_rate_limit_max_ips,
     get_rate_limit_requests,
@@ -52,8 +61,12 @@ except ImportError:
     GCS_AVAILABLE = False
     logger.warning("GCS utilities not available, running in local mode")
 
-DEFAULT_PREFIX = "price_prediction_model"
 MODELS_DIR = Path("web/models")
+AUTO_MODEL = "auto"
+NO_LIST_MODEL = NO_LIST_MODEL_ID
+LISTING_MODEL = LISTING_MODEL_ID
+PRODUCTION_MODEL_FILES = production_model_files(DEFAULT_MODEL_PREFIX)
+REQUIRED_MODEL_IDS = frozenset(PRODUCTION_MODEL_FILES)
 
 MODEL_CACHE: dict[str, dict] = {}
 
@@ -111,8 +124,9 @@ async def lifespan(app: FastAPI):
     logger.info("Loading models from %s", MODELS_DIR.absolute())
     MODEL_CACHE = load_all_models(MODELS_DIR)
 
-    if not MODEL_CACHE:
-        logger.error("No models loaded; the server will return errors.")
+    missing_models = _missing_required_models(MODEL_CACHE)
+    if missing_models:
+        logger.error("Missing required model(s): %s; the server is not ready.", missing_models)
     else:
         logger.info("Successfully loaded %d models: %s", len(MODEL_CACHE), list(MODEL_CACHE.keys()))
         logger.info("Server ready to accept requests")
@@ -155,12 +169,14 @@ async def rate_limit_middleware(request: Request, call_next):
     req_list = [ts for ts in req_list if current_time - ts < RATE_LIMIT_WINDOW]
 
     if len(req_list) >= RATE_LIMIT_REQUESTS:
-        raise HTTPException(
+        return JSONResponse(
             status_code=429,
-            detail=(
-                f"Rate limit exceeded. Max {RATE_LIMIT_REQUESTS} requests per "
-                f"{RATE_LIMIT_WINDOW} seconds."
-            ),
+            content={
+                "detail": (
+                    f"Rate limit exceeded. Max {RATE_LIMIT_REQUESTS} requests per "
+                    f"{RATE_LIMIT_WINDOW} seconds."
+                )
+            },
         )
 
     req_list.append(current_time)
@@ -178,19 +194,48 @@ async def rate_limit_middleware(request: Request, call_next):
 class PredictionRequest(BaseModel):
     """Prediction request payload."""
 
-    listing_price: float = Field(..., description="Property listing price in SEK")
-    living_area: float = Field(..., description="Living area in square meters")
-    rooms: float = Field(default=2, description="Number of rooms")
-    monthly_fee: float = Field(default=3000, description="Monthly fee in SEK")
-    days_on_market: float = Field(default=30, description="Days property has been on market")
-    construction_year: int = Field(default=1970, description="Year property was constructed")
-    municipality: str = Field(default="Stockholm", description="Municipality name")
-    property_type: str = Field(default="Lägenhet", description="Property type")
-    area: str = Field(default="Södermalm", description="Area/neighborhood name")
-    model: str = Field(default="lgbm", description="Model type to use")
-    floor: float | None = Field(default=None, description="Floor number")
+    listing_price: float | None = Field(
+        default=None,
+        gt=0,
+        allow_inf_nan=False,
+        description="Property listing price in SEK",
+    )
+    living_area: float = Field(
+        ..., gt=0, allow_inf_nan=False, description="Living area in square meters"
+    )
+    rooms: float = Field(default=2, gt=0, allow_inf_nan=False, description="Number of rooms")
+    monthly_fee: float = Field(
+        default=3000, ge=0, allow_inf_nan=False, description="Monthly fee in SEK"
+    )
+    days_on_market: float = Field(
+        default=30, ge=0, allow_inf_nan=False, description="Days property has been on market"
+    )
+    construction_year: int = Field(
+        default=1970, ge=1800, le=2100, description="Year property was constructed"
+    )
+    municipality: str = Field(
+        default="Stockholm", min_length=1, max_length=120, description="Municipality name"
+    )
+    property_type: str = Field(
+        default="Lägenhet", min_length=1, max_length=80, description="Property type"
+    )
+    area: str = Field(
+        default="Södermalm", min_length=1, max_length=160, description="Area/neighborhood name"
+    )
+    model: Literal["auto", "no_list_price", "with_list_price"] = Field(
+        default=AUTO_MODEL, description="Model id to use"
+    )
+    floor: float | None = Field(
+        default=None, ge=-20, le=200, allow_inf_nan=False, description="Floor number"
+    )
     elevator: bool | None = Field(default=None, description="Has elevator")
     balcony: bool | None = Field(default=None, description="Has balcony")
+    latitude: float | None = Field(
+        default=None, ge=-90, le=90, allow_inf_nan=False, description="Property latitude"
+    )
+    longitude: float | None = Field(
+        default=None, ge=-180, le=180, allow_inf_nan=False, description="Property longitude"
+    )
 
 
 class PredictionResponse(BaseModel):
@@ -199,6 +244,8 @@ class PredictionResponse(BaseModel):
     predicted_price: float
     model_used: str
     model_type: str
+    model_id: str
+    requires_listing_price: bool
     status: str = "success"
 
 
@@ -211,23 +258,17 @@ class HealthResponse(BaseModel):
 
 
 def _available_models(models_dir: Path) -> dict[str, Path]:
-    """Find available model files.
-
-    Prefers the canonical ``{DEFAULT_PREFIX}_{suffix}.joblib`` produced by the
-    training pipeline; falls back to the alphabetically-first timestamped
-    artefact for that suffix.
-    """
+    """Find the two production model artifacts."""
     mapping: dict[str, Path] = {}
-    for suffix in ("lgbm", "xgb", "linear"):
-        production_path = models_dir / f"{DEFAULT_PREFIX}_{suffix}.joblib"
-        if production_path.exists():
-            mapping[suffix] = production_path
-            continue
-
-        for path in sorted(models_dir.glob(f"*_{suffix}.joblib")):
-            mapping[suffix] = path
-            break
+    for model_id, filename in PRODUCTION_MODEL_FILES.items():
+        path = models_dir / filename
+        if path.exists():
+            mapping[model_id] = path
     return mapping
+
+
+def _missing_required_models(cache: dict[str, dict]) -> list[str]:
+    return sorted(REQUIRED_MODEL_IDS.difference(cache))
 
 
 def _download_models_from_gcs(models_dir: Path) -> None:
@@ -240,9 +281,8 @@ def _download_models_from_gcs(models_dir: Path) -> None:
         models_dir.mkdir(parents=True, exist_ok=True)
 
         required_models = [
-            "models/price_prediction_model_lgbm.joblib",
-            "models/price_prediction_model_feature_context.json",
-            "models/price_prediction_model_metrics_lgbm.json",
+            f"models/{filename}"
+            for filename in required_production_artifact_files(DEFAULT_MODEL_PREFIX)
         ]
 
         logger.info("Downloading %d required model files from GCS", len(required_models))
@@ -340,6 +380,8 @@ def load_all_models(models_dir: Path) -> dict[str, dict]:
             "model": model,
             "path": model_path,
             "sha256": digest,
+            "requires_listing_price": bool(getattr(model, "requires_listing_price", False)),
+            "model_type": getattr(model, "model_type", model_type),
         }
         logger.info(
             "Loaded %s model: %s (sha256=%s..., %.1fs)",
@@ -356,8 +398,11 @@ def load_all_models(models_dir: Path) -> dict[str, dict]:
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
     """Liveness probe; reports loaded models."""
-    if not MODEL_CACHE:
-        raise HTTPException(status_code=503, detail="No models loaded")
+    missing = _missing_required_models(MODEL_CACHE)
+    if missing:
+        raise HTTPException(
+            status_code=503, detail=f"Missing required models: {', '.join(missing)}"
+        )
 
     return HealthResponse(
         status="healthy", models_loaded=list(MODEL_CACHE.keys()), models_count=len(MODEL_CACHE)
@@ -371,18 +416,8 @@ async def predict(request: PredictionRequest):
         raise HTTPException(status_code=503, detail="No models loaded. Server is not ready.")
 
     try:
-        model_type = request.model.lower()
-        if model_type not in MODEL_CACHE:
-            if "lgbm" in MODEL_CACHE:
-                model_type = "lgbm"
-            else:
-                raise HTTPException(
-                    status_code=503,
-                    detail=(
-                        f"Requested model '{request.model}' not available and default "
-                        "model 'lgbm' not found"
-                    ),
-                )
+        requested_model = request.model.lower()
+        model_type = _resolve_prediction_model(requested_model, request.listing_price)
 
         cached = MODEL_CACHE[model_type]
         model = cached["model"]
@@ -406,7 +441,9 @@ async def predict(request: PredictionRequest):
         return PredictionResponse(
             predicted_price=float(prediction_arr[0]),
             model_used=model_path.name,
-            model_type=model_type,
+            model_type=str(cached.get("model_type", model_type)),
+            model_id=model_type,
+            requires_listing_price=bool(cached.get("requires_listing_price", False)),
             status="success",
         )
 
@@ -416,60 +453,26 @@ async def predict(request: PredictionRequest):
         _raise_internal_error("Prediction failed", e)
 
 
-@app.get("/diagnostics/area-sensitivity")
-async def area_sensitivity_check():
-    """Compare predictions for identical apartments in two areas to gauge area sensitivity."""
-    try:
-        if "lgbm" not in MODEL_CACHE:
-            raise HTTPException(status_code=503, detail="Model not loaded")
+def _resolve_prediction_model(requested_model: str, listing_price: float | None) -> str:
+    has_listing_price = listing_price is not None and listing_price > 0
+    if requested_model == AUTO_MODEL:
+        model_type = LISTING_MODEL if has_listing_price else NO_LIST_MODEL
+    elif requested_model in {NO_LIST_MODEL, LISTING_MODEL}:
+        model_type = requested_model
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown model '{requested_model}'. Use auto, no_list_price, or with_list_price.",
+        )
 
-        entry = MODEL_CACHE["lgbm"]
-        pipeline = entry.get("model")
-        if pipeline is None:
-            raise HTTPException(status_code=503, detail="Model pipeline not available")
-
-        base_case = {
-            "living_area": 60,
-            "rooms": 2,
-            "monthly_fee": 3000,
-            "construction_year": 1960,
-            "has_elevator": "yes",
-            "has_balcony": "yes",
-            "floor": 3,
-            "days_on_market": 20,
-        }
-        test_cases = [
-            {**base_case, "area": "Östermalm", "listing_price": 7000000},
-            {**base_case, "area": "Sundbyberg", "listing_price": 5200000},
-        ]
-
-        predictions: dict[str, float] = {}
-        for case in test_cases:
-            area_display = case["area"]
-            row = {
-                **{k: v for k, v in case.items() if k != "area"},
-                "area": normalize_area_for_model(area_display),
-            }
-            pred_arr = await asyncio.to_thread(pipeline.predict, pd.DataFrame([row]))
-            predictions[area_display] = float(pred_arr[0])
-
-        expected_diff = 1_800_000
-        actual_diff = predictions["Östermalm"] - predictions["Sundbyberg"]
-        sensitivity_pct = (actual_diff / expected_diff) * 100
-
-        return {
-            "test": "area_sensitivity",
-            "predictions": predictions,
-            "expected_difference_sek": expected_diff,
-            "actual_difference_sek": int(actual_diff),
-            "sensitivity_percent": round(sensitivity_pct, 1),
-            "status": "pass" if sensitivity_pct >= 80.0 else "fail",
-            "threshold_percent": 80.0,
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        _raise_internal_error("Diagnostics failed", e)
+    if model_type == LISTING_MODEL and not has_listing_price:
+        raise HTTPException(
+            status_code=400,
+            detail="The with_list_price model requires listing_price.",
+        )
+    if model_type not in MODEL_CACHE:
+        raise HTTPException(status_code=503, detail=f"Model '{model_type}' is not loaded")
+    return model_type
 
 
 @app.get("/")
@@ -481,7 +484,6 @@ async def root():
         "endpoints": {
             "health": "GET /health - Health check",
             "predict": "POST /predict - Make price prediction",
-            "diagnostics": "GET /diagnostics/area-sensitivity - Model area sensitivity check",
         },
         "models_loaded": list(MODEL_CACHE.keys()) if MODEL_CACHE else [],
         "documentation": "/docs",

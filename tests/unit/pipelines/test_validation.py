@@ -133,6 +133,13 @@ class TestValidatePriceRanges:
 
         assert result["passed"] is True
 
+    @pytest.mark.unit
+    def test_empty_frame_raises(self) -> None:
+        df = pd.DataFrame({"listing_id": [], "sold_price": []})
+
+        with pytest.raises(ValueError, match="no rows"):
+            validate_price_ranges.fn(df)
+
 
 class TestCheckMinimumListingCount:
     @pytest.mark.unit
@@ -182,12 +189,9 @@ class TestCheckRequiredFields:
             check_required_fields.fn(sample_df_missing_fields)
 
     @pytest.mark.unit
-    def test_null_field_warns(self, sample_df_null_fields: pd.DataFrame) -> None:
-        # Entirely-null columns are recorded but don't fail
-        result = check_required_fields.fn(sample_df_null_fields)
-
-        assert result["passed"] is True
-        assert "rooms" in result["null_fields"]
+    def test_null_field_raises(self, sample_df_null_fields: pd.DataFrame) -> None:
+        with pytest.raises(ValueError, match="entirely null"):
+            check_required_fields.fn(sample_df_null_fields)
 
     @pytest.mark.unit
     def test_custom_required_fields(self, sample_valid_df: pd.DataFrame) -> None:

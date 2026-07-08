@@ -4,12 +4,18 @@ import { useEffect, useState, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PropertyCard } from "@/components/value-finder/property-card";
 import { FiltersPanel } from "@/components/value-finder/filters-panel";
-import { SortControls } from "@/components/value-finder/sort-controls";
+import { SortControls, sortFieldLabel } from "@/components/value-finder/sort-controls";
 import { Pagination } from "@/components/value-finder/pagination";
+import { PageHero } from "@/components/ui/page-hero";
+import { StatBar, Stat } from "@/components/ui/stat-bar";
+import { FigureFrame } from "@/components/ui/figure-frame";
+import { SkeletonCard } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { formatNumber } from "@/lib/format";
 import type {
   ValueFinderFilters,
   ValueFinderResponse,
-  ValueFinderMetadataResponse,
+  ValueFinderFacetsResponse,
   SortField,
   SortOrder,
   ValueTier,
@@ -20,7 +26,7 @@ function ValueFinderContent() {
   const searchParams = useSearchParams();
 
   const [properties, setProperties] = useState<ValueFinderResponse | null>(null);
-  const [metadata, setMetadata] = useState<ValueFinderMetadataResponse | null>(null);
+  const [metadata, setMetadata] = useState<ValueFinderFacetsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -153,28 +159,24 @@ function ValueFinderContent() {
   };
 
   const currentFilters = getFiltersFromUrl();
+  const sortLabel = sortFieldLabel(currentFilters.sort || "value_score");
+  const frameMeta = properties
+    ? `${formatNumber(properties.total)} ${properties.total === 1 ? "home" : "homes"} · sorted by ${sortLabel.toLowerCase()}`
+    : `Sorted by ${sortLabel.toLowerCase()}`;
 
   return (
-    <div className="min-h-screen bg-tactical-bg">
+    <div className="min-h-screen bg-ledger-bg">
       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
-        {/* Hero */}
-        <header className="mx-auto max-w-2xl text-center animate-fade-in-up">
-          <p className="font-mono text-[12px] font-semibold uppercase tracking-tactical-wide text-tactical-accent">
-            Value Finder
-          </p>
-          <h1 className="mt-3 text-4xl font-semibold leading-[1.06] tracking-tight text-tactical-text sm:text-[46px]">
-            Find undervalued
-            <br className="hidden sm:block" /> Stockholm homes
-          </h1>
-          <p className="mx-auto mt-4 max-w-xl text-[15px] leading-relaxed text-tactical-muted">
-            Every recent sale, scored against the model&rsquo;s estimate. Filter by value tier to surface
-            the widest gaps between price paid and predicted worth.
-          </p>
-
+        <PageHero
+          chapter="02"
+          eyebrow="Value Finder"
+          title="Find undervalued Stockholm homes"
+          lead="Every recent sale, scored against the model's estimate. Filter by value tier to surface the widest gaps between price paid and predicted worth."
+        >
           {metadata && (
-            <dl className="mx-auto mt-8 flex max-w-md items-stretch justify-center divide-x divide-tactical-border rounded-2xl border border-tactical-border bg-tactical-surface shadow-elev-1">
+            <StatBar>
               <Stat
-                value={metadata.statistics.total_properties.toLocaleString("en-US")}
+                value={formatNumber(metadata.statistics.total_properties)}
                 label="Properties"
               />
               <Stat value={metadata.statistics.value_score.mean.toFixed(1)} label="Avg score" />
@@ -182,12 +184,12 @@ function ValueFinderContent() {
                 value={String(metadata.statistics.area_statistics.total_areas)}
                 label="Areas"
               />
-            </dl>
+            </StatBar>
           )}
-        </header>
+        </PageHero>
 
         {error && (
-          <div className="mx-auto mt-8 max-w-2xl rounded-xl border border-val-high-line bg-val-high-tint p-4">
+          <div className="mt-8 rounded-xl border border-val-high-line bg-val-high-tint p-4">
             <p className="text-[13px] font-medium text-val-high">{error}</p>
           </div>
         )}
@@ -195,80 +197,82 @@ function ValueFinderContent() {
         <div className="mt-10 flex flex-col gap-6 lg:mt-12 lg:flex-row lg:gap-8">
           <aside className="lg:w-[300px] lg:shrink-0">
             {metadata && (
-              <div>
-                <FiltersPanel
-                  filters={currentFilters}
-                  availableAreas={metadata.available_areas}
-                  propertyTypes={metadata.property_types}
-                  priceRange={metadata.price_range}
-                  livingAreaRange={metadata.living_area_range}
-                  roomsRange={metadata.rooms_range}
-                  valueScoreRange={metadata.value_score_range}
-                  onFiltersChange={handleFiltersChange}
-                  onClearFilters={handleClearFilters}
-                  isLoading={isLoading}
-                />
-              </div>
+              <FiltersPanel
+                filters={currentFilters}
+                availableAreas={metadata.available_areas}
+                propertyTypes={metadata.property_types}
+                priceRange={metadata.price_range}
+                livingAreaRange={metadata.living_area_range}
+                roomsRange={metadata.rooms_range}
+                valueScoreRange={metadata.value_score_range}
+                onFiltersChange={handleFiltersChange}
+                onClearFilters={handleClearFilters}
+                isLoading={isLoading}
+              />
             )}
           </aside>
 
           <main className="min-w-0 flex-1">
-            {properties && (
-              <SortControls
-                sortField={currentFilters.sort || "value_score"}
-                sortOrder={currentFilters.order || "desc"}
-                totalResults={properties.total}
-                pageSize={currentFilters.limit || 50}
-                onSortChange={handleSortChange}
-                onPageSizeChange={handlePageSizeChange}
-                isLoading={isLoading}
-              />
-            )}
-
-            {isLoading && (
-              <div className="flex items-center justify-center py-24">
-                <div className="flex flex-col items-center gap-3">
-                  <div className="h-8 w-8 animate-spin rounded-full border-2 border-tactical-border border-t-tactical-text" />
-                  <p className="text-[13px] text-tactical-muted">Loading properties…</p>
-                </div>
-              </div>
-            )}
-
-            {!isLoading && properties && properties.properties.length > 0 && (
-              <>
-                <div className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-2">
-                  {properties.properties.map((property) => (
-                    <PropertyCard key={property.listing_id} property={property} />
-                  ))}
-                </div>
-
-                <Pagination
-                  currentPage={properties.page}
-                  totalPages={properties.total_pages}
-                  totalResults={properties.total}
-                  pageSize={properties.page_size}
-                  onPageChange={handlePageChange}
+            <FigureFrame
+              kind="table"
+              index={1}
+              title="Scored sales register"
+              meta={frameMeta}
+              actions={
+                <SortControls
+                  sortField={currentFilters.sort || "value_score"}
+                  sortOrder={currentFilters.order || "desc"}
+                  pageSize={currentFilters.limit || 50}
+                  onSortChange={handleSortChange}
+                  onPageSizeChange={handlePageSizeChange}
                   isLoading={isLoading}
                 />
-              </>
-            )}
-
-            {!isLoading && properties && properties.properties.length === 0 && (
-              <div className="mt-6 rounded-2xl border border-tactical-border bg-tactical-surface px-6 py-16 text-center shadow-elev-1">
-                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-tactical-elevated">
-                  <svg className="h-6 w-6 text-tactical-dimmed" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
+              }
+            >
+              {isLoading && (
+                <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <SkeletonCard key={i} />
+                  ))}
                 </div>
-                <h3 className="mt-4 text-lg font-semibold text-tactical-text">No matches</h3>
-                <p className="mx-auto mt-1.5 max-w-sm text-[14px] text-tactical-muted">
-                  Nothing fits these filters. Try widening the range or clearing a tier.
-                </p>
-                <button onClick={handleClearFilters} className="tactical-btn-primary mx-auto mt-5">
-                  Clear all filters
-                </button>
-              </div>
-            )}
+              )}
+
+              {!isLoading && properties && properties.properties.length > 0 && (
+                <>
+                  <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+                    {properties.properties.map((property) => (
+                      <PropertyCard key={property.listing_id} property={property} />
+                    ))}
+                  </div>
+
+                  <Pagination
+                    currentPage={properties.page}
+                    totalPages={properties.total_pages}
+                    totalResults={properties.total}
+                    pageSize={properties.page_size}
+                    onPageChange={handlePageChange}
+                    isLoading={isLoading}
+                  />
+                </>
+              )}
+
+              {!isLoading && properties && properties.properties.length === 0 && (
+                <div className="px-6 py-16 text-center">
+                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-ledger-elevated">
+                    <svg className="h-6 w-6 text-ledger-dimmed" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
+                  <h3 className="mt-4 font-display text-lg font-semibold text-ledger-text">No matches</h3>
+                  <p className="mx-auto mt-1.5 max-w-sm text-[14px] text-ledger-muted">
+                    Nothing fits these filters. Try widening the range or clearing a tier.
+                  </p>
+                  <Button onClick={handleClearFilters} className="mx-auto mt-5">
+                    Clear all filters
+                  </Button>
+                </div>
+              )}
+            </FigureFrame>
           </main>
         </div>
       </div>
@@ -276,25 +280,33 @@ function ValueFinderContent() {
   );
 }
 
-function Stat({ value, label }: { value: string; label: string }) {
+function ValueFinderFallback() {
   return (
-    <div className="flex flex-1 flex-col items-center px-5 py-4">
-      <dd className="num text-2xl font-semibold text-tactical-text">{value}</dd>
-      <dt className="mt-1 text-[12px] text-tactical-muted">{label}</dt>
+    <div className="min-h-screen bg-ledger-bg">
+      <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
+        <PageHero
+          chapter="02"
+          eyebrow="Value Finder"
+          title="Find undervalued Stockholm homes"
+          lead="Every recent sale, scored against the model's estimate. Filter by value tier to surface the widest gaps between price paid and predicted worth."
+        />
+        <div className="mt-10 lg:mt-12">
+          <FigureFrame kind="table" index={1} title="Scored sales register" meta="Loading register…">
+            <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <SkeletonCard key={i} />
+              ))}
+            </div>
+          </FigureFrame>
+        </div>
+      </div>
     </div>
   );
 }
 
 export default function ValueFinderPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-tactical-bg flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-tactical-border border-t-tactical-text" />
-          <p className="text-[13px] text-tactical-muted">Loading…</p>
-        </div>
-      </div>
-    }>
+    <Suspense fallback={<ValueFinderFallback />}>
       <ValueFinderContent />
     </Suspense>
   );

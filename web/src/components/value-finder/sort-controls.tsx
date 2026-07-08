@@ -1,9 +1,9 @@
+import { buttonClasses } from "@/components/ui/button";
 import type { SortField, SortOrder } from "@/lib/value-finder-types";
 
 interface SortControlsProps {
   sortField: SortField;
   sortOrder: SortOrder;
-  totalResults: number;
   pageSize: number;
   onSortChange: (field: SortField, order: SortOrder) => void;
   onPageSizeChange: (size: number) => void;
@@ -19,10 +19,15 @@ const sortOptions: { value: SortField; label: string }[] = [
   { value: "living_area", label: "Living area" },
 ];
 
+/** Human label for a sort field — shared with the figure caption meta. */
+export function sortFieldLabel(field: SortField): string {
+  return sortOptions.find((o) => o.value === field)?.label ?? field;
+}
+
 const pageSizeOptions = [20, 50, 100];
 
 const selectClass =
-  "tactical-focus-ring appearance-none rounded-sm border border-tactical-border bg-tactical-surface bg-[length:16px] bg-[right_0.6rem_center] bg-no-repeat py-1.5 pl-3 pr-8 text-[13px] font-medium text-tactical-text transition-colors hover:border-tactical-border-emphasis focus:border-tactical-accent focus:outline-none disabled:opacity-40";
+  "focus-ring appearance-none rounded-sm border border-ledger-border bg-ledger-surface bg-size-[16px] bg-position-[right_0.6rem_center] bg-no-repeat py-1.5 pl-3 pr-8 text-[13px] font-medium text-ledger-text transition-colors hover:border-ledger-border-emphasis focus:border-ledger-accent focus:outline-hidden disabled:opacity-40";
 
 // inline chevron so selects match the light system without a global appearance reset
 const chevron =
@@ -31,26 +36,15 @@ const chevron =
 export function SortControls({
   sortField,
   sortOrder,
-  totalResults,
   pageSize,
   onSortChange,
   onPageSizeChange,
   isLoading = false,
 }: SortControlsProps) {
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-tactical-border bg-tactical-surface px-4 py-3 shadow-elev-1 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex items-center gap-2.5">
-        <span className="num text-[15px] font-semibold text-tactical-text">
-          {totalResults.toLocaleString("en-US")}
-        </span>
-        <span className="text-[13px] text-tactical-muted">
-          {totalResults === 1 ? "home" : "homes"}
-        </span>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
         <div className="flex items-center gap-1.5">
-          <label htmlFor="sort-field" className="text-[13px] text-tactical-muted">
+          <label htmlFor="sort-field" className="text-[13px] text-ledger-muted">
             Sort
           </label>
           <select
@@ -72,12 +66,12 @@ export function SortControls({
         <button
           onClick={() => onSortChange(sortField, sortOrder === "asc" ? "desc" : "asc")}
           disabled={isLoading}
-          className="tactical-btn tactical-focus-ring px-2.5 py-1.5"
+          className={buttonClasses("secondary", "sm", "px-2.5 py-1.5")}
           title={sortOrder === "asc" ? "Ascending" : "Descending"}
           aria-label={`Sort ${sortOrder === "asc" ? "ascending" : "descending"}`}
         >
           <svg
-            className={`h-4 w-4 text-tactical-muted transition-transform duration-tactical ${sortOrder === "asc" ? "rotate-180" : ""}`}
+            className={`h-4 w-4 text-ledger-muted transition-transform duration-ledger ${sortOrder === "asc" ? "rotate-180" : ""}`}
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -86,10 +80,10 @@ export function SortControls({
           </svg>
         </button>
 
-        <span className="mx-1 hidden h-5 w-px bg-tactical-border sm:block" aria-hidden />
+        <span className="mx-1 hidden h-5 w-px bg-ledger-border sm:block" aria-hidden />
 
         <div className="flex items-center gap-1.5">
-          <label htmlFor="page-size" className="text-[13px] text-tactical-muted">
+          <label htmlFor="page-size" className="text-[13px] text-ledger-muted">
             Show
           </label>
           <select
@@ -107,7 +101,6 @@ export function SortControls({
             ))}
           </select>
         </div>
-      </div>
     </div>
   );
 }

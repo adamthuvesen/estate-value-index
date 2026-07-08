@@ -87,25 +87,27 @@ def filter_valid_listings(
     *,
     min_price: int = MIN_VALID_PRICE,
     drop_na_features: bool = False,
+    require_listing_price: bool = True,
 ) -> pd.DataFrame:
     """Drop listings that cannot be used for supervised learning."""
 
-    required_columns = {"listing_price", "sold_price"}
+    required_columns = {"sold_price"}
+    if require_listing_price:
+        required_columns.add("listing_price")
     missing = required_columns.difference(frame.columns)
     if missing:
         raise KeyError(f"Missing required columns: {sorted(missing)}")
 
     filtered = frame.copy()
+    if "listing_price" not in filtered.columns:
+        filtered["listing_price"] = pd.NA
 
     # Preprocess area field to extract area names
     filtered = preprocess_area_field(filtered)
 
-    mask = (
-        filtered["listing_price"].notna()
-        & filtered["sold_price"].notna()
-        & (filtered["listing_price"] >= min_price)
-        & (filtered["sold_price"] >= min_price)
-    )
+    mask = filtered["sold_price"].notna() & (filtered["sold_price"] >= min_price)
+    if require_listing_price:
+        mask &= filtered["listing_price"].notna() & (filtered["listing_price"] >= min_price)
 
     filtered = filtered.loc[mask]
 

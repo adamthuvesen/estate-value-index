@@ -2,21 +2,21 @@
 
 from __future__ import annotations
 
+import json
 import logging
+import warnings
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pandas as pd
-from evidently import ColumnMapping
-from evidently.metric_preset import DataDriftPreset, RegressionPreset
-from evidently.report import Report
 
-from estate_value_index.monitoring.constants import (
-    CRITICAL_CATEGORICAL_FEATURES,
-    CRITICAL_NUMERIC_FEATURES,
-    PERFORMANCE_DEGRADATION_THRESHOLD,
-)
+from estate_value_index.monitoring.constants import PERFORMANCE_DEGRADATION_THRESHOLD
+
+if TYPE_CHECKING:
+    from evidently import ColumnMapping
+    from evidently.report import Report
 
 logger = logging.getLogger(__name__)
 
@@ -29,8 +29,8 @@ class DriftResult:
     drifted_features: list[str]
     drift_score: float
     performance_degraded: bool
-    current_mae: float | None
-    reference_mae: float | None
+    current_median_ape: float | None
+    reference_median_ape: float | None
     degradation_pct: float | None
     report_html: str
     timestamp: str
@@ -42,8 +42,6 @@ class _ExtractedMetrics:
     dataset_drift: bool
     drifted_features: list[str]
     drift_scores: list[float]
-    current_mae: float | None
-    reference_mae: float | None
 
 
 class ModelMonitor:
@@ -61,12 +59,41 @@ class ModelMonitor:
         self,
         reference_data_path: str | Path,
         model_version: str,
+        feature_metadata_path: str | Path | None = None,
     ) -> None:
         self.reference_data = pd.read_parquet(reference_data_path)
         self.model_version = model_version
+        self._metadata_features = self._load_metadata_features(feature_metadata_path)
 
         if "sold_price" not in self.reference_data.columns:
             logger.warning("Reference data missing 'sold_price' - performance monitoring disabled")
+
+    def _load_metadata_features(
+        self,
+        feature_metadata_path: str | Path | None,
+    ) -> tuple[list[str] | None, list[str] | None]:
+        if feature_metadata_path is None:
+            return None, None
+
+        path = Path(feature_metadata_path)
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        numeric = payload.get("numeric_features")
+        categorical = payload.get("categorical_features")
+        if numeric is not None or categorical is not None:
+            return list(numeric or []), list(categorical or [])
+
+        features = payload.get("features_used")
+        if features:
+            feature_list = list(features)
+            numeric = [
+                feature
+                for feature in feature_list
+                if feature in self.reference_data.columns
+                and pd.api.types.is_numeric_dtype(self.reference_data[feature])
+            ]
+            categorical = [feature for feature in feature_list if feature not in numeric]
+            return numeric, categorical
+        return None, None
 
     def detect_drift(
         self,
@@ -100,12 +127,24 @@ class ModelMonitor:
             target_column=target_column,
             prediction_column=prediction_column,
         )
-        drift_report = self._run_drift_report(current_data, column_mapping, has_predictions)
-
-        extracted = self._extract_all_metrics(drift_report.as_dict())
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message="divide by zero encountered in divide",
+                category=RuntimeWarning,
+            )
+            drift_report = self._run_drift_report(current_data, column_mapping, has_predictions)
+            extracted = self._extract_all_metrics(drift_report.as_dict())
         drift_score = self._drift_score(extracted.drift_scores)
+        # Gate performance on MdAPE (median absolute % error), the AVM-standard
+        # metric. Evidently reports MAE, not MdAPE, so compute it from the data.
+        current_median_ape = self._median_ape(current_data, target_column, prediction_column)
+        reference_median_ape = self._median_ape(
+            self.reference_data, target_column, prediction_column
+        )
         performance_degraded, degradation_pct = self._performance_degradation(
-            extracted,
+            current_median_ape,
+            reference_median_ape,
             has_predictions=has_predictions,
         )
 
@@ -120,13 +159,30 @@ class ModelMonitor:
             drifted_features=extracted.drifted_features,
             drift_score=drift_score,
             performance_degraded=performance_degraded,
-            current_mae=extracted.current_mae,
-            reference_mae=extracted.reference_mae,
+            current_median_ape=current_median_ape,
+            reference_median_ape=reference_median_ape,
             degradation_pct=degradation_pct,
             report_html=drift_report.get_html(),
             timestamp=datetime.now().isoformat(),
             num_drifted_features=len(extracted.drifted_features),
         )
+
+    def _median_ape(
+        self,
+        data: pd.DataFrame,
+        target_column: str,
+        prediction_column: str,
+    ) -> float | None:
+        """Median absolute % error, or None when target/prediction are unavailable."""
+        if target_column not in data.columns or prediction_column not in data.columns:
+            return None
+        actual = pd.to_numeric(data[target_column], errors="coerce")
+        predicted = pd.to_numeric(data[prediction_column], errors="coerce")
+        abs_pct = (predicted - actual).abs() / actual.replace(0, pd.NA)
+        abs_pct = abs_pct.replace([float("inf"), float("-inf")], pd.NA).dropna()
+        if abs_pct.empty:
+            return None
+        return float(abs_pct.median())
 
     def _has_predictions(
         self,
@@ -141,10 +197,20 @@ class ModelMonitor:
     def _critical_columns(self, current_data: pd.DataFrame) -> tuple[list[str], list[str]]:
         ref_cols = self.reference_data.columns
         cur_cols = current_data.columns
-        categorical_cols = [
-            f for f in CRITICAL_CATEGORICAL_FEATURES if f in ref_cols and f in cur_cols
-        ]
-        numeric_cols = [f for f in CRITICAL_NUMERIC_FEATURES if f in ref_cols and f in cur_cols]
+        metadata_numeric, metadata_categorical = self._metadata_features
+        if metadata_numeric is None and metadata_categorical is None:
+            excluded = {"sold_price", "predicted_price"}
+            common = [col for col in ref_cols if col in cur_cols and col not in excluded]
+            numeric_candidates = [
+                col for col in common if pd.api.types.is_numeric_dtype(self.reference_data[col])
+            ]
+            categorical_candidates = [col for col in common if col not in numeric_candidates]
+        else:
+            numeric_candidates = metadata_numeric or []
+            categorical_candidates = metadata_categorical or []
+
+        categorical_cols = [f for f in categorical_candidates if f in ref_cols and f in cur_cols]
+        numeric_cols = [f for f in numeric_candidates if f in ref_cols and f in cur_cols]
         return categorical_cols, numeric_cols
 
     def _column_mapping(
@@ -155,6 +221,12 @@ class ModelMonitor:
         target_column: str,
         prediction_column: str,
     ) -> ColumnMapping:
+        # Imported lazily: the prediction serving path imports this module
+        # transitively (production_models -> runner -> monitoring), but the
+        # runtime image installs only .[ml], not the .[monitoring] extra that
+        # provides evidently. Drift detection is a separate monitoring job.
+        from evidently import ColumnMapping
+
         categorical_cols, numeric_cols = self._critical_columns(current_data)
         column_mapping = ColumnMapping()
         column_mapping.numerical_features = numeric_cols
@@ -172,6 +244,10 @@ class ModelMonitor:
         column_mapping: ColumnMapping,
         has_predictions: bool,
     ) -> Report:
+        # Lazy import: see _column_mapping. Keeps evidently out of the serving path.
+        from evidently.metric_preset import DataDriftPreset, RegressionPreset
+        from evidently.report import Report
+
         metrics: list = [DataDriftPreset()]
         if has_predictions:
             metrics.append(RegressionPreset())
@@ -188,25 +264,27 @@ class ModelMonitor:
 
     def _performance_degradation(
         self,
-        extracted: _ExtractedMetrics,
+        current_median_ape: float | None,
+        reference_median_ape: float | None,
         *,
         has_predictions: bool,
     ) -> tuple[bool, float | None]:
-        if not has_predictions or extracted.current_mae is None or extracted.reference_mae is None:
+        if (
+            not has_predictions
+            or current_median_ape is None
+            or reference_median_ape is None
+            or reference_median_ape == 0
+        ):
             return False, None
 
-        degradation_pct = (
-            (extracted.current_mae - extracted.reference_mae) / extracted.reference_mae * 100
-        )
+        degradation_pct = (current_median_ape - reference_median_ape) / reference_median_ape * 100
         return degradation_pct > (PERFORMANCE_DEGRADATION_THRESHOLD * 100), degradation_pct
 
     def _extract_all_metrics(self, report_dict: dict) -> _ExtractedMetrics:
-        """Extract drift + regression metrics from an Evidently report dict."""
+        """Extract data-drift metrics from an Evidently report dict."""
         dataset_drift = False
         drifted_features: list[str] = []
         drift_scores: list[float] = []
-        current_mae: float | None = None
-        reference_mae: float | None = None
 
         for metric in report_dict.get("metrics", []):
             metric_type = metric.get("metric")
@@ -224,14 +302,19 @@ class ModelMonitor:
                     score = 1.0
                 drift_scores.append(score)
 
-            elif metric_type == "RegressionQualityMetric":
-                current_mae = result.get("current", {}).get("mean_absolute_error")
-                reference_mae = result.get("reference", {}).get("mean_absolute_error")
+            elif metric_type == "DataDriftTable":
+                dataset_drift = result.get("dataset_drift", dataset_drift)
+                for column_name, column_result in result.get("drift_by_columns", {}).items():
+                    drifted = column_result.get("drift_detected", False)
+                    if drifted:
+                        drifted_features.append(column_name)
+                    score = column_result.get("drift_score", 0.0)
+                    if score == 0.0 and drifted:
+                        score = 1.0
+                    drift_scores.append(score)
 
         return _ExtractedMetrics(
             dataset_drift=dataset_drift,
             drifted_features=drifted_features,
             drift_scores=drift_scores,
-            current_mae=current_mae,
-            reference_mae=reference_mae,
         )

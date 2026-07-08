@@ -212,11 +212,11 @@ jobs:
           # Check results
           success = result.get('success', False)
           validation_passed = result.get('stages', {}).get('training', {}).get('validation_passed', False)
-          validation_mae = result.get('stages', {}).get('training', {}).get('validation_mae_passed', True)
+          validation_median_ape = result.get('stages', {}).get('training', {}).get('validation_median_ape_passed', True)
 
           print(f'Pipeline completed: {success}')
           print(f'Validation passed: {validation_passed}')
-          print(f'  - MAE check: {validation_mae}')
+          print(f'  - MdAPE check: {validation_median_ape}')
 
           # Write validation status for notifications
           with open('validation_status.txt', 'w') as f:
@@ -227,18 +227,21 @@ jobs:
 
           # Extract metrics
           metrics = result.get('stages', {}).get('training', {}).get('metrics', {})
-          mae = metrics.get('mae', 0)
+          median_ape = metrics.get('median_ape')
+          if median_ape is None:
+              print('❌ median_ape missing from pipeline metrics — cannot evaluate quality gate')
+              sys.exit(1)
 
-          # Quality gate: MAE threshold
-          if mae > 350000:
-              print(f'❌ MAE quality gate failed: {mae:,.0f} SEK exceeds threshold of 350,000 SEK')
+          # Quality gate: MdAPE threshold (kept in sync with DEFAULT_MEDIAN_APE_THRESHOLD)
+          if median_ape > 0.08:
+              print(f'❌ MdAPE quality gate failed: {median_ape:.2%} exceeds threshold of 8.00%')
               sys.exit(1)
           else:
-              print(f'✅ MAE quality gate passed: {mae:,.0f} SEK')
+              print(f'✅ MdAPE quality gate passed: {median_ape:.2%}')
 
           # Fail if validation failed
           if not validation_passed:
-              print('❌ Pipeline validation failed (MAE threshold not met)')
+              print('❌ Pipeline validation failed (MdAPE threshold not met)')
               sys.exit(1)
 
           print('✅ Pipeline validation passed')
@@ -278,7 +281,7 @@ jobs:
 
           # Check if it was a validation failure vs other failure
           if [ -f validation_status.txt ] && grep -q "VALIDATION_FAILED" validation_status.txt; then
-            echo "Reason: Validation Failed (MAE threshold)"
+            echo "Reason: Validation Failed (MdAPE threshold)"
           else
             echo "Reason: Pipeline Error"
           fi

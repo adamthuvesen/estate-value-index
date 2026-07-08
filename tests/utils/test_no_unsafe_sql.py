@@ -28,12 +28,13 @@ from pathlib import Path
 # qualname -> reason. Each entry is dynamic SQL that interpolates something other
 # than a safe_table_ref()/quote_identifier() call, and has been reviewed.
 REVIEWED_DYNAMIC_SQL: dict[str, str] = {
-    "estate_value_index.pipelines.tasks.sync:sync_bigquery_to_local_task": (
+    "estate_value_index.pipelines.tasks.sync:_bigquery_sync_summary": (
         "`table_ref` is BigQueryConfig.full_table_id, which is validated via "
         "safe_table_ref() in the property."
     ),
-    "estate_value_index.pipelines.tasks.sync:verify_sync_task": (
-        "`table_ref` is the validated BigQueryConfig.full_table_id."
+    "estate_value_index.pipelines.tasks.sync:sync_bigquery_to_local_task": (
+        "`table_ref` is BigQueryConfig.full_table_id, which is validated via "
+        "safe_table_ref() in the property."
     ),
     "estate_value_index.pipelines.tasks.ingestion:upload_to_bigquery_task": (
         "TRUNCATE interpolates the validated BigQueryConfig.full_table_id."

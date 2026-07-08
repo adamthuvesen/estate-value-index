@@ -63,16 +63,19 @@ class _FakeGCSClient:
         blob.upload_from_filename(str(local_path))
         return f"gs://{self.bucket_name}/{gcs_path}"
 
+    def exists(self, gcs_path: str) -> bool:
+        return (self._base / gcs_path).exists()
+
 
 @pytest.fixture
 def fake_model_dir(tmp_path: Path) -> Path:
     """Lay out the four artefacts that ``upload_model_artifacts`` looks for."""
-    prefix = "price_prediction_model"
+    prefix = "price_prediction_model_no_list_price"
     model_dir = tmp_path / "models"
     model_dir.mkdir()
-    joblib.dump({"kind": "lgbm"}, model_dir / f"{prefix}_lgbm.joblib")
+    joblib.dump({"kind": "no_list"}, model_dir / f"{prefix}.joblib")
     (model_dir / f"{prefix}_feature_context.json").write_text("{}", encoding="utf-8")
-    (model_dir / f"{prefix}_metrics_lgbm.json").write_text("{}", encoding="utf-8")
+    (model_dir / f"{prefix}_metrics.json").write_text("{}", encoding="utf-8")
     (model_dir / f"{prefix}_feature_importance.json").write_text("{}", encoding="utf-8")
     return model_dir
 
@@ -89,11 +92,13 @@ def test_upload_writes_sidecar_alongside_joblib(
     monkeypatch.setattr(gcs_module, "is_gcs_enabled", lambda: True)
     monkeypatch.setattr(gcs_module, "GCSClient", lambda *a, **kw: fake_client)
 
-    artefacts = gcs_module.upload_model_artifacts(fake_model_dir, "price_prediction_model")
+    artefacts = gcs_module.upload_model_artifacts(
+        fake_model_dir, "price_prediction_model_no_list_price"
+    )
 
     # Both artefact and sidecar end up in the fake bucket layout.
-    uploaded_joblib = bucket_dir / "models" / "price_prediction_model_lgbm.joblib"
-    uploaded_sidecar = bucket_dir / "models" / "price_prediction_model_lgbm.joblib.sha256"
+    uploaded_joblib = bucket_dir / "models" / "price_prediction_model_no_list_price.joblib"
+    uploaded_sidecar = bucket_dir / "models" / "price_prediction_model_no_list_price.joblib.sha256"
 
     assert uploaded_joblib.exists(), "model file must be uploaded"
     assert uploaded_sidecar.exists(), "sidecar file must be uploaded"
@@ -105,8 +110,8 @@ def test_upload_writes_sidecar_alongside_joblib(
     assert digest == expected
 
     # The returned artefacts mapping references both URIs.
-    assert artefacts["model"].endswith("price_prediction_model_lgbm.joblib")
-    assert artefacts["model_sha256"].endswith("price_prediction_model_lgbm.joblib.sha256")
+    assert artefacts["model"].endswith("price_prediction_model_no_list_price.joblib")
+    assert artefacts["model_sha256"].endswith("price_prediction_model_no_list_price.joblib.sha256")
 
 
 def test_sidecar_upload_failure_rolls_back_artefact(
@@ -130,19 +135,43 @@ def test_sidecar_upload_failure_rolls_back_artefact(
     monkeypatch.setattr(gcs_module, "is_gcs_enabled", lambda: True)
     monkeypatch.setattr(gcs_module, "GCSClient", lambda *a, **kw: fake_client)
 
-    # The helper currently swallows GCS exceptions and returns {} on failure.
-    result = gcs_module.upload_model_artifacts(fake_model_dir, "price_prediction_model")
+    with pytest.raises(RuntimeError, match="GCS model artifact upload failed"):
+        gcs_module.upload_model_artifacts(fake_model_dir, "price_prediction_model_no_list_price")
 
-    uploaded_joblib = bucket_dir / "models" / "price_prediction_model_lgbm.joblib"
-    uploaded_sidecar = bucket_dir / "models" / "price_prediction_model_lgbm.joblib.sha256"
+    uploaded_joblib = bucket_dir / "models" / "price_prediction_model_no_list_price.joblib"
+    uploaded_sidecar = bucket_dir / "models" / "price_prediction_model_no_list_price.joblib.sha256"
 
     assert not uploaded_joblib.exists(), (
         "partial joblib upload must be rolled back when the sidecar fails"
     )
     assert not uploaded_sidecar.exists()
-    # Caller-visible: failure produces an empty mapping; no half-uploaded model leaks.
-    assert "model" not in result
-    assert "model_sha256" not in result
+
+
+def test_upload_missing_model_raises(tmp_path: Path, monkeypatch) -> None:
+    model_dir = tmp_path / "models"
+    model_dir.mkdir()
+
+    monkeypatch.setattr(gcs_module, "is_gcs_enabled", lambda: True)
+    monkeypatch.setattr(
+        gcs_module, "GCSClient", lambda *a, **kw: _FakeGCSClient(tmp_path / "bucket")
+    )
+
+    with pytest.raises(RuntimeError, match="GCS model artifact upload failed"):
+        gcs_module.upload_model_artifacts(model_dir, "price_prediction_model_no_list_price")
+
+
+def test_resolve_data_path_does_not_fallback_to_local_when_gcs_enabled(
+    tmp_path: Path, monkeypatch
+) -> None:
+    local_file = tmp_path / "stale.json"
+    local_file.write_text("{}", encoding="utf-8")
+    fake_client = _FakeGCSClient(tmp_path / "bucket")
+
+    monkeypatch.setattr(gcs_module, "is_gcs_enabled", lambda: True)
+    monkeypatch.setattr(gcs_module, "GCSClient", lambda *a, **kw: fake_client)
+
+    with pytest.raises(FileNotFoundError, match="File not found in GCS"):
+        gcs_module.resolve_data_path(local_file, "missing/stale.json")
 
 
 def test_compute_sha256_matches_hashlib(tmp_path: Path) -> None:

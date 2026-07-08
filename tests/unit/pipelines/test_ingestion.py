@@ -6,9 +6,11 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
 
+import pandas as pd
 import pytest
 
 from estate_value_index.pipelines.tasks.ingestion import (
+    geocode_new_addresses_task,
     process_listings_task,
     upload_to_bigquery_task,
 )
@@ -147,3 +149,44 @@ class TestUploadToBigqueryTask:
         loaded_data = mock_client.load_table_from_json.call_args[0][0]
         assert len(loaded_data) == 2
         assert result["success"] is True
+
+    @pytest.mark.unit
+    def test_rejects_missing_listing_id_before_upload(self, tmp_path: Path, mocker: Any) -> None:
+        processed_file = tmp_path / "listings.json"
+        processed_file.write_text('{"listing_id": null, "price": 1000000}\n')
+
+        mocker.patch(
+            "estate_value_index.pipelines.tasks.ingestion.get_bq_config",
+            return_value=MagicMock(
+                client=MagicMock(),
+                full_table_id="project.dataset.table",
+                project_id="project",
+                dataset_id="dataset",
+                table_id="table",
+            ),
+        )
+
+        with pytest.raises(ValueError, match="listing_id"):
+            upload_to_bigquery_task.fn(processed_file=processed_file)
+
+
+class TestGeocodeNewAddressesTask:
+    @pytest.mark.unit
+    def test_insert_errors_raise(self, mocker: Any) -> None:
+        mock_client = MagicMock()
+        mock_client.query.return_value.to_dataframe.return_value = pd.DataFrame(
+            [{"address": "Street 1", "area": "Solna", "geocode_key": "Street 1, solna"}]
+        )
+        mock_client.insert_rows_json.return_value = [{"index": 0, "errors": ["bad row"]}]
+
+        mocker.patch(
+            "estate_value_index.pipelines.tasks.ingestion.get_bq_client", return_value=mock_client
+        )
+        mocker.patch(
+            "estate_value_index.utils.settings.load_env_config",
+            return_value=MagicMock(bigquery_project_id="test-project"),
+        )
+        mocker.patch("estate_value_index.ml.geocoding.geocode_address", return_value=(59.3, 18.0))
+
+        with pytest.raises(RuntimeError, match="geocode insert errors"):
+            geocode_new_addresses_task.fn(rate_limit_delay=0)

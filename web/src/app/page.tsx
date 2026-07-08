@@ -1,68 +1,46 @@
-"use client";
-
-import { useEffect, useState } from "react";
 import PredictionApp from "@/components/prediction-app";
+import { PageHero } from "@/components/ui/page-hero";
+import { getAreaOverviewList } from "@/lib/area-overview";
 import { MODEL_LABELS, SAMPLE_LISTINGS } from "@/lib/sample-data";
 
-export default function HomePage() {
-  const [areas, setAreas] = useState<string[]>([]);
-  const [isLoadingAreas, setIsLoadingAreas] = useState(true);
+// Area names come from the per-request area-statistics cache, so render at request time
+// rather than baking a snapshot into the static build.
+export const dynamic = "force-dynamic";
 
-  useEffect(() => {
-    const fetchAreas = async () => {
-      try {
-        const response = await fetch("/api/area");
-        if (response.ok) {
-          const data = await response.json();
-          const areaNames = data.areas
-            .map((area: { display_name: string }) => area.display_name)
-            .sort((a: string, b: string) => a.localeCompare(b, "sv"));
-          setAreas(areaNames);
-        }
-      } catch (error) {
-        console.error("Failed to fetch areas:", error);
-        setAreas(["Södermalm", "Östermalm", "Kungsholmen", "Vasastan", "Norrmalm", "Gamla Stan"]);
-      } finally {
-        setIsLoadingAreas(false);
-      }
-    };
+async function loadAreaNames(): Promise<string[]> {
+  // The predictor only needs FastAPI + models to work, so a missing/unavailable
+  // area-statistics file must not 500 the homepage — degrade to an empty list and
+  // let the form's free-text area field carry on.
+  try {
+    const areas = await getAreaOverviewList();
+    return areas
+      .map((area) => area.display_name)
+      .sort((a, b) => a.localeCompare(b, "sv"));
+  } catch (error) {
+    console.error("[HOME] Area list unavailable, rendering predictor without it:", error);
+    return [];
+  }
+}
 
-    fetchAreas();
-  }, []);
+export default async function HomePage() {
+  const areaNames = await loadAreaNames();
 
   return (
-    <main className="min-h-screen bg-tactical-bg">
+    <main className="min-h-screen bg-ledger-bg">
       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
-        <header className="mx-auto max-w-2xl text-center animate-fade-in-up">
-          <p className="font-mono text-[12px] font-semibold uppercase tracking-tactical-wide text-tactical-accent">
-            Predictor
-          </p>
-          <h1 className="mt-3 text-4xl font-semibold leading-[1.06] tracking-tight text-tactical-text sm:text-[46px]">
-            What&rsquo;s this home worth?
-          </h1>
-          <p className="mx-auto mt-4 max-w-xl text-[15px] leading-relaxed text-tactical-muted">
-            Import a Booli listing or enter the details, and the model estimates its market value
-            from thousands of Stockholm sales.
-          </p>
-        </header>
+        <PageHero
+          chapter="01"
+          eyebrow="Predictor"
+          title="What's this home worth?"
+          lead="Import a Booli listing or enter the details, and the model estimates its market value from thousands of Stockholm sales."
+        />
 
         <div className="mt-10 lg:mt-12">
-          {!isLoadingAreas && (
-            <PredictionApp
-              sampleListings={SAMPLE_LISTINGS}
-              defaultAreas={areas}
-              modelLabels={MODEL_LABELS}
-            />
-          )}
-
-          {isLoadingAreas && (
-            <div className="flex items-center justify-center py-24">
-              <div className="flex flex-col items-center gap-3">
-                <div className="h-8 w-8 animate-spin rounded-full border-2 border-tactical-border border-t-tactical-text" />
-                <p className="text-[13px] text-tactical-muted">Loading areas…</p>
-              </div>
-            </div>
-          )}
+          <PredictionApp
+            sampleListings={SAMPLE_LISTINGS}
+            defaultAreas={areaNames}
+            modelLabels={MODEL_LABELS}
+          />
         </div>
       </div>
     </main>

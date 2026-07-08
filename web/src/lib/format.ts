@@ -25,7 +25,7 @@ export function formatRawNumber(value: number): string {
   return new Intl.NumberFormat("sv-SE").format(value);
 }
 
-export function formatCurrency(value: number | null | undefined): string {
+export function formatSek(value: number | null | undefined): string {
   if (value === null || value === undefined) return "N/A";
   return new Intl.NumberFormat("sv-SE", {
     style: "currency",
@@ -33,11 +33,6 @@ export function formatCurrency(value: number | null | undefined): string {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(value);
-}
-
-export function formatSek(value: number | null | undefined): string {
-  if (value === null || value === undefined) return "N/A";
-  return `${formatNumber(value)} kr`;
 }
 
 export function formatSekPerSqm(value: number | null | undefined): string {
@@ -58,6 +53,21 @@ export function formatShortThousands(value: number): string {
 export function formatShortSek(value: number | null | undefined): string {
   if (value === null || value === undefined) return "N/A";
   return `${formatShortThousands(value)} kr`;
+}
+
+/**
+ * Turn a lowercase area/municipality slug (e.g. `"bromma_alsten"`, sourced
+ * from the dataset's ASCII-normalized area key) into a presentable label
+ * (`"Bromma Alsten"`). Slugs never carry diacritics, so this can't recover
+ * exact Swedish spelling — it's a display approximation, not a name lookup.
+ */
+export function titleCaseArea(value: string): string {
+  return value
+    .toLowerCase()
+    .split(/[\s_-]+/)
+    .filter(Boolean)
+    .map((part) => part[0].toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 export function formatDateSv(date: Date | string): string {

@@ -9,7 +9,7 @@ from google.cloud import bigquery
 
 from estate_value_index.pipelines.constants import (
     DEFAULT_MACHINE_TYPE,
-    DEFAULT_MAE_THRESHOLD,
+    DEFAULT_MEDIAN_APE_THRESHOLD,
     DEFAULT_MODEL_DIR,
     DEFAULT_MODEL_PREFIX,
 )
@@ -78,7 +78,6 @@ class TrainingFlowConfig:
     tune: bool = False
     machine_type: str = DEFAULT_MACHINE_TYPE
     importance_threshold: float | None = None
-    production_mode: bool = True
 
     # Pipeline toggles
     rebuild_container: bool = False
@@ -87,7 +86,7 @@ class TrainingFlowConfig:
     stream_logs: bool = True
 
     # Validation thresholds
-    max_mae: float = DEFAULT_MAE_THRESHOLD
+    max_median_ape: float = DEFAULT_MEDIAN_APE_THRESHOLD
     max_rmse: float | None = None
 
     # Fallback options

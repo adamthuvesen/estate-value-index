@@ -20,8 +20,8 @@ These choices shaped the system and the failure modes it checks for.
 
 - **Chronological splits, never random.** Production evaluation splits on `sold_date`; a naive
   random row split leaks future prices into training and flatters the metric. Area and
-  time aggregates are built so they can't peek at rows from the future either. `MAX_MAE_THRESHOLD`
-  is re-baselined against honest temporal MAE, not a shuffled holdout. See
+  time aggregates are built so they can't peek at rows from the future either. `MAX_MEDIAN_APE_THRESHOLD`
+  is re-baselined against honest temporal MdAPE, not a shuffled holdout. See
   `tests/ml/test_temporal_leakage.py`.
 - **Inference feature context matches training.** Train/serve skew is a common failure mode, so area
   normalization (`normalize_area_for_model()` for Booli's `Property - Area - City` strings) and
@@ -138,22 +138,28 @@ or production performance.
 
 ## Run locally
 
-Terminal 1:
+One command starts both servers and regenerates the web app's derived data
+(value analysis + area statistics) from the model in `web/models/` and the
+local dataset:
 
 ```bash
-uv run uvicorn api_server:app --host 0.0.0.0 --port 8000
-```
-
-Terminal 2:
-
-```bash
-cd web && npm run dev
+./scripts/dev_web.sh                 # regenerates derived data if missing
+./scripts/dev_web.sh --refresh-data  # force-regenerate (after new data/model)
+./scripts/dev_web.sh --skip-data     # servers only, reuse existing data
 ```
 
 - Web app: http://localhost:3000
 - API docs: http://localhost:8000/docs
 
-Set `PREDICTION_API_URL` if the FastAPI service is not on `http://localhost:8000`.
+Needs a trained model in `web/models/`. Produce one (writes there by default):
+
+```bash
+uv run python -m estate_value_index.cli train-production-models --data-source bigquery
+```
+
+Env overrides: `WEB_DATA_FILE`, `API_PORT`, `WEB_PORT`. To run the servers by
+hand instead, start `uvicorn api_server:app --port 8000` and `cd web && npm run
+dev`, and set `PREDICTION_API_URL` if the API is not on `http://localhost:8000`.
 
 ## Data Access
 
@@ -166,12 +172,12 @@ fixtures are synthetic and are the only data meant for public redistribution.
 ## Common tasks
 
 ```bash
-# Test (Python coverage gate is 70%)
+# Test (Python coverage gate is 59%)
 uv run pytest
 cd web && npm test && cd ..
 
-# Train on materialized features; add --tune for Optuna search
-uv run python train_model.py --use-features
+# Train production models locally
+uv run python -m estate_value_index.cli train-production-models --data-source bigquery
 
 # Run the pipeline (see --help for all flags)
 uv run python -m estate_value_index.pipelines.core.complete_pipeline --quick      # fast local run

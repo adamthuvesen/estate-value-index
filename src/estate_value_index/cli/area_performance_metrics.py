@@ -18,6 +18,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from sklearn.metrics import mean_absolute_error, mean_absolute_percentage_error, r2_score
 
 from estate_value_index.ml.data_loader import load_features_from_bigquery
+from estate_value_index.model_artifacts import NO_LIST_MODEL_ID, production_artifact_names
 
 # Threshold (in SEK) above which the predicted median is treated as already
 # being in linear price space. ~100K cleanly separates raw log targets
@@ -371,7 +372,7 @@ def analyze_area_performance():
     """Analyze model performance stratified by area."""
     _print_section("AREA-STRATIFIED PERFORMANCE ANALYSIS", char="=")
 
-    model_path = Path("web/models/price_prediction_model_lgbm.joblib")
+    model_path = Path("web/models") / production_artifact_names(NO_LIST_MODEL_ID).model
     print(f"\nLoading model from {model_path}...")
     model_pipeline = joblib.load(model_path)
 

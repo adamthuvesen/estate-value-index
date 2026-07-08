@@ -14,10 +14,12 @@ export const SAMPLE_LISTINGS: SampleListing[] = [
       construction_year: "1949",
       property_type: "Lägenhet",
       area: "Södermalm",
-      model: "lgbm",
+      model: "auto",
       floor: "2",
       elevator: "",
       balcony: "",
+      latitude: "",
+      longitude: "",
     }
   },
   {
@@ -32,10 +34,12 @@ export const SAMPLE_LISTINGS: SampleListing[] = [
       construction_year: "1924",
       property_type: "Lägenhet",
       area: "Östermalm",
-      model: "lgbm",
+      model: "auto",
       floor: "1",
       elevator: "true",
       balcony: "",
+      latitude: "",
+      longitude: "",
     }
   },
   {
@@ -50,10 +54,12 @@ export const SAMPLE_LISTINGS: SampleListing[] = [
       construction_year: "1931",
       property_type: "Lägenhet",
       area: "Kungsholmen",
-      model: "lgbm",
+      model: "auto",
       floor: "",
       elevator: "",
       balcony: "",
+      latitude: "",
+      longitude: "",
     }
   },
   {
@@ -68,10 +74,12 @@ export const SAMPLE_LISTINGS: SampleListing[] = [
       construction_year: "1973",
       property_type: "Lägenhet",
       area: "Vasastan",
-      model: "lgbm",
+      model: "auto",
       floor: "5",
       elevator: "true",
       balcony: "true",
+      latitude: "",
+      longitude: "",
     }
   },
   {
@@ -86,10 +94,12 @@ export const SAMPLE_LISTINGS: SampleListing[] = [
       construction_year: "1915",
       property_type: "Lägenhet",
       area: "Norrmalm",
-      model: "lgbm",
+      model: "auto",
       floor: "1",
       elevator: "true",
       balcony: "",
+      latitude: "",
+      longitude: "",
     }
   },
   {
@@ -104,10 +114,12 @@ export const SAMPLE_LISTINGS: SampleListing[] = [
       construction_year: "1962",
       property_type: "Lägenhet",
       area: "Gärdet",
-      model: "lgbm",
+      model: "auto",
       floor: "3",
       elevator: "true",
       balcony: "true",
+      latitude: "",
+      longitude: "",
     }
   }
 ];
@@ -127,7 +139,7 @@ export const DEFAULT_AREAS = [
 ];
 
 export const MODEL_LABELS: Record<string, string> = {
-  lgbm: "LightGBM",
-  xgb: "XGBoost",
-  linear: "Linear Regression",
+  auto: "Auto",
+  no_list_price: "No listing price",
+  with_list_price: "Listing-aware",
 };

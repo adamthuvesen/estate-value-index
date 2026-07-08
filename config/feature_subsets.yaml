@@ -1,76 +1,696 @@
 # Feature subset configurations for model training.
 #
 # `--feature-set <key>` selects a subset; omitting it uses `default` below.
-# Sets were chosen by recursive feature elimination on the LightGBM pipeline
-# (temporal holdout, 5235 train / 1331 test), then decorrelated. Held-out MAE
-# is flat from ~6 features up to the full registry — most registry features are
-# redundant derivatives — so the compact sets match the full model:
-#   - full   (~66 feat): ~271k MAE / 4.5% MAPE
-#   - lean_15 (15 feat): ~272k MAE / 4.6% MAPE
-#   - lean_10 (10 feat): ~275k MAE / 4.6% MAPE   <- default
-#   - lean_8   (8 feat): ~274k MAE / 4.6% MAPE
-#   - lean_6   (6 feat): ~274k MAE / 4.6% MAPE
-#   - listing_price only: ~305k MAE / 5.1% MAPE
-# Accuracy only degrades below ~5 features. Numbers are single-split; confirm
-# a final choice with repeated/rolling temporal folds before production.
+# Production defaults are the aligned two-model family:
+# - no_list_price serving: `no_list_price_v1`
+# - with_list_price serving: `with_list_price_v1`
 
-default: lean_10
+default: no_list_price_v1
 
-# Recommended: smallest set with full accuracy plus an interpretability margin.
-lean_10:
+# Published-listing experiment that hides current asking price and any same-row
+# feature derived from it. Use this to measure how much the model can recover
+# from property facts, prior comps, H3 location, transit, and description cues.
+no_list_price_25:
   numeric:
-    - listing_price            # asking price (anchor)
-    - relative_area_price      # asking price vs area median
+    - living_area
+    - rooms
+    - monthly_fee
     - monthly_fee_per_sqm
-    - floor_per_sqm
-    - area_price_change_mean   # area momentum (past-only)
+    - floor
+    - floor_height_premium
+    - amenity_score
+    - property_age
+    - living_area_squared
+    - rooms_per_sqm
     - area_sold_price_median_3m
+    - area_sold_price_median_12m
     - area_sales_volume_3m
-    - area_age_interaction     # living_area x property_age
-    - cost_benefit_ratio
-    - efficiency_premium
-  categorical: []
+    - area_target_encoded
+    - micro_area_ppsqm_median
+    - micro_area_ppsqm_count
+    - micro_area_ppsqm_premium_vs_area
+    - distance_to_city_center
+    - distance_to_nearest_metro
+    - metro_stations_within_1km
+    - transit_accessibility_score
+    - is_renovated
+    - needs_renovation
+    - luxury_keyword_count
+    - condition_score
+  categorical:
+    - area
+    - h3_res10
+    - h3_res9
+    - micro_area_resolution_used
+    - age_bucket
+    - space_efficiency
+    - architectural_era
+    - renovation_likelihood
+    - has_elevator
+    - has_balcony
+    - floor_tier
 
-lean_8:
+no_list_price_h3_core:
   numeric:
-    - listing_price
-    - monthly_fee_per_sqm
+    - living_area
+    - rooms
+    - floor
     - floor_per_sqm
-    - area_price_change_mean
+    - floor_height_premium
+    - amenity_score
+    - living_area_squared
+    - rooms_per_sqm
+    - area_sold_price_median_1m
+    - area_sold_price_median_3m
+    - area_sold_price_median_6m
+    - area_sold_price_median_12m
+    - area_sales_volume_1m
     - area_sales_volume_3m
-    - area_age_interaction
-    - cost_benefit_ratio
-    - efficiency_premium
-  categorical: []
+    - area_sales_volume_6m
+    - area_sales_volume_12m
+    - area_target_encoded
+    - micro_area_ppsqm_median
+    - micro_area_ppsqm_count
+    - micro_area_ppsqm_premium_vs_area
+    - distance_to_city_center
+    - distance_to_nearest_metro
+    - distance_to_nearest_train
+    - metro_stations_within_500m
+    - metro_stations_within_1km
+    - transit_accessibility_score
+    - price_acceleration_3m
+    - temporal_price_trend
+  categorical:
+    - area
+    - h3_res10
+    - h3_res9
+    - micro_area_resolution_used
+    - space_efficiency
+    - has_elevator
+    - has_balcony
+    - floor_tier
 
-lean_6:
+no_list_price_h3_comps:
+  numeric:
+    - living_area
+    - rooms
+    - floor
+    - floor_per_sqm
+    - floor_height_premium
+    - amenity_score
+    - living_area_squared
+    - rooms_per_sqm
+    - area_sold_price_median_1m
+    - area_sold_price_median_3m
+    - area_sold_price_median_6m
+    - area_sold_price_median_12m
+    - area_sales_volume_1m
+    - area_sales_volume_3m
+    - area_sales_volume_6m
+    - area_sales_volume_12m
+    - area_target_encoded
+    - micro_area_ppsqm_median
+    - micro_area_ppsqm_count
+    - micro_area_ppsqm_premium_vs_area
+    - h3_neighbor_ppsqm
+    - h3_neighbor_ppsqm_count
+    - h3_neighbor_premium_vs_micro
+    - same_size_ppsqm_median
+    - same_size_ppsqm_count
+    - same_size_premium_vs_area
+    - distance_to_city_center
+    - distance_to_nearest_metro
+    - distance_to_nearest_train
+    - metro_stations_within_500m
+    - metro_stations_within_1km
+    - transit_accessibility_score
+    - price_acceleration_3m
+    - temporal_price_trend
+  categorical:
+    - area
+    - h3_res10
+    - h3_res9
+    - micro_area_resolution_used
+    - same_size_scope_used
+    - space_efficiency
+    - has_elevator
+    - has_balcony
+    - floor_tier
+
+no_list_price_h3_market:
+  numeric:
+    - living_area
+    - rooms
+    - floor
+    - floor_per_sqm
+    - floor_height_premium
+    - amenity_score
+    - living_area_squared
+    - rooms_per_sqm
+    - area_sold_price_median_1m
+    - area_sold_price_median_3m
+    - area_sold_price_median_6m
+    - area_sold_price_median_12m
+    - area_sales_volume_1m
+    - area_sales_volume_3m
+    - area_sales_volume_6m
+    - area_sales_volume_12m
+    - area_target_encoded
+    - micro_area_ppsqm_median
+    - micro_area_ppsqm_count
+    - micro_area_ppsqm_premium_vs_area
+    - h3_neighbor_ppsqm
+    - h3_neighbor_ppsqm_count
+    - h3_neighbor_premium_vs_micro
+    - same_size_ppsqm_median
+    - same_size_ppsqm_count
+    - same_size_premium_vs_area
+    - distance_to_city_center
+    - distance_to_nearest_metro
+    - distance_to_nearest_train
+    - metro_stations_within_500m
+    - metro_stations_within_1km
+    - transit_accessibility_score
+    - market_interest_rate
+    - market_interest_rate_change_3m
+    - market_economic_tendency
+    - market_consumer_confidence
+    - market_construction_confidence
+    - market_gdp_growth
+    - market_ppsqm_index
+    - market_ppsqm_index_change_3m
+    - market_sales_volume
+    - market_months_since_2020
+    - market_data_age_months
+    - price_acceleration_3m
+    - temporal_price_trend
+  categorical:
+    - area
+    - h3_res10
+    - h3_res9
+    - micro_area_resolution_used
+    - same_size_scope_used
+    - space_efficiency
+    - has_elevator
+    - has_balcony
+    - floor_tier
+
+no_list_price_h3_market_street:
+  numeric:
+    - living_area
+    - rooms
+    - floor
+    - floor_per_sqm
+    - floor_height_premium
+    - amenity_score
+    - living_area_squared
+    - rooms_per_sqm
+    - area_sold_price_median_1m
+    - area_sold_price_median_3m
+    - area_sold_price_median_6m
+    - area_sold_price_median_12m
+    - area_sales_volume_1m
+    - area_sales_volume_3m
+    - area_sales_volume_6m
+    - area_sales_volume_12m
+    - area_target_encoded
+    - micro_area_ppsqm_median
+    - micro_area_ppsqm_count
+    - micro_area_ppsqm_premium_vs_area
+    - h3_neighbor_ppsqm
+    - h3_neighbor_ppsqm_count
+    - h3_neighbor_premium_vs_micro
+    - same_size_ppsqm_median
+    - same_size_ppsqm_count
+    - same_size_premium_vs_area
+    - street_area_ppsqm_median
+    - street_area_ppsqm_p75
+    - street_area_ppsqm_p90
+    - street_area_ppsqm_count
+    - street_area_premium_vs_micro
+    - street_area_upper_tail_ratio
+    - street_size_ppsqm_median
+    - street_size_ppsqm_p75
+    - street_size_ppsqm_p90
+    - street_size_ppsqm_count
+    - street_size_premium_vs_street
+    - street_size_upper_tail_ratio
+    - address_ppsqm_median
+    - address_ppsqm_p75
+    - address_ppsqm_p90
+    - address_ppsqm_count
+    - address_premium_vs_street
+    - address_upper_tail_ratio
+    - distance_to_city_center
+    - distance_to_nearest_metro
+    - distance_to_nearest_train
+    - metro_stations_within_500m
+    - metro_stations_within_1km
+    - transit_accessibility_score
+    - market_interest_rate
+    - market_interest_rate_change_3m
+    - market_economic_tendency
+    - market_consumer_confidence
+    - market_construction_confidence
+    - market_gdp_growth
+    - market_ppsqm_index
+    - market_ppsqm_index_change_3m
+    - market_sales_volume
+    - market_months_since_2020
+    - market_data_age_months
+    - price_acceleration_3m
+    - temporal_price_trend
+  categorical:
+    - area
+    - h3_res10
+    - h3_res9
+    - micro_area_resolution_used
+    - same_size_scope_used
+    - street_name
+    - street_area_scope_used
+    - street_size_scope_used
+    - address_comp_scope_used
+    - space_efficiency
+    - has_elevator
+    - has_balcony
+    - floor_tier
+
+# Production no_list_price serving default. 21 numeric + 4 categorical features
+# (25 total), selected via Recursive Feature Elimination from the broader
+# no_list_price_h3_market_street set below. Formerly named
+# no_list_price_h3_market_street_rfe25.
+no_list_price_v1:
+  numeric:
+    - living_area
+    - rooms_per_sqm
+    - floor_per_sqm
+    - street_size_upper_tail_ratio
+    - micro_area_ppsqm_count
+    - same_size_premium_vs_area
+    - same_size_ppsqm_count
+    - address_upper_tail_ratio
+    - temporal_price_trend
+    - h3_neighbor_ppsqm_count
+    - street_area_upper_tail_ratio
+    - price_acceleration_3m
+    - h3_neighbor_premium_vs_micro
+    - area_sales_volume_3m
+    - market_construction_confidence
+    - same_size_ppsqm_median
+    - area_sold_price_median_3m
+    - area_sales_volume_1m
+    - area_sold_price_median_1m
+    - h3_neighbor_ppsqm
+    - address_ppsqm_count
+  categorical:
+    - area
+    - h3_res10
+    - h3_res9
+    - street_name
+
+listing_price_h3_market_street:
   numeric:
     - listing_price
+    - price_per_sqm
+    - relative_area_price
+    - monthly_fee
     - monthly_fee_per_sqm
-    - area_price_change_mean
-    - area_age_interaction
+    - fee_price_interaction
+    - total_cost_per_sqm
     - cost_benefit_ratio
     - efficiency_premium
-  categorical: []
+    - living_area
+    - rooms
+    - floor
+    - floor_per_sqm
+    - floor_height_premium
+    - amenity_score
+    - living_area_squared
+    - rooms_per_sqm
+    - area_sold_price_median_1m
+    - area_sold_price_median_3m
+    - area_sold_price_median_6m
+    - area_sold_price_median_12m
+    - area_sales_volume_1m
+    - area_sales_volume_3m
+    - area_sales_volume_6m
+    - area_sales_volume_12m
+    - area_target_encoded
+    - micro_area_ppsqm_median
+    - micro_area_ppsqm_count
+    - micro_area_ppsqm_premium_vs_area
+    - h3_neighbor_ppsqm
+    - h3_neighbor_ppsqm_count
+    - h3_neighbor_premium_vs_micro
+    - same_size_ppsqm_median
+    - same_size_ppsqm_count
+    - same_size_premium_vs_area
+    - street_area_ppsqm_median
+    - street_area_ppsqm_p75
+    - street_area_ppsqm_p90
+    - street_area_ppsqm_count
+    - street_area_premium_vs_micro
+    - street_area_upper_tail_ratio
+    - street_size_ppsqm_median
+    - street_size_ppsqm_p75
+    - street_size_ppsqm_p90
+    - street_size_ppsqm_count
+    - street_size_premium_vs_street
+    - street_size_upper_tail_ratio
+    - address_ppsqm_median
+    - address_ppsqm_p75
+    - address_ppsqm_p90
+    - address_ppsqm_count
+    - address_premium_vs_street
+    - address_upper_tail_ratio
+    - distance_to_city_center
+    - distance_to_nearest_metro
+    - distance_to_nearest_train
+    - metro_stations_within_500m
+    - metro_stations_within_1km
+    - transit_accessibility_score
+    - market_interest_rate
+    - market_interest_rate_change_3m
+    - market_economic_tendency
+    - market_consumer_confidence
+    - market_construction_confidence
+    - market_gdp_growth
+    - market_ppsqm_index
+    - market_ppsqm_index_change_3m
+    - market_sales_volume
+    - market_months_since_2020
+    - market_data_age_months
+    - price_acceleration_3m
+    - temporal_price_trend
+  categorical:
+    - area
+    - h3_res10
+    - h3_res9
+    - micro_area_resolution_used
+    - same_size_scope_used
+    - street_name
+    - street_area_scope_used
+    - street_size_scope_used
+    - address_comp_scope_used
+    - space_efficiency
+    - has_elevator
+    - has_balcony
+    - floor_tier
 
-lean_15:
+listing_price_h3_market_street_rfe15:
   numeric:
     - listing_price
     - relative_area_price
-    - monthly_fee_per_sqm
+    - living_area
     - floor_per_sqm
-    - area_price_change_mean
-    - area_sold_price_median_3m
-    - area_sales_volume_3m
-    - area_age_interaction
-    - rooms_age_interaction
-    - fee_price_interaction
-    - cost_benefit_ratio
+    - market_economic_tendency
+    - street_size_upper_tail_ratio
+    - total_cost_per_sqm
     - efficiency_premium
-    - temporal_price_trend
-    - demand_supply_ratio
+    - monthly_fee_per_sqm
+    - price_acceleration_3m
+    - rooms_per_sqm
   categorical:
     - area
+    - h3_res9
+    - street_name
+    - h3_res10
+
+listing_price_h3_market_street_aligned26:
+  numeric:
+    - living_area
+    - rooms_per_sqm
+    - floor_per_sqm
+    - street_size_upper_tail_ratio
+    - micro_area_ppsqm_count
+    - same_size_premium_vs_area
+    - same_size_ppsqm_count
+    - address_upper_tail_ratio
+    - temporal_price_trend
+    - h3_neighbor_ppsqm_count
+    - street_area_upper_tail_ratio
+    - price_acceleration_3m
+    - h3_neighbor_premium_vs_micro
+    - area_sales_volume_3m
+    - market_construction_confidence
+    - same_size_ppsqm_median
+    - area_sold_price_median_3m
+    - area_sales_volume_1m
+    - area_sold_price_median_1m
+    - h3_neighbor_ppsqm
+    - address_ppsqm_count
+    - listing_price
+  categorical:
+    - area
+    - h3_res10
+    - h3_res9
+    - street_name
+
+# Production with_list_price serving default. The no_list_price_v1 21 numeric
+# features plus 5 listing-price-derived features (26 numeric + 4 categorical =
+# 30 total), aligned to the same base set so the two production models stay
+# comparable. Formerly named listing_price_h3_market_street_aligned30.
+with_list_price_v1:
+  numeric:
+    - living_area
+    - rooms_per_sqm
+    - floor_per_sqm
+    - street_size_upper_tail_ratio
+    - micro_area_ppsqm_count
+    - same_size_premium_vs_area
+    - same_size_ppsqm_count
+    - address_upper_tail_ratio
+    - temporal_price_trend
+    - h3_neighbor_ppsqm_count
+    - street_area_upper_tail_ratio
+    - price_acceleration_3m
+    - h3_neighbor_premium_vs_micro
+    - area_sales_volume_3m
+    - market_construction_confidence
+    - same_size_ppsqm_median
+    - area_sold_price_median_3m
+    - area_sales_volume_1m
+    - area_sold_price_median_1m
+    - h3_neighbor_ppsqm
+    - address_ppsqm_count
+    - listing_price
+    - relative_area_price
+    - total_cost_per_sqm
+    - monthly_fee_per_sqm
+    - efficiency_premium
+  categorical:
+    - area
+    - h3_res10
+    - h3_res9
+    - street_name
+
+no_list_price_h3_market_tail:
+  numeric:
+    - living_area
+    - rooms
+    - floor
+    - floor_per_sqm
+    - floor_height_premium
+    - amenity_score
+    - living_area_squared
+    - rooms_per_sqm
+    - area_sold_price_median_1m
+    - area_sold_price_median_3m
+    - area_sold_price_median_6m
+    - area_sold_price_median_12m
+    - area_sales_volume_1m
+    - area_sales_volume_3m
+    - area_sales_volume_6m
+    - area_sales_volume_12m
+    - area_target_encoded
+    - micro_area_ppsqm_median
+    - micro_area_ppsqm_p75
+    - micro_area_ppsqm_p90
+    - micro_area_ppsqm_count
+    - micro_area_ppsqm_premium_vs_area
+    - micro_area_upper_tail_ratio
+    - h3_neighbor_ppsqm
+    - h3_neighbor_ppsqm_p75
+    - h3_neighbor_ppsqm_p90
+    - h3_neighbor_ppsqm_count
+    - h3_neighbor_premium_vs_micro
+    - h3_neighbor_upper_tail_ratio
+    - same_size_ppsqm_median
+    - same_size_ppsqm_p75
+    - same_size_ppsqm_p90
+    - same_size_ppsqm_count
+    - same_size_premium_vs_area
+    - same_size_upper_tail_ratio
+    - distance_to_city_center
+    - distance_to_nearest_metro
+    - distance_to_nearest_train
+    - metro_stations_within_500m
+    - metro_stations_within_1km
+    - transit_accessibility_score
+    - market_interest_rate
+    - market_interest_rate_change_3m
+    - market_economic_tendency
+    - market_consumer_confidence
+    - market_construction_confidence
+    - market_gdp_growth
+    - market_ppsqm_index
+    - market_ppsqm_index_change_3m
+    - market_sales_volume
+    - market_months_since_2020
+    - market_data_age_months
+    - price_acceleration_3m
+    - temporal_price_trend
+  categorical:
+    - area
+    - h3_res10
+    - h3_res9
+    - micro_area_resolution_used
+    - same_size_scope_used
+    - space_efficiency
+    - has_elevator
+    - has_balcony
+    - floor_tier
+
+no_list_price_h3_market_luxury:
+  numeric:
+    - living_area
+    - rooms
+    - floor
+    - floor_per_sqm
+    - floor_height_premium
+    - amenity_score
+    - living_area_squared
+    - rooms_per_sqm
+    - area_sold_price_median_1m
+    - area_sold_price_median_3m
+    - area_sold_price_median_6m
+    - area_sold_price_median_12m
+    - area_sales_volume_1m
+    - area_sales_volume_3m
+    - area_sales_volume_6m
+    - area_sales_volume_12m
+    - area_target_encoded
+    - micro_area_ppsqm_median
+    - micro_area_ppsqm_count
+    - micro_area_ppsqm_premium_vs_area
+    - h3_neighbor_ppsqm
+    - h3_neighbor_ppsqm_count
+    - h3_neighbor_premium_vs_micro
+    - same_size_ppsqm_median
+    - same_size_ppsqm_count
+    - same_size_premium_vs_area
+    - h3_market_ppsqm_ratio
+    - same_size_market_ppsqm_ratio
+    - neighbor_market_ppsqm_ratio
+    - micro_luxury_score
+    - luxury_location_flag
+    - distance_to_city_center
+    - distance_to_nearest_metro
+    - distance_to_nearest_train
+    - metro_stations_within_500m
+    - metro_stations_within_1km
+    - transit_accessibility_score
+    - market_interest_rate
+    - market_interest_rate_change_3m
+    - market_economic_tendency
+    - market_consumer_confidence
+    - market_construction_confidence
+    - market_gdp_growth
+    - market_ppsqm_index
+    - market_ppsqm_index_change_3m
+    - market_sales_volume
+    - market_months_since_2020
+    - market_data_age_months
+    - price_acceleration_3m
+    - temporal_price_trend
+  categorical:
+    - area
+    - h3_res10
+    - h3_res9
+    - micro_area_resolution_used
+    - same_size_scope_used
+    - luxury_location_tier
+    - space_efficiency
+    - has_elevator
+    - has_balcony
+    - floor_tier
+
+no_list_price_h3_fee:
+  numeric:
+    - living_area
+    - rooms
+    - monthly_fee
+    - monthly_fee_per_sqm
+    - fee_efficiency
+    - floor
+    - floor_per_sqm
+    - floor_height_premium
+    - amenity_score
+    - living_area_squared
+    - rooms_per_sqm
+    - area_sold_price_median_1m
+    - area_sold_price_median_3m
+    - area_sold_price_median_6m
+    - area_sold_price_median_12m
+    - area_sales_volume_1m
+    - area_sales_volume_3m
+    - area_sales_volume_6m
+    - area_sales_volume_12m
+    - area_target_encoded
+    - micro_area_ppsqm_median
+    - micro_area_ppsqm_count
+    - micro_area_ppsqm_premium_vs_area
+    - distance_to_city_center
+    - distance_to_nearest_metro
+    - distance_to_nearest_train
+    - metro_stations_within_500m
+    - metro_stations_within_1km
+    - transit_accessibility_score
+    - price_acceleration_3m
+    - temporal_price_trend
+  categorical:
+    - area
+    - h3_res10
+    - h3_res9
+    - micro_area_resolution_used
+    - space_efficiency
+    - has_elevator
+    - has_balcony
+    - floor_tier
+
+no_list_price_22_no_h3:
+  numeric:
+    - living_area
+    - rooms
+    - monthly_fee
+    - monthly_fee_per_sqm
+    - floor
+    - floor_height_premium
+    - amenity_score
+    - property_age
+    - living_area_squared
+    - rooms_per_sqm
+    - area_sold_price_median_3m
+    - area_sold_price_median_12m
+    - area_sales_volume_3m
+    - area_target_encoded
+    - distance_to_city_center
+    - distance_to_nearest_metro
+    - metro_stations_within_1km
+    - transit_accessibility_score
+    - is_renovated
+    - needs_renovation
+    - luxury_keyword_count
+    - condition_score
+  categorical:
+    - area
+    - age_bucket
+    - space_efficiency
+    - architectural_era
+    - renovation_likelihood
+    - has_elevator
+    - has_balcony
+    - floor_tier
 
 # All features from the registry (no subset).
 full:

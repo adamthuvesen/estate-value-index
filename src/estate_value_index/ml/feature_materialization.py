@@ -8,9 +8,11 @@ This module provides functions for:
 
 from __future__ import annotations
 
+import json
 import logging
 from dataclasses import dataclass
 from datetime import date
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -18,14 +20,19 @@ import pandas as pd
 
 from estate_value_index.exceptions import BigQueryError, exception_context
 from estate_value_index.ml import create_optimized_features, filter_valid_listings
+from estate_value_index.ml.ask_price import mask_ask_price_signals
 from estate_value_index.ml.data_loader import load_from_bigquery
 from estate_value_index.ml.features import CATEGORICAL_FEATURE_NAMES, NUMERIC_FEATURE_NAMES
+from estate_value_index.ml.features.micro_area import normalize_coordinate_columns
 from estate_value_index.ml.preprocessing import normalize_area_for_model
 from estate_value_index.utils.bigquery_safety import safe_table_ref
 from estate_value_index.utils.clients import get_bq_client
 from estate_value_index.utils.settings import bq_table, get_batch_size, load_env_config
 
 logger = logging.getLogger(__name__)
+FEATURE_SCHEMA_PATH = (
+    Path(__file__).resolve().parents[3] / "schemas" / "bq_features_engineered.json"
+)
 
 
 @dataclass(frozen=True)
@@ -55,6 +62,11 @@ def join_geocodes(
     Returns:
         DataFrame with lat/lon columns added
     """
+    df = normalize_coordinate_columns(df.copy())
+    if {"lat", "lon"}.issubset(df.columns) and df[["lat", "lon"]].notna().all(axis=1).all():
+        logger.info("Raw listings already include coordinates; skipping geocode join")
+        return df
+
     if "address" not in df.columns or "area" not in df.columns:
         logger.warning("Missing address/area columns, skipping geocode join")
         return df
@@ -67,7 +79,7 @@ def join_geocodes(
         geocodes_df = client.query(
             f"SELECT address, lat, lon "
             f"FROM {safe_table_ref(project_id, geocodes_dataset, geocodes_table, quote=True)}"
-        ).to_dataframe()
+        ).to_dataframe(create_bqstorage_client=False)
         logger.info("Loaded %d geocodes from BigQuery", len(geocodes_df))
     except Exception as e:
         # Swallowing this would silently train a model without distance
@@ -81,7 +93,6 @@ def join_geocodes(
 
     # Create address key for joining
     # Format: "Street Address, normalized_area"
-    df = df.copy()
     df["_normalized_area"] = df["area"].apply(
         lambda v: normalize_area_for_model(v, empty_for_unknown=True) if pd.notna(v) else ""
     )
@@ -90,6 +101,10 @@ def join_geocodes(
     # Join with geocodes
     geocodes_df = geocodes_df.rename(columns={"address": "_geocode_key"})
     df = df.merge(geocodes_df, on="_geocode_key", how="left")
+    if "lat_x" in df.columns and "lat_y" in df.columns:
+        df["lat"] = df["lat_x"].fillna(df["lat_y"])
+        df["lon"] = df["lon_x"].fillna(df["lon_y"])
+        df = df.drop(columns=["lat_x", "lat_y", "lon_x", "lon_y"])
 
     # Clean up
     df = df.drop(columns=["_geocode_key", "_normalized_area"])
@@ -212,6 +227,50 @@ def _feature_upload_target(project_id: str, env_config: Any, truncate: bool) -> 
         staging_id=staging_id,
         upload_target=staging_id,
     )
+
+
+def _load_feature_schema_fields(schema_path: Path = FEATURE_SCHEMA_PATH) -> list[Any]:
+    from google.cloud import bigquery
+
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    return [
+        bigquery.SchemaField(
+            field["name"],
+            field["type"],
+            mode=field.get("mode", "NULLABLE"),
+            description=field.get("description"),
+        )
+        for field in schema
+    ]
+
+
+def _sync_feature_table_schema(
+    client: Any,
+    project_id: str,
+    target: FeatureUploadTarget,
+    schema_path: Path = FEATURE_SCHEMA_PATH,
+) -> list[str]:
+    """Add missing nullable feature columns from the repo schema before upload."""
+    table_ref = safe_table_ref(project_id, target.dataset_id, target.table_id)
+    table = client.get_table(table_ref)
+    existing = {field.name for field in table.schema}
+    desired_fields = _load_feature_schema_fields(schema_path)
+    missing = [field for field in desired_fields if field.name not in existing]
+
+    if not missing:
+        return []
+
+    required_missing = [field.name for field in missing if field.mode == "REQUIRED"]
+    if required_missing:
+        raise RuntimeError(
+            "feature table is missing required schema fields: " + ", ".join(required_missing)
+        )
+
+    table.schema = list(table.schema) + missing
+    client.update_table(table, ["schema"])
+    added = [field.name for field in missing]
+    logger.info("Added %d feature table schema field(s): %s", len(added), ", ".join(added))
+    return added
 
 
 def _insert_feature_batches(
@@ -374,8 +433,14 @@ def materialize_features(
     df_raw = join_geocodes(df_raw, project_id)
 
     logger.info("Filtering valid listings")
-    df_filtered = filter_valid_listings(df_raw, min_price=3000000, drop_na_features=False)
+    df_filtered = filter_valid_listings(
+        df_raw,
+        min_price=3000000,
+        drop_na_features=False,
+        require_listing_price=False,
+    )
     logger.info("After filtering: %d listings", len(df_filtered))
+    df_filtered = mask_ask_price_signals(df_filtered)
 
     logger.info("Engineering features")
     df_engineered = create_optimized_features(df_filtered)
@@ -396,6 +461,7 @@ def materialize_features(
     target = _feature_upload_target(project_id, env_config, truncate)
     if not truncate:
         logger.info("Uploading %d rows to %s", len(rows), target.full_table_id)
+    _sync_feature_table_schema(client, project_id, target)
     row_count = _upload_feature_rows(client, project_id, target, rows, batch_size)
 
     logger.info(

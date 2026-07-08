@@ -6,6 +6,6 @@ CLI entrypoints (`estate_value_index.cli`) and the Prefect tasks
 """
 
 from estate_value_index.analytics.area_statistics import generate_area_statistics
-from estate_value_index.analytics.value_analysis import run_analysis
+from estate_value_index.analytics.value_analysis import generate_value_analysis
 
-__all__ = ["generate_area_statistics", "run_analysis"]
+__all__ = ["generate_area_statistics", "generate_value_analysis"]

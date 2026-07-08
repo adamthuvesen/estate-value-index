@@ -49,8 +49,20 @@ def date_windows(start: date, end: date, window_days: int) -> Iterator[DateWindo
 
 
 def write_window_config(base_config_file: Path, output_file: Path, window: DateWindow) -> None:
-    config = json.loads(base_config_file.read_text(encoding="utf-8"))
+    if not base_config_file.exists():
+        raise FileNotFoundError(f"Booli base config not found: {base_config_file}")
+    try:
+        config = json.loads(base_config_file.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Invalid Booli base config JSON: {base_config_file}") from exc
+    if not isinstance(config, dict):
+        raise ValueError(f"Booli base config must be a JSON object: {base_config_file}")
+
     search_parameters = config.setdefault("search_parameters", {})
+    if not isinstance(search_parameters, dict):
+        raise ValueError(
+            f"Booli base config search_parameters must be an object: {base_config_file}"
+        )
     search_parameters["minSoldDate"] = window.start.isoformat()
     search_parameters["maxSoldDate"] = window.end.isoformat()
 
@@ -86,7 +98,9 @@ def validate_jsonl_file(path: Path) -> dict[str, Any]:
             missing = [
                 field
                 for field in REQUIRED_LISTING_FIELDS
-                if field not in listing or listing[field] is None
+                if field not in listing
+                or listing[field] is None
+                or (isinstance(listing[field], str) and not listing[field].strip())
             ]
             if missing:
                 missing_fields.update(missing)
@@ -202,6 +216,8 @@ def run_backfill(
                 )
                 validation = validate_jsonl_file(scraped_file)
                 window_validation[window.label] = validation
+                if validation["total_listings"] == 0:
+                    raise RuntimeError(f"zero scraped rows for window {window.label}")
                 if validation["validation_rate"] < min_validation_rate:
                     raise RuntimeError(
                         "validation rate "
@@ -223,6 +239,8 @@ def run_backfill(
     merged_file = output_dir / "all_dedup.jsonl"
     merge_summary = merge_deduped_jsonl(listing_files, merged_file)
     merged_validation = validate_jsonl_file(merged_file)
+    if merged_validation["total_listings"] == 0:
+        raise RuntimeError("zero merged rows after backfill")
 
     return {
         "dry_run": False,
@@ -312,7 +330,7 @@ def main(argv: list[str] | None = None, *, args: Namespace | None = None) -> int
             max_window_retries=args.max_window_retries,
             min_validation_rate=args.min_validation_rate,
         )
-    except RuntimeError as exc:
+    except (RuntimeError, OSError, ValueError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
 

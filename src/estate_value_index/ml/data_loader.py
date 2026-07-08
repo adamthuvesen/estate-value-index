@@ -11,6 +11,7 @@ from typing import Any
 import pandas as pd
 
 from estate_value_index.exceptions import BigQueryError, exception_context
+from estate_value_index.ml.features.micro_area import normalize_coordinate_columns
 from estate_value_index.utils.bigquery_safety import (
     Filter,
     _validate_bq_project_id,
@@ -31,6 +32,10 @@ _NUMERIC_COLUMNS = [
     "days_on_market",
     "construction_year",
     "floor",
+    "latitude",
+    "longitude",
+    "lat",
+    "lon",
 ]
 _DATETIME_COLUMNS = ("scraped_at", "sold_date")
 _FEATURE_CATEGORICAL_COLUMNS = [
@@ -38,6 +43,9 @@ _FEATURE_CATEGORICAL_COLUMNS = [
     "age_bucket",
     "space_efficiency",
     "area_price_tier",
+    "h3_res10",
+    "h3_res9",
+    "micro_area_resolution_used",
     "postal_prefix",
     "stockholm_district",
     "market_cycle",
@@ -122,6 +130,7 @@ def _normalize_listing_frame(
 ) -> pd.DataFrame:
     _coerce_numeric(frame, _NUMERIC_COLUMNS)
     _coerce_datetime(frame, _DATETIME_COLUMNS)
+    normalize_coordinate_columns(frame)
 
     if drop_duplicate_listing_ids and "listing_id" in frame.columns:
         sort_columns = [col for col in ("listing_id", "scraped_at") if col in frame.columns]
@@ -180,7 +189,10 @@ def _query_bigquery_table(
         job_config = (
             bigquery.QueryJobConfig(query_parameters=query_params) if query_params else None
         )
-        return client.query(query, job_config=job_config).to_dataframe()
+        # Regular tabledata API; some envs can't reach bigquerystorage.googleapis.com.
+        return client.query(query, job_config=job_config).to_dataframe(
+            create_bqstorage_client=False
+        )
     except Exception as e:
         raise BigQueryError(
             f"{error_message}: {e}",
@@ -189,6 +201,8 @@ def _query_bigquery_table(
 
 
 def _normalize_feature_frame(df: pd.DataFrame) -> pd.DataFrame:
+    normalize_coordinate_columns(df)
+
     for col in _FEATURE_CATEGORICAL_COLUMNS:
         if col in df.columns:
             df[col] = df[col].astype("category")

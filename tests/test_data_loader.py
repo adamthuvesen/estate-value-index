@@ -178,6 +178,23 @@ class TestListingLoading:
         assert pd.api.types.is_datetime64_any_dtype(df["sold_date"])
 
     @pytest.mark.integration
+    def test_load_listings_normalizes_coordinate_aliases(self, temp_data_dir):
+        data = [
+            {
+                "listing_id": "TEST-001",
+                "latitude": "59.315",
+                "longitude": "18.070",
+            }
+        ]
+
+        (temp_data_dir / "listings.json").write_text(json.dumps(data))
+
+        df = load_listings(temp_data_dir)
+
+        assert df["lat"].iloc[0] == pytest.approx(59.315)
+        assert df["lon"].iloc[0] == pytest.approx(18.070)
+
+    @pytest.mark.integration
     def test_load_listings_duplicate_handling(self, temp_data_dir):
         data = [
             {

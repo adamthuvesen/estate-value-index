@@ -9,8 +9,8 @@ __author__ = "Estate Value Index Team"
 VERSION_INFO = {
     "version": __version__,
     "python_requires": ">=3.11",
-    "model_version": "lgbm-v1",
-    "feature_count": 91,
+    "model_version": "tiered-two-model-v1",
+    "production_models": ("no_list_price", "with_list_price"),
 }
 
 __all__ = [

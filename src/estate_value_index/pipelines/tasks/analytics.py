@@ -82,7 +82,7 @@ def generate_area_statistics_task(
 def generate_value_analysis_task(
     output_file: Path | None = None,
     data_file: Path | None = None,
-    model_type: str = "lgbm",
+    model_type: str = "no_list_price",
     apply_training_filters: bool = False,
 ) -> AnalyticsResult:
     """Generate value analysis by running predictions on all properties.
@@ -108,9 +108,9 @@ def generate_value_analysis_task(
     logger.info(f"Generating value analysis from {data_file}")
 
     # Import the analysis function directly instead of using sys.argv patching
-    from estate_value_index.analytics.value_analysis import run_analysis
+    from estate_value_index.analytics.value_analysis import generate_value_analysis
 
-    run_analysis(
+    generate_value_analysis(
         data_file=data_file,
         model_type=model_type,
         output_file=output_file,

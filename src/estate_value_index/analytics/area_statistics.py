@@ -20,6 +20,7 @@ from typing import Any
 from estate_value_index.ingestion.processing import load_jsonl_file as load_jsonl
 from estate_value_index.ml.area_names import get_display_name
 from estate_value_index.ml.preprocessing import normalize_area_for_model
+from estate_value_index.model_artifacts import NO_LIST_MODEL_ID, production_artifact_names
 
 logger = logging.getLogger(__name__)
 
@@ -256,7 +257,11 @@ def _room_bucket(rooms: int | float | None) -> str | None:
 def calculate_value_tier_distribution(value_properties: list[dict]) -> dict[str, int]:
     tier_counts = defaultdict(int)
     for prop in value_properties:
-        tier_counts[prop.get("value_tier", "Unknown")] += 1
+        # Suppressed rows (missing core fields) carry a null tier; leave them out
+        # of the distribution rather than bucketing them as "Unknown".
+        tier = prop.get("value_tier")
+        if tier:
+            tier_counts[tier] += 1
     return dict(tier_counts)
 
 
@@ -429,15 +434,17 @@ def _mean_price_or_feature_value(
 
 
 def _value_insights(value_properties: list[dict]) -> dict[str, Any]:
-    undervalued_count = sum(1 for p in value_properties if p.get("is_undervalued", False))
-    value_scores = [p.get("value_score", 50) for p in value_properties]
-    prediction_deltas = [p.get("prediction_delta_absolute", 0) for p in value_properties]
+    # Rows missing core fields are held out of the ranking: their value_score is
+    # null and is_rankable is False. Score/rate stats cover ranked rows only so a
+    # suppressed row can't drag an area's average toward the fill value.
+    rankable = [p for p in value_properties if p["is_rankable"]]
+    undervalued_count = sum(1 for p in rankable if p.get("is_undervalued", False))
+    value_scores = [score for p in rankable if (score := p.get("value_score")) is not None]
+    prediction_deltas = [p.get("prediction_delta_absolute", 0) for p in rankable]
 
     return {
         "undervalued_count": undervalued_count,
-        "undervalued_pct": round(undervalued_count / len(value_properties) * 100, 1)
-        if value_properties
-        else 0,
+        "undervalued_pct": round(undervalued_count / len(rankable) * 100, 1) if rankable else 0,
         "avg_value_score": round(statistics.mean(value_scores), 1) if value_scores else 50.0,
         "median_value_score": round(statistics.median(value_scores), 1) if value_scores else 50.0,
         "avg_prediction_delta": round(statistics.mean(prediction_deltas))
@@ -483,6 +490,21 @@ def _room_filtered_market_dynamics(
         "sales_volume_12m": 0,
         "liquidity": round(len(filtered_raw) / max(market_dynamics["days_on_market_median"], 1), 2),
     }
+
+
+def _context_price_or_mean(
+    feature_context: dict,
+    feature_key: str,
+    area_key: str,
+    properties: list[dict],
+    property_key: str,
+) -> int:
+    context_value = feature_context.get(feature_key, {}).get(area_key)
+    if context_value is not None:
+        return round(context_value)
+    return _mean_price_or_feature_value(
+        properties, property_key, feature_context, feature_key, area_key
+    )
 
 
 def calculate_room_filtered_statistics(
@@ -553,7 +575,7 @@ def _resolve_area_statistics_paths(
     project_root = Path(__file__).resolve().parents[3]
     return AreaStatisticsPaths(
         feature_context=feature_context_path
-        or project_root / "web" / "models" / "price_prediction_model_feature_context.json",
+        or project_root / "web" / "models" / production_artifact_names(NO_LIST_MODEL_ID).context,
         value_analysis=value_analysis_path
         or project_root / "data" / "enrichment" / "value_analysis.json",
         raw_listings=raw_listings_path
@@ -594,8 +616,12 @@ def _area_overview(
     monthly_prices: dict[str, Any],
 ) -> dict[str, Any]:
     return {
-        "avg_listing_price": round(feature_context.get("area_avg_price", {}).get(area_key, 0)),
-        "avg_sold_price": round(feature_context.get("area_target_mean", {}).get(area_key, 0)),
+        "avg_listing_price": _context_price_or_mean(
+            feature_context, "area_avg_price", area_key, raw_props, "listing_price"
+        ),
+        "avg_sold_price": _context_price_or_mean(
+            feature_context, "area_target_mean", area_key, raw_props, "sold_price"
+        ),
         "avg_price_per_sqm": market_dynamics.get("avg_price_per_sqm"),
         "listing_count": len(raw_props),
         "inventory": market_dynamics["inventory"],
@@ -665,7 +691,16 @@ def _build_area_statistics(
     listings_by_area = _group_by_area(raw_listings)
     value_props_by_area = _group_by_area(value_properties)
     area_stats = {}
-    areas = feature_context.get("area_avg_price", {}).keys()
+    areas = set(listings_by_area) | set(value_props_by_area)
+    for key in (
+        "area_avg_price",
+        "area_target_mean",
+        "area_listing_count",
+        "area_sales_volume_3m",
+        "area_sales_volume_6m",
+        "area_sales_volume_12m",
+    ):
+        areas.update(feature_context.get(key, {}).keys())
 
     logger.info("Generating statistics for %d areas...", len(areas))
 

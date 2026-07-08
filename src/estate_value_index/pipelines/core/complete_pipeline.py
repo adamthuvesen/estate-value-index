@@ -136,12 +136,13 @@ def _run_sync_stage(logger: Any, results: dict[str, Any], *, dry_run: bool) -> N
 
         logger.info(
             "Sync complete: "
-            f"{sync_result.get('listings_count', 0)} listings, "
+            f"{sync_result.get('records_synced', 0)} listings, "
             f"in_sync={verify_result.get('in_sync', False)}"
         )
     except Exception as e:
-        logger.warning(f"Sync failed but continuing: {e}")
+        logger.error(f"Sync failed: {e}")
         results["stages"]["sync"] = {"error": str(e), "success": False}
+        raise
 
 
 def _training_config(
@@ -161,7 +162,6 @@ def _training_config(
             skip_materialization=not skip_scraping,
             register_to_vertex=False,
             stream_logs=True,
-            production_mode=True,
             dry_run=dry_run,
             use_vertex=True,
         )
@@ -169,7 +169,6 @@ def _training_config(
     return TrainingFlowConfig(
         tune=tune,
         use_vertex=False,
-        production_mode=True,
     )
 
 

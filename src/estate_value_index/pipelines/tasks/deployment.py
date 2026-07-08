@@ -11,6 +11,11 @@ from pathlib import Path
 import requests
 from prefect import task
 
+from estate_value_index.model_artifacts import (
+    LISTING_MODEL_ID,
+    NO_LIST_MODEL_ID,
+    production_artifact_names,
+)
 from estate_value_index.pipelines.types import DeploymentResult, HealthCheckResult
 from estate_value_index.pipelines.utils import get_task_logger
 from estate_value_index.utils.clients import get_bq_client, get_storage_client
@@ -422,23 +427,17 @@ def health_check_task(
     try:
         response = requests.get(service_url, timeout=timeout, allow_redirects=True)
         response_time_ms = (time.time() - start_time) * 1000
-        is_healthy = response.status_code == expected_status
-        # 503 = degraded but service is running; treat as "alive" for deployment checks
-        is_alive = response.status_code in (200, 503)
+        is_healthy = response.status_code == expected_status == 200
 
         if is_healthy:
             logger.info(f"Healthy (status={response.status_code}, time={response_time_ms:.0f}ms)")
-        elif is_alive:
-            logger.info(
-                f"Degraded but alive (status={response.status_code}, time={response_time_ms:.0f}ms)"
-            )
         else:
             logger.warning(f"Unhealthy (status={response.status_code})")
 
         return HealthCheckResult(
             success=True,
             timestamp=datetime.now().isoformat(),
-            healthy=is_alive,  # Consider alive services as healthy for deployment purposes
+            healthy=is_healthy,
             status_code=response.status_code,
             response_time_ms=round(response_time_ms, 2),
         )
@@ -580,21 +579,26 @@ def monitor_pipeline_health_task() -> dict:
     # Check model artifacts
     try:
         model_dir = Path("web/models")
-        model_files = list(model_dir.glob("price_prediction_model_*.joblib"))
+        model_files = [
+            model_dir / production_artifact_names(NO_LIST_MODEL_ID).model,
+            model_dir / production_artifact_names(LISTING_MODEL_ID).model,
+        ]
+        missing_models = [path.name for path in model_files if not path.exists()]
 
-        if model_files:
+        if not missing_models:
             latest_model = max(model_files, key=lambda p: p.stat().st_mtime)
             age_hours = (time.time() - latest_model.stat().st_mtime) / 3600
 
             checks["model_artifacts"] = {
                 "healthy": age_hours < 168,
+                "models": [path.name for path in model_files],
                 "age_hours": round(age_hours, 1),
             }
             if age_hours > 168:
                 issues.append(f"Model is {age_hours / 24:.1f} days old")
         else:
-            checks["model_artifacts"] = {"healthy": False, "error": "No models found"}
-            issues.append("No model artifacts found")
+            checks["model_artifacts"] = {"healthy": False, "missing": missing_models}
+            issues.append(f"Missing model artifacts: {', '.join(missing_models)}")
     except Exception as e:
         checks["model_artifacts"] = {"healthy": False, "error": str(e)}
 

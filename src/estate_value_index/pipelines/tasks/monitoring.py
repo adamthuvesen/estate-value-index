@@ -129,6 +129,7 @@ def monitor_model_drift_task(
     current_data_path: str | Path,
     reference_data_path: str | Path,
     model_version: str,
+    feature_metadata_path: str | Path | None = None,
     alert_on_drift: bool = True,
     upload_to_gcs: bool = True,
     gcs_bucket: str | None = None,
@@ -139,6 +140,7 @@ def monitor_model_drift_task(
         current_data_path: Path to current production data (parquet)
         reference_data_path: Path to baseline training data (parquet, can be gs:// URI)
         model_version: Model version identifier
+        feature_metadata_path: Optional production metrics/context JSON with monitored features
         alert_on_drift: If True, log alerts when drift detected
         upload_to_gcs: If True, upload drift reports to GCS
         gcs_bucket: GCS bucket for report storage
@@ -170,7 +172,7 @@ def monitor_model_drift_task(
             logger.error(
                 f"Baseline data not found at {reference_path_str}. "
                 "Baseline must be created during model training. "
-                "Run train_model.py with GCS_ENABLED=true to create baseline."
+                "Run train-production-models with GCS_ENABLED=true to create baseline."
             )
             return {
                 "success": False,
@@ -179,8 +181,8 @@ def monitor_model_drift_task(
                 "num_drifted_features": 0,
                 "drift_score": 0.0,
                 "performance_degraded": False,
-                "current_mae": None,
-                "reference_mae": None,
+                "current_median_ape": None,
+                "reference_median_ape": None,
                 "degradation_pct": None,
                 "timestamp": datetime.now().isoformat(),
                 "error": "Baseline not found - run model training first to create baseline",
@@ -198,6 +200,7 @@ def monitor_model_drift_task(
     monitor = ModelMonitor(
         reference_data_path=reference_data_path,
         model_version=model_version,
+        feature_metadata_path=feature_metadata_path,
     )
 
     # Detect drift
@@ -231,7 +234,7 @@ def monitor_model_drift_task(
     if result.performance_degraded:
         logger.critical(
             f"Model performance degraded by {result.degradation_pct:.1f}%! "
-            f"MAE: {result.reference_mae:,.0f} → {result.current_mae:,.0f}"
+            f"MdAPE: {result.reference_median_ape:.2%} → {result.current_median_ape:.2%}"
         )
 
     # Return structured result
@@ -242,8 +245,8 @@ def monitor_model_drift_task(
         "num_drifted_features": result.num_drifted_features,
         "drift_score": result.drift_score,
         "performance_degraded": result.performance_degraded,
-        "current_mae": result.current_mae,
-        "reference_mae": result.reference_mae,
+        "current_median_ape": result.current_median_ape,
+        "reference_median_ape": result.reference_median_ape,
         "degradation_pct": result.degradation_pct,
         "timestamp": result.timestamp,
     }

@@ -49,6 +49,50 @@ _COMMANDS: dict[str, Command] = {
         "Print area-level model performance metrics",
         "estate_value_index.cli.area_performance_metrics",
     ),
+    "micro-areas": Command(
+        "Generate H3 micro-area premium reports",
+        "estate_value_index.cli.micro_areas",
+    ),
+    "calibration-experiment": Command(
+        "Run residual calibration model experiments",
+        "estate_value_index.cli.calibration_experiment",
+    ),
+    "ppsqm-experiment": Command(
+        "Run PPSQM target blend experiments",
+        "estate_value_index.cli.ppsqm_experiment",
+    ),
+    "market-normalized-experiment": Command(
+        "Run market-normalized target experiments",
+        "estate_value_index.cli.market_normalized_experiment",
+    ),
+    "high-end-weighting-experiment": Command(
+        "Run high-end sample weighting experiments",
+        "estate_value_index.cli.high_end_weighting_experiment",
+    ),
+    "specialist-experiment": Command(
+        "Run gated high-end specialist experiments",
+        "estate_value_index.cli.specialist_experiment",
+    ),
+    "premium-specialist-experiment": Command(
+        "Run premium-over-comp specialist experiments",
+        "estate_value_index.cli.premium_specialist_experiment",
+    ),
+    "tiered-ensemble-experiment": Command(
+        "Run tiered low/mid/high ensemble experiments",
+        "estate_value_index.cli.tiered_ensemble_experiment",
+    ),
+    "model-suite-experiment": Command(
+        "Run the four-variant model suite experiment",
+        "estate_value_index.cli.model_suite_experiment",
+    ),
+    "feature-count-experiment": Command(
+        "Run top-k feature count experiments",
+        "estate_value_index.cli.feature_count_experiment",
+    ),
+    "train-production-models": Command(
+        "Train the two production prediction models",
+        "estate_value_index.cli.train_production_models",
+    ),
 }
 
 

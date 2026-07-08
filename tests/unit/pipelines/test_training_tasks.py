@@ -9,6 +9,11 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from estate_value_index.model_artifacts import (
+    NO_LIST_MODEL_ID,
+    production_artifact_names,
+    required_production_artifact_files,
+)
 from estate_value_index.pipelines.tasks.training import (
     _get_job_state,
     _parse_vertex_job_output,
@@ -126,35 +131,35 @@ class TestGetJobState:
 
 class TestValidateModelPerformance:
     @pytest.mark.unit
-    def test_mae_under_threshold_passes(self, temp_metrics_file: Path) -> None:
-        # Fixture MAE is 250K; threshold of 260K should pass
+    def test_median_ape_under_threshold_passes(self, temp_metrics_file: Path) -> None:
+        # Fixture MdAPE is 6%; threshold of 8% should pass
         result = validate_model_performance_task.fn(
             metrics_path=temp_metrics_file,
-            max_mae=260_000,
+            max_median_ape=0.08,
         )
 
         assert result["success"] is True
         assert result["validation_passed"] is True
-        assert result["mae"] == 250_000
+        assert result["median_ape"] == 0.06
 
     @pytest.mark.unit
-    def test_mae_over_threshold_fails(self, temp_metrics_file_high_mae: Path) -> None:
-        # Fixture MAE is 300K; threshold of 255K should fail
+    def test_median_ape_over_threshold_fails(self, temp_metrics_file_high_mdape: Path) -> None:
+        # Fixture MdAPE is 10%; threshold of 8% should fail
         result = validate_model_performance_task.fn(
-            metrics_path=temp_metrics_file_high_mae,
-            max_mae=255_000,
+            metrics_path=temp_metrics_file_high_mdape,
+            max_median_ape=0.08,
         )
 
         assert result["validation_passed"] is False
         assert len(result["reasons"]) > 0
-        assert "MAE" in result["reasons"][0]
+        assert "MdAPE" in result["reasons"][0]
 
     @pytest.mark.unit
     def test_rmse_validation(self, temp_metrics_file: Path) -> None:
         # Fixture RMSE is 350K; threshold of 400K should pass
         result = validate_model_performance_task.fn(
             metrics_path=temp_metrics_file,
-            max_mae=300_000,
+            max_median_ape=0.08,
             max_rmse=400_000,
         )
 
@@ -166,7 +171,7 @@ class TestValidateModelPerformance:
         # Fixture RMSE is 350K; threshold of 300K should fail
         result = validate_model_performance_task.fn(
             metrics_path=temp_metrics_file,
-            max_mae=300_000,
+            max_median_ape=0.08,
             max_rmse=300_000,
         )
 
@@ -174,26 +179,36 @@ class TestValidateModelPerformance:
         assert any("RMSE" in r for r in result["reasons"])
 
     @pytest.mark.unit
-    def test_missing_mae_raises(self, tmp_path: Path) -> None:
+    def test_missing_median_ape_raises(self, tmp_path: Path) -> None:
         metrics_path = tmp_path / "bad_metrics.json"
         metrics_path.write_text(json.dumps({"rmse": 350_000}))
 
-        with pytest.raises(ValueError, match="MAE not found"):
+        with pytest.raises(ValueError, match="median_ape not found"):
             validate_model_performance_task.fn(metrics_path=metrics_path)
 
     @pytest.mark.unit
     def test_returns_correct_structure(self, temp_metrics_file: Path) -> None:
-        result = validate_model_performance_task.fn(metrics_path=temp_metrics_file, max_mae=300_000)
+        result = validate_model_performance_task.fn(
+            metrics_path=temp_metrics_file, max_median_ape=0.08
+        )
 
-        for field in ["success", "timestamp", "validation_passed", "mae", "rmse", "reasons"]:
+        for field in [
+            "success",
+            "timestamp",
+            "validation_passed",
+            "median_ape",
+            "mae",
+            "rmse",
+            "reasons",
+        ]:
             assert field in result
 
     @pytest.mark.unit
     def test_handles_missing_rmse(self, tmp_path: Path) -> None:
-        metrics_path = tmp_path / "mae_only.json"
-        metrics_path.write_text(json.dumps({"mae": 200_000}))
+        metrics_path = tmp_path / "mdape_only.json"
+        metrics_path.write_text(json.dumps({"median_ape": 0.05}))
 
-        result = validate_model_performance_task.fn(metrics_path=metrics_path, max_mae=250_000)
+        result = validate_model_performance_task.fn(metrics_path=metrics_path, max_median_ape=0.08)
 
         assert result["validation_passed"] is True
         assert result["rmse"] == 0.0
@@ -229,7 +244,7 @@ class TestDownloadModelArtifacts:
         assert not local_dir.exists()
 
         local_dir.mkdir(parents=True)
-        (local_dir / "price_prediction_model_lgbm.joblib").touch()
+        (local_dir / production_artifact_names(NO_LIST_MODEL_ID).model).touch()
 
         result = download_model_artifacts_task.fn(
             model_uri="gs://bucket/vertex-ai/models/20241201",
@@ -246,9 +261,8 @@ class TestDownloadModelArtifacts:
             return_value=MagicMock(stdout="", stderr=""),
         )
 
-        (temp_model_dir / "price_prediction_model_lgbm.joblib").touch()
-        (temp_model_dir / "price_prediction_model_metrics_lgbm.json").touch()
-        (temp_model_dir / "price_prediction_model_feature_context.json").touch()
+        for filename in required_production_artifact_files():
+            (temp_model_dir / filename).touch()
 
         result = download_model_artifacts_task.fn(
             model_uri="gs://bucket/models/20241201",
@@ -291,7 +305,7 @@ class TestPromoteModelToProduction:
         promote_model_to_production_task.fn("gs://test-bucket/vertex-ai/models/20260706-160501")
 
         dests = [cmd[-1] for cmd in copied if "cp" in cmd]
-        assert any(d.endswith("price_prediction_model_lgbm.joblib") for d in dests)
-        assert any(d.endswith("price_prediction_model_lgbm.joblib.sha256") for d in dests), (
-            "sidecar must be promoted alongside the joblib"
-        )
+        assert any(d.endswith(production_artifact_names(NO_LIST_MODEL_ID).model) for d in dests)
+        assert any(
+            d.endswith(production_artifact_names(NO_LIST_MODEL_ID).sidecar) for d in dests
+        ), "sidecar must be promoted alongside the joblib"

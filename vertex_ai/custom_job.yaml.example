@@ -16,18 +16,17 @@ jobSpec:
         args:
           - --data-source
           - bigquery
-          - --use-features
           - --model-dir
-          - gs://your-gcs-bucket/vertex-ai/models/sample
+          - /tmp/estate-value-index/models
           - --model-prefix
-          - vertex-lgbm-sample
+          - price_prediction_model
         env:
           - name: GCP_PROJECT_ID
             value: your-gcp-project-id
-          - name: BIGQUERY_DATASET_FEATURES
-            value: booli_features
-          - name: BIGQUERY_TABLE_FEATURES
-            value: engineered_features
+          - name: BIGQUERY_DATASET_RAW
+            value: booli_raw
+          - name: BIGQUERY_TABLE_LISTINGS
+            value: listings
           - name: GCS_BUCKET
             value: your-gcs-bucket
           - name: GCS_ENABLED

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import {
   VALUE_TIERS,
   type ValueAnalysisData,
-  type ValueFinderMetadataResponse,
+  type ValueFinderFacetsResponse,
 } from "@/lib/value-finder-types";
 import { getValueAnalysisData } from "@/lib/value-analysis-cache";
 import {
@@ -26,7 +26,8 @@ const seedRange = (): NumericRange => ({
   max: Number.NEGATIVE_INFINITY,
 });
 
-const updateRange = (range: NumericRange, value: number) => {
+const updateRange = (range: NumericRange, value: number | null) => {
+  if (value === null) return;
   if (value < range.min) range.min = value;
   if (value > range.max) range.max = value;
 };
@@ -34,7 +35,7 @@ const updateRange = (range: NumericRange, value: number) => {
 const finalizeRange = (range: NumericRange): NumericRange =>
   Number.isFinite(range.min) ? range : { min: 0, max: 0 };
 
-function buildMetadataResponse(data: ValueAnalysisData): ValueFinderMetadataResponse {
+function buildMetadataResponse(data: ValueAnalysisData): ValueFinderFacetsResponse {
   const areas = new Set<string>();
   const municipalities = new Set<string>();
   const propertyTypes = new Set<string>();

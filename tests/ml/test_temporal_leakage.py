@@ -30,6 +30,8 @@ def _minimal_listing(
     listing_price: float | None = None,
     living_area: float = 60.0,
     rooms: float = 2.0,
+    latitude: float | None = None,
+    longitude: float | None = None,
 ) -> dict:
     """One listing dict with the columns downstream feature engineering needs."""
     return {
@@ -49,6 +51,8 @@ def _minimal_listing(
         "floor": 3.0,
         "elevator": True,
         "balcony": True,
+        "latitude": latitude,
+        "longitude": longitude,
     }
 
 
@@ -110,6 +114,80 @@ def test_area_market_features_strict_prior_window(
                 continue
             assert a == pytest.approx(b, rel=1e-9, nan_ok=True), (
                 f"{column} for {row_id} depends on the other row's price (a={a}, b={b})"
+            )
+
+
+def test_micro_area_features_no_same_day_leak() -> None:
+    rows = [
+        _minimal_listing(
+            f"PRIOR-{i}",
+            "Södermalm",
+            f"2024-01-{i + 1:02d}",
+            4_000_000 + i * 10_000,
+            living_area=50.0,
+            latitude=59.315,
+            longitude=18.07,
+        )
+        for i in range(20)
+    ]
+    rows.extend(
+        [
+            _minimal_listing(
+                "R1",
+                "Södermalm",
+                "2024-06-01",
+                5_000_000,
+                living_area=50.0,
+                latitude=59.315,
+                longitude=18.07,
+            ),
+            _minimal_listing(
+                "R2",
+                "Södermalm",
+                "2024-06-01",
+                50_000_000,
+                living_area=50.0,
+                latitude=59.315,
+                longitude=18.07,
+            ),
+        ]
+    )
+    df = pd.DataFrame(rows)
+    engineered = create_optimized_features(df).set_index("listing_id")
+
+    swapped = df.copy()
+    mask = swapped["listing_id"].isin(["R1", "R2"])
+    swapped.loc[mask, "sold_price"] = swapped.loc[mask, "sold_price"].iloc[::-1].values
+    engineered_swapped = create_optimized_features(swapped).set_index("listing_id")
+
+    for column in (
+        "micro_area_ppsqm_median",
+        "micro_area_ppsqm_p75",
+        "micro_area_ppsqm_p90",
+        "micro_area_ppsqm_count",
+        "micro_area_upper_tail_ratio",
+        "h3_neighbor_ppsqm",
+        "h3_neighbor_ppsqm_p75",
+        "h3_neighbor_ppsqm_p90",
+        "h3_neighbor_ppsqm_count",
+        "h3_neighbor_upper_tail_ratio",
+        "same_size_ppsqm_median",
+        "same_size_ppsqm_p75",
+        "same_size_ppsqm_p90",
+        "same_size_ppsqm_count",
+        "same_size_upper_tail_ratio",
+        "street_area_ppsqm_median",
+        "street_area_ppsqm_p90",
+        "street_area_ppsqm_count",
+        "street_size_ppsqm_median",
+        "street_size_ppsqm_p90",
+        "address_ppsqm_median",
+        "address_ppsqm_p90",
+        "address_ppsqm_count",
+    ):
+        for row_id in ("R1", "R2"):
+            assert engineered.loc[row_id, column] == pytest.approx(
+                engineered_swapped.loc[row_id, column], rel=1e-9
             )
 
 
@@ -201,6 +279,16 @@ def test_feature_context_sufficient_for_holdout() -> None:
         "area_inventory",
         "area_sold_price_median_3m",
         "area_sales_volume_3m",
+        "h3_neighbor_ppsqm",
+        "h3_neighbor_ppsqm_p90",
+        "same_size_ppsqm_median",
+        "same_size_ppsqm_p90",
+        "street_area_ppsqm_median",
+        "street_area_ppsqm_p90",
+        "address_ppsqm_median",
+        "address_ppsqm_p90",
+        "market_interest_rate",
+        "market_ppsqm_index",
     ]
     for col in leakage_columns:
         if col not in holdout_a.columns or col not in holdout_b.columns:
