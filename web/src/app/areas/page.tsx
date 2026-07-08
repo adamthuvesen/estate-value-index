@@ -1,299 +1,129 @@
-"use client";
+import type { Metadata } from "next";
+import { PageHero } from "@/components/ui/page-hero";
+import { StatBar, Stat } from "@/components/ui/stat-bar";
+import { FigureFrame } from "@/components/ui/figure-frame";
+import { AreasTable } from "@/components/areas/areas-table";
+import { getAreaStatisticsData } from "@/lib/area-statistics-cache";
+import { getAreaOverviewList } from "@/lib/area-overview";
+import { isMissingDataError } from "@/lib/api-errors";
+import type { AreaOverview, AreaStatisticsMetadata } from "@/lib/area-types";
+import { formatDateSv, formatNumber, getStaleInfo } from "@/lib/format";
 
-/* eslint-disable react-hooks/static-components -- SortButton closes over sort state; Phase 2 hoists it into areas-table.tsx */
-
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import type { AreaListResponse, AreaOverview } from "@/lib/area-types";
-import {
-  formatDateSv,
-  formatNumber,
-  formatNumberOrDash,
-  formatSek,
-  getStaleInfo,
-} from "@/lib/format";
-
-type ApiErrorResponse = {
-  error_code?: string;
-  error_message?: string;
-  remediation?: string;
+export const metadata: Metadata = {
+  title: "Areas",
+  description:
+    "Stockholm neighbourhood market statistics — prices, momentum, and the model's most undervalued areas.",
 };
 
-const buildAreasErrorMessage = (payload: ApiErrorResponse | null, status: number) => {
-  if (payload?.error_code === "AREA_DATA_MISSING") {
-    return "Area statistics aren’t available yet. Run the enrichment pipeline or enable GCS downloads.";
+type LoadResult =
+  | { ok: true; areas: AreaOverview[]; meta: AreaStatisticsMetadata }
+  | { ok: false; kind: "missing" | "error" };
+
+async function loadAreas(): Promise<LoadResult> {
+  try {
+    const [data, areas] = await Promise.all([
+      getAreaStatisticsData(),
+      getAreaOverviewList(),
+    ]);
+    return { ok: true, areas, meta: data.metadata };
+  } catch (error) {
+    console.error("Error loading areas:", error);
+    return { ok: false, kind: isMissingDataError(error) ? "missing" : "error" };
   }
-  if (payload?.error_code === "AREA_DATA_ERROR") {
-    return "Area statistics couldn’t be loaded. Check the data pipeline and server logs.";
-  }
-  if (status === 404) {
-    return "Area statistics aren’t available yet.";
-  }
-  return "Couldn’t load area data. Please try again later.";
+}
+
+const ERROR_COPY: Record<"missing" | "error", string> = {
+  missing:
+    "Area statistics aren’t available yet. Run the enrichment pipeline or enable GCS downloads.",
+  error: "Couldn’t load area data. Please try again later.",
 };
 
-const TIER_LABEL: Record<string, string> = {
-  premium: "Premium",
-  upper: "Upper",
-  medium: "Medium",
-  budget: "Budget",
-};
+function Shell({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">{children}</div>
+  );
+}
 
-export default function AreasPage() {
-  const [data, setData] = useState<AreaListResponse | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [sortField, setSortField] = useState<keyof AreaOverview>("listing_count");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
-
-  useEffect(() => {
-    const fetchAreas = async () => {
-      try {
-        const response = await fetch("/api/area");
-        if (!response.ok) {
-          const payload = (await response.json().catch(() => null)) as ApiErrorResponse | null;
-          throw new Error(buildAreasErrorMessage(payload, response.status));
-        }
-        const json = await response.json();
-        setData(json);
-      } catch (err) {
-        console.error("Error fetching areas:", err);
-        const fallbackMessage = "Couldn’t load area data. Please try again later.";
-        if (err instanceof Error && err.message) {
-          const safeMessage =
-            err.message.includes("Area") || err.message.includes("load")
-              ? err.message
-              : fallbackMessage;
-          setError(safeMessage);
-        } else {
-          setError(fallbackMessage);
-        }
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchAreas();
-  }, []);
-
-  const handleSort = (field: keyof AreaOverview) => {
-    if (sortField === field) {
-      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
-    } else {
-      setSortField(field);
-      setSortOrder("desc");
-    }
-  };
-
-  const getSortedAreas = (): AreaOverview[] => {
-    if (!data?.areas) return [];
-    const sorted = [...data.areas];
-    sorted.sort((a, b) => {
-      const aVal = a[sortField];
-      const bVal = b[sortField];
-      if (aVal === null && bVal === null) return 0;
-      if (aVal === null) return 1;
-      if (bVal === null) return -1;
-      if (typeof aVal === "string" && typeof bVal === "string") {
-        return sortOrder === "asc" ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
-      }
-      if (typeof aVal === "number" && typeof bVal === "number") {
-        return sortOrder === "asc" ? aVal - bVal : bVal - aVal;
-      }
-      return 0;
-    });
-    return sorted;
-  };
-
-  // Diverging color: low = green (good value), high = clay red (expensive)
-  const gradientClass = (normalized: number): string => {
-    if (normalized >= 0.8) return "text-val-high font-semibold";
-    if (normalized >= 0.6) return "text-val-over";
-    if (normalized >= 0.4) return "text-ledger-muted";
-    if (normalized >= 0.2) return "text-val-great";
-    return "text-val-exc font-semibold";
-  };
-
-  const getPricePerSqmColor = (value: number | null, allAreas: AreaOverview[]) => {
-    if (value === null) return "text-ledger-dimmed";
-    const validPrices = allAreas.map((a) => a.avg_price_per_sqm).filter((p): p is number => p !== null);
-    if (validPrices.length === 0) return "text-ledger-dimmed";
-    const min = Math.min(...validPrices);
-    const max = Math.max(...validPrices);
-    const range = max - min;
-    if (range === 0) return "text-ledger-muted";
-    return gradientClass((value - min) / range);
-  };
-
-  const getPriceChangeColor = (value: number) => (value > 0 ? "text-val-exc" : value < 0 ? "text-val-high" : "text-ledger-muted");
-
-  const SortButton = ({ field, label, align = "left" }: { field: keyof AreaOverview; label: string; align?: "left" | "right" }) => (
-    <button
-      onClick={() => handleSort(field)}
-      className={`flex w-full items-center gap-1 text-[11px] font-semibold uppercase tracking-eyebrow text-ledger-dimmed transition-colors hover:text-ledger-text ${
-        align === "right" ? "justify-end" : "justify-start"
-      }`}
-    >
-      {label}
-      <span className={`text-[10px] ${sortField === field ? "text-ledger-accent" : "text-transparent"}`}>
-        {sortField === field ? (sortOrder === "asc" ? "↑" : "↓") : "↕"}
+/** Swatch key for the per-m² color grade — the coding is otherwise undocumented. */
+function PerSqmLegend() {
+  return (
+    <div className="flex items-center gap-2 text-caption text-ledger-dimmed">
+      <span>lower</span>
+      <span className="flex items-center gap-1" aria-hidden>
+        <span className="h-2 w-2 rounded-full bg-val-exc" />
+        <span className="h-2 w-2 rounded-full bg-val-great" />
+        <span className="h-2 w-2 rounded-full bg-val-fair" />
+        <span className="h-2 w-2 rounded-full bg-val-over" />
+        <span className="h-2 w-2 rounded-full bg-val-high" />
       </span>
-    </button>
+      <span>higher price/m²</span>
+    </div>
   );
+}
 
-  if (isLoading) {
+export default async function AreasPage() {
+  const result = await loadAreas();
+
+  if (!result.ok) {
     return (
-      <PageShell>
-        <div className="flex items-center justify-center py-24">
-          <div className="flex flex-col items-center gap-3">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-ledger-border border-t-ledger-text" />
-            <p className="text-[13px] text-ledger-muted">Loading areas…</p>
-          </div>
-        </div>
-      </PageShell>
-    );
-  }
-
-  if (error) {
-    return (
-      <PageShell>
-        <div className="mx-auto mt-4 max-w-xl rounded-2xl border border-ledger-border bg-ledger-surface px-6 py-12 text-center shadow-elev-1">
-          <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-val-over-tint">
-            <svg className="h-5 w-5 text-val-over" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" />
-            </svg>
-          </div>
-          <p className="mt-4 text-[14px] text-ledger-muted">{error}</p>
-        </div>
-      </PageShell>
-    );
-  }
-
-  const staleInfo = getStaleInfo(data?.metadata.generated_at);
-  const areas = getSortedAreas();
-
-  return (
-    <PageShell totalAreas={data?.metadata.total_areas}>
-      {staleInfo?.isStale && (
-        <div className="mx-auto mt-6 max-w-2xl rounded-xl border border-val-over-line bg-val-over-tint px-4 py-3 text-center">
-          <p className="text-[13px] text-val-over">
-            Data is {Math.floor(staleInfo.ageDays)} days old — last updated {formatDateSv(staleInfo.generatedAt)}.
-          </p>
-        </div>
-      )}
-
-      <dl className="mx-auto mt-8 flex max-w-md items-stretch justify-center divide-x divide-ledger-border rounded-2xl border border-ledger-border bg-ledger-surface shadow-elev-1">
-        <Stat value={String(data?.metadata.total_areas ?? "—")} label="Areas" />
-        <Stat value={formatNumber(data?.metadata.total_properties || 0)} label="Properties" />
-        <Stat
-          value={data?.metadata.generated_at ? new Date(data.metadata.generated_at).toLocaleDateString("sv-SE") : "—"}
-          label="Updated"
-          small
+      <Shell>
+        <PageHero
+          chapter="03"
+          eyebrow="Areas"
+          title="Stockholm areas"
+          lead="Market statistics across Stockholm’s areas — prices, momentum, and where the model finds the most undervalued homes."
         />
-      </dl>
-
-      <div className="mt-10 overflow-hidden rounded-2xl border border-ledger-border bg-ledger-surface shadow-elev-1">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-ledger-border">
-                <th className="px-4 py-3 text-left"><SortButton field="display_name" label="Area" /></th>
-                <th className="px-4 py-3 text-left"><SortButton field="price_tier" label="Tier" /></th>
-                <th className="px-4 py-3 text-right"><SortButton field="avg_sold_price" label="Avg price" align="right" /></th>
-                <th className="px-4 py-3 text-right"><SortButton field="avg_price_per_sqm" label="Per m²" align="right" /></th>
-                <th className="px-4 py-3 text-right"><SortButton field="listing_count" label="Homes" align="right" /></th>
-                <th className="px-4 py-3 text-right"><SortButton field="price_change_mean" label="Δ price" align="right" /></th>
-                <th className="px-4 py-3 text-right"><SortButton field="undervalued_pct" label="Undervalued" align="right" /></th>
-                <th className="px-4 py-3 text-right"><SortButton field="days_on_market_median" label="Days" align="right" /></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-ledger-border">
-              {areas.map((area) => (
-                <tr key={area.area_name} className="group transition-colors hover:bg-ledger-elevated/50">
-                  <td className="px-4 py-3">
-                    <Link
-                      href={`/area/${area.area_name}`}
-                      className="focus-ring inline-flex items-center gap-2 text-[13px] font-medium text-ledger-text transition-colors group-hover:text-ledger-accent"
-                    >
-                      {area.display_name}
-                      {area.has_limited_data && (
-                        <span className="rounded-pill bg-val-over-tint px-1.5 py-0.5 text-[10px] font-medium text-val-over">
-                          limited
-                        </span>
-                      )}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="inline-flex rounded-pill border border-ledger-border bg-ledger-elevated px-2.5 py-0.5 text-[12px] font-medium text-ledger-muted">
-                      {TIER_LABEL[area.price_tier] ?? area.price_tier}
-                    </span>
-                  </td>
-                  <td className="num whitespace-nowrap px-4 py-3 text-right text-[13px] text-ledger-text">
-                    {formatSek(area.avg_sold_price)}
-                  </td>
-                  <td className={`num whitespace-nowrap px-4 py-3 text-right text-[13px] ${getPricePerSqmColor(area.avg_price_per_sqm, areas)}`}>
-                    {area.avg_price_per_sqm ? `${formatNumber(area.avg_price_per_sqm)}` : "—"}
-                  </td>
-                  <td className="num whitespace-nowrap px-4 py-3 text-right text-[13px] text-ledger-muted">
-                    {formatNumber(area.listing_count)}
-                  </td>
-                  <td className={`num whitespace-nowrap px-4 py-3 text-right text-[13px] ${getPriceChangeColor(area.price_change_mean)}`}>
-                    {area.price_change_mean > 0 ? "+" : ""}
-                    {formatSek(area.price_change_mean)}
-                  </td>
-                  <td className="num whitespace-nowrap px-4 py-3 text-right text-[13px] text-ledger-muted">
-                    {formatNumberOrDash(area.undervalued_pct, 1)}%
-                  </td>
-                  <td className="num whitespace-nowrap px-4 py-3 text-right text-[13px] text-ledger-muted">
-                    {formatNumber(area.days_on_market_median)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="mt-10 rounded-sm border border-val-over-line bg-val-over-tint px-6 py-10 text-center">
+          <p className="text-body-sm text-val-over">{ERROR_COPY[result.kind]}</p>
         </div>
-      </div>
+      </Shell>
+    );
+  }
 
-      <p className="mt-5 text-center text-[13px] text-ledger-dimmed">
-        Select any area for detailed analytics.
-      </p>
-    </PageShell>
-  );
-}
+  const { areas, meta } = result;
+  const staleInfo = getStaleInfo(meta.generated_at);
+  const isStale = staleInfo?.isStale ?? false;
+  const hasLimited = areas.some((area) => area.has_limited_data);
 
-function PageShell({ children, totalAreas }: { children: React.ReactNode; totalAreas?: number }) {
+  const metaLine = isStale && staleInfo
+    ? `Source: Booli · Updated ${formatDateSv(meta.generated_at)} · ${Math.floor(staleInfo.ageDays)} days old`
+    : `Source: Booli · Updated ${formatDateSv(meta.generated_at)}`;
+
   return (
-    <div className="min-h-screen bg-ledger-bg">
-      <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
-        <header className="mx-auto max-w-2xl text-center animate-fade-in-up">
-          <p className="font-mono text-[12px] font-semibold uppercase tracking-eyebrow text-ledger-accent">
-            Areas
-          </p>
-          <h1 className="mt-3 text-4xl font-semibold leading-[1.06] tracking-tight text-ledger-text sm:text-[46px]">
-            Stockholm neighbourhoods
-          </h1>
-          <p className="mx-auto mt-4 max-w-xl text-[15px] leading-relaxed text-ledger-muted">
-            Market statistics{typeof totalAreas === "number" ? ` across ${totalAreas} areas` : ""} — prices, momentum,
+    <Shell>
+      <PageHero
+        chapter="03"
+        eyebrow="Areas"
+        title="Stockholm areas"
+        lead={
+          <>
+            Market statistics across {meta.total_areas} areas. Table 1 ranks prices, momentum,
             and where the model finds the most undervalued homes.
-          </p>
-        </header>
-        {children}
-      </div>
-    </div>
-  );
-}
-
-function Stat({ value, label, small = false }: { value: string; label: string; small?: boolean }) {
-  return (
-    <div className="flex flex-1 flex-col items-center px-4 py-4">
-      <dd
-        className={`num whitespace-nowrap font-semibold text-ledger-text ${
-          small ? "text-base" : "text-2xl"
-        }`}
+          </>
+        }
       >
-        {value}
-      </dd>
-      <dt className="mt-1 text-[12px] text-ledger-muted">{label}</dt>
-    </div>
+        <StatBar>
+          <Stat value={formatNumber(meta.total_areas)} label="Areas" />
+          <Stat value={formatNumber(meta.total_properties)} label="Properties" />
+          <Stat value={formatDateSv(meta.generated_at)} label="Updated" small />
+        </StatBar>
+      </PageHero>
+
+      <div className="mt-12">
+        <FigureFrame
+          kind="table"
+          index={1}
+          title="Area register"
+          meta={metaLine}
+          stale={isStale}
+          actions={<PerSqmLegend />}
+          footnote={
+            hasLimited ? "† Limited sample — interpret with care." : undefined
+          }
+        >
+          <AreasTable areas={areas} />
+        </FigureFrame>
+      </div>
+    </Shell>
   );
 }
