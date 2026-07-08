@@ -96,7 +96,11 @@ export function MarketSection({
           </dd>
         </div>
         <div>
-          <dt className="eyebrow">Sales volume (3M)</dt>
+          {/* Sales volume isn't computed per room bucket, so it stays all-rooms; label it
+              honestly when a room filter is active rather than implying it's scoped. */}
+          <dt className="eyebrow">
+            {filter === "all" ? "Sales volume (3M)" : "Sales volume (3M, all rooms)"}
+          </dt>
           <dd className="num mt-1.5 text-title font-semibold text-ledger-text">
             {formatNumber(marketDynamics.sales_volume_3m)}
           </dd>

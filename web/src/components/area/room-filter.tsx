@@ -5,6 +5,7 @@ import { useRoomFilter } from "@/components/area/room-filter-provider";
 
 const FILTERS: { key: RoomFilter; label: string }[] = [
   { key: "all", label: "All" },
+  { key: "1", label: "1 room" },
   { key: "2", label: "2 rooms" },
   { key: "3", label: "3 rooms" },
   { key: "4+", label: "4+ rooms" },
