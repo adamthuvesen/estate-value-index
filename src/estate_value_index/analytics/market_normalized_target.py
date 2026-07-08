@@ -292,7 +292,9 @@ def _build_result_payload(
     diagnostic_frame["base_prediction"] = base_predictions
     diagnostic_frame["normalized_prediction"] = normalized_predictions
     diagnostic_frame["calibrated_prediction"] = blended_predictions
-    diagnostic_frame["sold_month"] = pd.to_datetime(diagnostic_frame["sold_date"]).dt.to_period("M").astype(str)
+    diagnostic_frame["sold_month"] = (
+        pd.to_datetime(diagnostic_frame["sold_date"]).dt.to_period("M").astype(str)
+    )
     diagnostic_frame["price_band"] = diagnostic_frame["sold_price"].apply(_price_band)
     diagnostic_frame["central_area"] = diagnostic_frame["area"].isin(
         {"ostermalm", "vasastan", "sodermalm", "kungsholmen"}

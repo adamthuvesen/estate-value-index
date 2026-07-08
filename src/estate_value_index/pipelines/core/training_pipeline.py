@@ -121,9 +121,10 @@ def _run_local_training(config: TrainingFlowConfig, results: dict, logger: Logge
         raise RuntimeError(f"Local training failed: {e}") from e
 
     # Validate local model
-    metrics_file = Path(config.local_model_dir) / production_artifact_names(
-        NO_LIST_MODEL_ID, config.model_prefix
-    ).metrics
+    metrics_file = (
+        Path(config.local_model_dir)
+        / production_artifact_names(NO_LIST_MODEL_ID, config.model_prefix).metrics
+    )
     if not metrics_file.exists():
         results["success"] = False
         raise RuntimeError(
@@ -407,9 +408,12 @@ def _validate_and_promote_stage(
     logger.info("STEP 6: Validating model performance")
     logger.info("-" * 80)
 
-    metrics_path = Path(config.local_model_dir) / production_artifact_names(
-        NO_LIST_MODEL_ID, state.resolved_model_prefix or config.model_prefix
-    ).metrics
+    metrics_path = (
+        Path(config.local_model_dir)
+        / production_artifact_names(
+            NO_LIST_MODEL_ID, state.resolved_model_prefix or config.model_prefix
+        ).metrics
+    )
     if not metrics_path.exists():
         logger.warning(f"Metrics file not found: {metrics_path}")
         results["validation_passed"] = False

@@ -110,9 +110,7 @@ def test_select_blend_uses_custom_gate_thresholds(monkeypatch) -> None:
     )
     monkeypatch.setattr(
         "estate_value_index.ml.production_models.select_best_expert_weights",
-        lambda *args, **kwargs: {
-            "weights": {"global": 1.0, "low": 0.0, "mid": 0.0, "high": 0.0}
-        },
+        lambda *args, **kwargs: {"weights": {"global": 1.0, "low": 0.0, "mid": 0.0, "high": 0.0}},
     )
 
     def capture_gated_selection(y_true, predictions, gate_labels, **kwargs):

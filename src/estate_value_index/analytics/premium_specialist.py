@@ -369,7 +369,9 @@ def _build_result_payload(
     diagnostic_frame["base_prediction"] = global_predictions
     diagnostic_frame["calibrated_prediction"] = premium_blend_predictions
     diagnostic_frame["specialist_gate"] = np.asarray(test_gate, dtype=bool)
-    diagnostic_frame["sold_month"] = pd.to_datetime(diagnostic_frame["sold_date"]).dt.to_period("M").astype(str)
+    diagnostic_frame["sold_month"] = (
+        pd.to_datetime(diagnostic_frame["sold_date"]).dt.to_period("M").astype(str)
+    )
     diagnostic_frame["price_band"] = diagnostic_frame["sold_price"].apply(_price_band)
     diagnostic_frame["central_area"] = diagnostic_frame["area"].isin(
         {"ostermalm", "vasastan", "sodermalm", "kungsholmen"}
@@ -409,7 +411,9 @@ def _build_result_payload(
             "oof_gate_rows": int(np.asarray(oof_gate, dtype=bool).sum()),
             "test_gate_rows": int(np.asarray(test_gate, dtype=bool).sum()),
             "test_gate_rate": float(np.asarray(test_gate, dtype=bool).mean() * 100),
-            "test_12m_plus_capture_rate": _capture_rate(y_test, test_gate, REPORT_HIGH_END_MIN_PRICE),
+            "test_12m_plus_capture_rate": _capture_rate(
+                y_test, test_gate, REPORT_HIGH_END_MIN_PRICE
+            ),
         },
         "blend_selection": {
             "global": global_blend_selection,

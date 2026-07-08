@@ -63,9 +63,9 @@ def create_market_features(
             feature_values[column] = value.reindex(df.index).astype(float)
             continue
         if column == "market_data_age_months":
-            feature_values[column] = _data_age_months(
-                lookup_month, joined["market_month"]
-            ).reindex(df.index)
+            feature_values[column] = _data_age_months(lookup_month, joined["market_month"]).reindex(
+                df.index
+            )
             feature_values[column] = feature_values[column].fillna(0.0).astype(float)
             continue
 
@@ -164,9 +164,9 @@ def _load_interest_rates() -> pd.DataFrame:
     rates["market_interest_rate_change_3m"] = rates["market_interest_rate"] - rates[
         "market_interest_rate"
     ].shift(3)
-    return rates[
-        ["market_month", "market_interest_rate", "market_interest_rate_change_3m"]
-    ].dropna(subset=["market_month"])
+    return rates[["market_month", "market_interest_rate", "market_interest_rate_change_3m"]].dropna(
+        subset=["market_month"]
+    )
 
 
 def _load_ki_indicators() -> pd.DataFrame:

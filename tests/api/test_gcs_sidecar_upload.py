@@ -92,7 +92,9 @@ def test_upload_writes_sidecar_alongside_joblib(
     monkeypatch.setattr(gcs_module, "is_gcs_enabled", lambda: True)
     monkeypatch.setattr(gcs_module, "GCSClient", lambda *a, **kw: fake_client)
 
-    artefacts = gcs_module.upload_model_artifacts(fake_model_dir, "price_prediction_model_no_list_price")
+    artefacts = gcs_module.upload_model_artifacts(
+        fake_model_dir, "price_prediction_model_no_list_price"
+    )
 
     # Both artefact and sidecar end up in the fake bucket layout.
     uploaded_joblib = bucket_dir / "models" / "price_prediction_model_no_list_price.joblib"
@@ -150,7 +152,9 @@ def test_upload_missing_model_raises(tmp_path: Path, monkeypatch) -> None:
     model_dir.mkdir()
 
     monkeypatch.setattr(gcs_module, "is_gcs_enabled", lambda: True)
-    monkeypatch.setattr(gcs_module, "GCSClient", lambda *a, **kw: _FakeGCSClient(tmp_path / "bucket"))
+    monkeypatch.setattr(
+        gcs_module, "GCSClient", lambda *a, **kw: _FakeGCSClient(tmp_path / "bucket")
+    )
 
     with pytest.raises(RuntimeError, match="GCS model artifact upload failed"):
         gcs_module.upload_model_artifacts(model_dir, "price_prediction_model_no_list_price")

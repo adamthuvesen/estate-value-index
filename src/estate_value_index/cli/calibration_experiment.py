@@ -57,10 +57,7 @@ def main(argv: list[str] | None = None, *, args=None) -> int:
     delta = result["delta"]
     print(f"Residual calibration experiment complete: {feature_set}")
     print(f"Base MAE: {base['mae']:,.0f} SEK; bias: {base['mean_bias']:,.0f} SEK")
-    print(
-        "Calibrated MAE: "
-        f"{calibrated['mae']:,.0f} SEK; bias: {calibrated['mean_bias']:,.0f} SEK"
-    )
+    print(f"Calibrated MAE: {calibrated['mae']:,.0f} SEK; bias: {calibrated['mean_bias']:,.0f} SEK")
     print(
         "Delta: "
         f"MAE {delta['mae']:,.0f} SEK, "
@@ -87,10 +84,7 @@ def _run_production(args) -> int:
     gate = result["gate"]
     print(f"Production residual calibration complete: {feature_set}")
     print(f"Base MAE: {base['mae']:,.0f} SEK; bias: {base['mean_bias']:,.0f} SEK")
-    print(
-        "Calibrated MAE: "
-        f"{calibrated['mae']:,.0f} SEK; bias: {calibrated['mean_bias']:,.0f} SEK"
-    )
+    print(f"Calibrated MAE: {calibrated['mae']:,.0f} SEK; bias: {calibrated['mean_bias']:,.0f} SEK")
     print(
         "Delta: "
         f"MAE {delta['mae']:,.0f} SEK, "

@@ -28,7 +28,9 @@ def main(argv: list[str] | None = None, *, args=None) -> int:
         parser.add_argument("--low-max-price", type=float, default=DEFAULT_TRAIN_TIER_LOW_MAX_PRICE)
         parser.add_argument("--mid-min-price", type=float, default=DEFAULT_TRAIN_TIER_MID_MIN_PRICE)
         parser.add_argument("--mid-max-price", type=float, default=DEFAULT_TRAIN_TIER_MID_MAX_PRICE)
-        parser.add_argument("--high-min-price", type=float, default=DEFAULT_TRAIN_TIER_HIGH_MIN_PRICE)
+        parser.add_argument(
+            "--high-min-price", type=float, default=DEFAULT_TRAIN_TIER_HIGH_MIN_PRICE
+        )
         parser.add_argument("--gate-low-max", type=float, default=DEFAULT_INFERENCE_GATE_LOW_MAX)
         parser.add_argument("--gate-high-min", type=float, default=DEFAULT_INFERENCE_GATE_HIGH_MIN)
         parser.add_argument("--weight-step", type=float, default=DEFAULT_WEIGHT_STEP)

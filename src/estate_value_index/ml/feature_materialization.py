@@ -30,7 +30,9 @@ from estate_value_index.utils.clients import get_bq_client
 from estate_value_index.utils.settings import bq_table, get_batch_size, load_env_config
 
 logger = logging.getLogger(__name__)
-FEATURE_SCHEMA_PATH = Path(__file__).resolve().parents[3] / "schemas" / "bq_features_engineered.json"
+FEATURE_SCHEMA_PATH = (
+    Path(__file__).resolve().parents[3] / "schemas" / "bq_features_engineered.json"
+)
 
 
 @dataclass(frozen=True)
@@ -261,8 +263,7 @@ def _sync_feature_table_schema(
     required_missing = [field.name for field in missing if field.mode == "REQUIRED"]
     if required_missing:
         raise RuntimeError(
-            "feature table is missing required schema fields: "
-            + ", ".join(required_missing)
+            "feature table is missing required schema fields: " + ", ".join(required_missing)
         )
 
     table.schema = list(table.schema) + missing

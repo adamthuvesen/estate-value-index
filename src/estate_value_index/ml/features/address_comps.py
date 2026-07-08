@@ -69,9 +69,13 @@ def _ensure_address_keys(df: pd.DataFrame) -> pd.DataFrame:
     df["_address_comp_key"] = np.where(address_valid, area_key + "|" + address_key, None)
     if SIZE_BAND_COLUMN not in df.columns:
         df[SIZE_BAND_COLUMN] = _size_band(df)
-    size_band = df[SIZE_BAND_COLUMN].astype("object").where(
-        df[SIZE_BAND_COLUMN].notna(),
-        "unknown",
+    size_band = (
+        df[SIZE_BAND_COLUMN]
+        .astype("object")
+        .where(
+            df[SIZE_BAND_COLUMN].notna(),
+            "unknown",
+        )
     )
     df["_street_size_key"] = np.where(
         street_valid,
@@ -144,7 +148,9 @@ def _choose_address_comp_stats(
 ) -> None:
     _fill_from_micro_area(df, "street_area")
     street_ok = street_area["count"] >= STREET_AREA_MIN_PRIOR_COUNT
-    _assign_stats(df, "street_area", street_ok, street_area, "street_area_scope_used", "street_area")
+    _assign_stats(
+        df, "street_area", street_ok, street_area, "street_area_scope_used", "street_area"
+    )
     _finish_stats(df, "street_area")
 
     _copy_prefix(df, source="street_area", target="street_size")
@@ -218,9 +224,7 @@ def _assign_stats(
 
 
 def _finish_stats(df: pd.DataFrame, prefix: str) -> None:
-    df[f"{prefix}_ppsqm_p75"] = df[f"{prefix}_ppsqm_p75"].fillna(
-        df[f"{prefix}_ppsqm_median"]
-    )
+    df[f"{prefix}_ppsqm_p75"] = df[f"{prefix}_ppsqm_p75"].fillna(df[f"{prefix}_ppsqm_median"])
     df[f"{prefix}_ppsqm_p90"] = (
         df[f"{prefix}_ppsqm_p90"]
         .fillna(df[f"{prefix}_ppsqm_p75"])

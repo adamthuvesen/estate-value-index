@@ -41,10 +41,7 @@ def test_normalize_street_name_removes_house_number() -> None:
 
 
 def test_street_area_comp_uses_prior_street_history() -> None:
-    rows = [
-        _listing(f"P{i}", f"2024-01-{i + 1:02d}", 150_000 + i * 1000)
-        for i in range(5)
-    ]
+    rows = [_listing(f"P{i}", f"2024-01-{i + 1:02d}", 150_000 + i * 1000) for i in range(5)]
     rows.append(_listing("TARGET", "2024-02-01", 190_000))
 
     engineered = create_optimized_features(pd.DataFrame(rows)).set_index("listing_id")
@@ -52,16 +49,14 @@ def test_street_area_comp_uses_prior_street_history() -> None:
     assert engineered.loc["TARGET", "street_name"] == "grev magnigatan"
     assert engineered.loc["TARGET", "street_area_scope_used"] == "street_area"
     assert engineered.loc["TARGET", "street_area_ppsqm_count"] == 5
-    assert engineered.loc["TARGET", "street_area_ppsqm_p90"] >= engineered.loc[
-        "TARGET", "street_area_ppsqm_median"
-    ]
+    assert (
+        engineered.loc["TARGET", "street_area_ppsqm_p90"]
+        >= engineered.loc["TARGET", "street_area_ppsqm_median"]
+    )
 
 
 def test_address_comp_uses_prior_exact_address_history() -> None:
-    rows = [
-        _listing(f"A{i}", f"2024-01-{i + 1:02d}", 155_000 + i * 1000)
-        for i in range(3)
-    ]
+    rows = [_listing(f"A{i}", f"2024-01-{i + 1:02d}", 155_000 + i * 1000) for i in range(3)]
     rows.extend(
         [
             _listing(
@@ -83,10 +78,7 @@ def test_address_comp_uses_prior_exact_address_history() -> None:
 
 
 def test_address_comp_features_do_not_use_same_day_labels() -> None:
-    rows = [
-        _listing(f"P{i}", f"2024-01-{i + 1:02d}", 150_000 + i * 1000)
-        for i in range(5)
-    ]
+    rows = [_listing(f"P{i}", f"2024-01-{i + 1:02d}", 150_000 + i * 1000) for i in range(5)]
     rows.extend(
         [
             _listing("R1", "2024-06-01", 160_000),

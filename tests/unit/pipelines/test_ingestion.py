@@ -179,7 +179,9 @@ class TestGeocodeNewAddressesTask:
         )
         mock_client.insert_rows_json.return_value = [{"index": 0, "errors": ["bad row"]}]
 
-        mocker.patch("estate_value_index.pipelines.tasks.ingestion.get_bq_client", return_value=mock_client)
+        mocker.patch(
+            "estate_value_index.pipelines.tasks.ingestion.get_bq_client", return_value=mock_client
+        )
         mocker.patch(
             "estate_value_index.utils.settings.load_env_config",
             return_value=MagicMock(bigquery_project_id="test-project"),

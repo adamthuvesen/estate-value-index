@@ -439,16 +439,12 @@ def _value_insights(value_properties: list[dict]) -> dict[str, Any]:
     # suppressed row can't drag an area's average toward the fill value.
     rankable = [p for p in value_properties if p["is_rankable"]]
     undervalued_count = sum(1 for p in rankable if p.get("is_undervalued", False))
-    value_scores = [
-        score for p in rankable if (score := p.get("value_score")) is not None
-    ]
+    value_scores = [score for p in rankable if (score := p.get("value_score")) is not None]
     prediction_deltas = [p.get("prediction_delta_absolute", 0) for p in rankable]
 
     return {
         "undervalued_count": undervalued_count,
-        "undervalued_pct": round(undervalued_count / len(rankable) * 100, 1)
-        if rankable
-        else 0,
+        "undervalued_pct": round(undervalued_count / len(rankable) * 100, 1) if rankable else 0,
         "avg_value_score": round(statistics.mean(value_scores), 1) if value_scores else 50.0,
         "median_value_score": round(statistics.median(value_scores), 1) if value_scores else 50.0,
         "avg_prediction_delta": round(statistics.mean(prediction_deltas))
@@ -506,7 +502,9 @@ def _context_price_or_mean(
     context_value = feature_context.get(feature_key, {}).get(area_key)
     if context_value is not None:
         return round(context_value)
-    return _mean_price_or_feature_value(properties, property_key, feature_context, feature_key, area_key)
+    return _mean_price_or_feature_value(
+        properties, property_key, feature_context, feature_key, area_key
+    )
 
 
 def calculate_room_filtered_statistics(
@@ -577,10 +575,7 @@ def _resolve_area_statistics_paths(
     project_root = Path(__file__).resolve().parents[3]
     return AreaStatisticsPaths(
         feature_context=feature_context_path
-        or project_root
-        / "web"
-        / "models"
-        / production_artifact_names(NO_LIST_MODEL_ID).context,
+        or project_root / "web" / "models" / production_artifact_names(NO_LIST_MODEL_ID).context,
         value_analysis=value_analysis_path
         or project_root / "data" / "enrichment" / "value_analysis.json",
         raw_listings=raw_listings_path

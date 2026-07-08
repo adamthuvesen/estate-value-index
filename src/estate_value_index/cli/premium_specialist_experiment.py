@@ -24,11 +24,21 @@ def main(argv: list[str] | None = None, *, args=None) -> int:
         parser.add_argument("--feature-set", default="no_list_price_h3_market_tail")
         parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
         parser.add_argument("--splits", type=int, default=4)
-        parser.add_argument("--specialist-min-price", type=float, default=DEFAULT_SPECIALIST_MIN_PRICE)
-        parser.add_argument("--gate-prediction-min", type=float, default=DEFAULT_GATE_PREDICTION_MIN)
-        parser.add_argument("--gate-comp-value-min", type=float, default=DEFAULT_GATE_COMP_VALUE_MIN)
-        parser.add_argument("--gate-luxury-score-min", type=float, default=DEFAULT_GATE_LUXURY_SCORE_MIN)
-        parser.add_argument("--gate-min-living-area", type=float, default=DEFAULT_GATE_MIN_LIVING_AREA)
+        parser.add_argument(
+            "--specialist-min-price", type=float, default=DEFAULT_SPECIALIST_MIN_PRICE
+        )
+        parser.add_argument(
+            "--gate-prediction-min", type=float, default=DEFAULT_GATE_PREDICTION_MIN
+        )
+        parser.add_argument(
+            "--gate-comp-value-min", type=float, default=DEFAULT_GATE_COMP_VALUE_MIN
+        )
+        parser.add_argument(
+            "--gate-luxury-score-min", type=float, default=DEFAULT_GATE_LUXURY_SCORE_MIN
+        )
+        parser.add_argument(
+            "--gate-min-living-area", type=float, default=DEFAULT_GATE_MIN_LIVING_AREA
+        )
         parser.add_argument("--max-premium-ratio", type=float, default=DEFAULT_MAX_PREMIUM_RATIO)
         parser.add_argument(
             "--anchor-column",

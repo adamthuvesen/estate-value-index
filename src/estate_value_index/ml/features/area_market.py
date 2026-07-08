@@ -251,43 +251,33 @@ def _create_area_temporal_metrics(
         temporal_frame["area_sold_price_median_1m"] = df["area"].map(context.area_median_price_1m)
         temporal_frame["area_sold_price_median_3m"] = df["area"].map(context.area_median_price_3m)
         temporal_frame["area_sold_price_median_6m"] = df["area"].map(context.area_median_price_6m)
-        temporal_frame["area_sold_price_median_12m"] = df["area"].map(
-            context.area_median_price_12m
-        )
+        temporal_frame["area_sold_price_median_12m"] = df["area"].map(context.area_median_price_12m)
 
         temporal_frame["area_sold_price_median_1m"] = temporal_frame[
             "area_sold_price_median_1m"
-        ].fillna(
-            context.global_area_median_price_1m
-        )
+        ].fillna(context.global_area_median_price_1m)
         temporal_frame["area_sold_price_median_3m"] = temporal_frame[
             "area_sold_price_median_3m"
-        ].fillna(
-            context.global_area_median_price_3m
-        )
+        ].fillna(context.global_area_median_price_3m)
         temporal_frame["area_sold_price_median_6m"] = temporal_frame[
             "area_sold_price_median_6m"
-        ].fillna(
-            context.global_area_median_price_6m
-        )
+        ].fillna(context.global_area_median_price_6m)
         temporal_frame["area_sold_price_median_12m"] = temporal_frame[
             "area_sold_price_median_12m"
-        ].fillna(
-            context.global_area_median_price_12m
-        )
+        ].fillna(context.global_area_median_price_12m)
 
-        temporal_frame["area_sales_volume_1m"] = df["area"].map(
-            context.area_sales_volume_1m
-        ).fillna(0.0)
-        temporal_frame["area_sales_volume_3m"] = df["area"].map(
-            context.area_sales_volume_3m
-        ).fillna(0.0)
-        temporal_frame["area_sales_volume_6m"] = df["area"].map(
-            context.area_sales_volume_6m
-        ).fillna(0.0)
-        temporal_frame["area_sales_volume_12m"] = df["area"].map(
-            context.area_sales_volume_12m
-        ).fillna(0.0)
+        temporal_frame["area_sales_volume_1m"] = (
+            df["area"].map(context.area_sales_volume_1m).fillna(0.0)
+        )
+        temporal_frame["area_sales_volume_3m"] = (
+            df["area"].map(context.area_sales_volume_3m).fillna(0.0)
+        )
+        temporal_frame["area_sales_volume_6m"] = (
+            df["area"].map(context.area_sales_volume_6m).fillna(0.0)
+        )
+        temporal_frame["area_sales_volume_12m"] = (
+            df["area"].map(context.area_sales_volume_12m).fillna(0.0)
+        )
         df = pd.concat([df, temporal_frame], axis=1)
 
     # Fill missing values with fallbacks (same order as original)

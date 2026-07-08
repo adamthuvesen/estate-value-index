@@ -228,9 +228,7 @@ def _assign_micro_area_stats(
 
 
 def _finish_micro_area_stats(df: pd.DataFrame, area: pd.DataFrame) -> None:
-    df["micro_area_ppsqm_p75"] = df["micro_area_ppsqm_p75"].fillna(
-        df["micro_area_ppsqm_median"]
-    )
+    df["micro_area_ppsqm_p75"] = df["micro_area_ppsqm_p75"].fillna(df["micro_area_ppsqm_median"])
     df["micro_area_ppsqm_p90"] = (
         df["micro_area_ppsqm_p90"]
         .fillna(df["micro_area_ppsqm_p75"])
@@ -399,9 +397,7 @@ def _add_training_neighbor_features(df: pd.DataFrame) -> pd.DataFrame:
             df.loc[orig_idx, "h3_neighbor_ppsqm_p90"] = p90
             df.loc[orig_idx, "h3_neighbor_ppsqm_count"] = count
 
-        rows = same_date[["h3_res10", MICRO_AREA_SOURCE_COLUMN]].itertuples(
-            index=False, name=None
-        )
+        rows = same_date[["h3_res10", MICRO_AREA_SOURCE_COLUMN]].itertuples(index=False, name=None)
         for cell, ppsqm in rows:
             state.setdefault(str(cell), []).append(float(ppsqm))
 
@@ -454,9 +450,7 @@ def _init_neighbor_features(df: pd.DataFrame) -> None:
 def _finish_neighbor_features(df: pd.DataFrame) -> None:
     df["h3_neighbor_ppsqm_count"] = df["h3_neighbor_ppsqm_count"].fillna(0.0)
     df["h3_neighbor_ppsqm"] = df["h3_neighbor_ppsqm"].fillna(df["micro_area_ppsqm_median"])
-    df["h3_neighbor_ppsqm_p75"] = df["h3_neighbor_ppsqm_p75"].fillna(
-        df["h3_neighbor_ppsqm"]
-    )
+    df["h3_neighbor_ppsqm_p75"] = df["h3_neighbor_ppsqm_p75"].fillna(df["h3_neighbor_ppsqm"])
     df["h3_neighbor_ppsqm_p90"] = (
         df["h3_neighbor_ppsqm_p90"]
         .fillna(df["h3_neighbor_ppsqm_p75"])
@@ -684,9 +678,7 @@ def _choose_same_size_stats(
         df["micro_area_ppsqm_median"]
     )
     df["same_size_ppsqm_count"] = df["same_size_ppsqm_count"].fillna(0.0)
-    df["same_size_ppsqm_p75"] = df["same_size_ppsqm_p75"].fillna(
-        df["same_size_ppsqm_median"]
-    )
+    df["same_size_ppsqm_p75"] = df["same_size_ppsqm_p75"].fillna(df["same_size_ppsqm_median"])
     df["same_size_ppsqm_p90"] = (
         df["same_size_ppsqm_p90"]
         .fillna(df["same_size_ppsqm_p75"])

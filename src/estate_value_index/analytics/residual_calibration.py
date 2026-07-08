@@ -144,7 +144,11 @@ def build_calibration_features(
         else:
             features[column] = np.nan
 
-    area = frame["area"].astype("string") if "area" in frame.columns else pd.Series(pd.NA, index=frame.index)
+    area = (
+        frame["area"].astype("string")
+        if "area" in frame.columns
+        else pd.Series(pd.NA, index=frame.index)
+    )
     features["is_central_area"] = area.isin(CENTRAL_AREAS).astype(float)
 
     for column in CALIBRATION_CATEGORICAL_FEATURES:
@@ -262,7 +266,9 @@ def _resolve_features(
     numeric_features, categorical_features, _ = get_feature_lists()
     subset_numeric, subset_categorical = load_feature_subset(feature_set)
     if subset_numeric is not None:
-        numeric_features = [feature for feature in subset_numeric if feature in df_engineered.columns]
+        numeric_features = [
+            feature for feature in subset_numeric if feature in df_engineered.columns
+        ]
         categorical_features = [
             feature for feature in (subset_categorical or []) if feature in df_engineered.columns
         ]
@@ -346,7 +352,9 @@ def _build_oof_residual_training_data(
             prepared.test_engineered["sold_price"].reset_index(drop=True).to_numpy()
             - fit.predictions
         )
-        fold_features["actual_price"] = prepared.test_engineered["sold_price"].reset_index(drop=True)
+        fold_features["actual_price"] = prepared.test_engineered["sold_price"].reset_index(
+            drop=True
+        )
         fold_features["fold"] = fold
         rows.append(fold_features)
 
@@ -364,9 +372,7 @@ def _fit_residual_calibrator(oof: pd.DataFrame, *, random_state: int) -> Pipelin
                     transformers=[
                         (
                             "numeric",
-                            Pipeline(
-                                steps=[("imputer", SimpleImputer(strategy="median"))]
-                            ),
+                            Pipeline(steps=[("imputer", SimpleImputer(strategy="median"))]),
                             CALIBRATION_NUMERIC_FEATURES,
                         ),
                         (
@@ -430,7 +436,9 @@ def _build_result_payload(
     diagnostic_frame["base_error"] = base_predictions - y_test
     diagnostic_frame["calibrated_error"] = calibrated_predictions - y_test
     diagnostic_frame["residual_adjustment"] = residual_adjustment
-    diagnostic_frame["sold_month"] = pd.to_datetime(diagnostic_frame["sold_date"]).dt.to_period("M").astype(str)
+    diagnostic_frame["sold_month"] = (
+        pd.to_datetime(diagnostic_frame["sold_date"]).dt.to_period("M").astype(str)
+    )
     diagnostic_frame["price_band"] = diagnostic_frame["sold_price"].apply(_price_band)
     diagnostic_frame["central_area"] = diagnostic_frame["area"].isin(CENTRAL_AREAS)
 
@@ -491,8 +499,7 @@ def _metric_delta(
         "within_10_pct": calibrated["within_10_pct"] - base["within_10_pct"],
         "within_20_pct": calibrated["within_20_pct"] - base["within_20_pct"],
         "mean_bias": calibrated["mean_bias"] - base["mean_bias"],
-        "underprediction_rate": calibrated["underprediction_rate"]
-        - base["underprediction_rate"],
+        "underprediction_rate": calibrated["underprediction_rate"] - base["underprediction_rate"],
     }
 
 

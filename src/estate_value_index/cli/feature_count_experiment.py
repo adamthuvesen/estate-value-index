@@ -48,10 +48,7 @@ def main(argv: list[str] | None = None, *, args=None) -> int:
     baseline = result["baseline_full"]["blend"]
     best = min(result["evaluations"], key=lambda evaluation: evaluation["blend"]["mae"])
     print(f"Feature count experiment complete: {args.feature_set}")
-    print(
-        f"Full feature MAE: {baseline['mae']:,.0f} SEK; "
-        f"bias: {baseline['mean_bias']:,.0f} SEK"
-    )
+    print(f"Full feature MAE: {baseline['mae']:,.0f} SEK; bias: {baseline['mean_bias']:,.0f} SEK")
     print(
         f"Best top-k: {best['feature_count']} features; "
         f"MAE: {best['blend']['mae']:,.0f} SEK; "

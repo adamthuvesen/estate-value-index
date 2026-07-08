@@ -277,9 +277,7 @@ class ModelMonitor:
         ):
             return False, None
 
-        degradation_pct = (
-            (current_median_ape - reference_median_ape) / reference_median_ape * 100
-        )
+        degradation_pct = (current_median_ape - reference_median_ape) / reference_median_ape * 100
         return degradation_pct > (PERFORMANCE_DEGRADATION_THRESHOLD * 100), degradation_pct
 
     def _extract_all_metrics(self, report_dict: dict) -> _ExtractedMetrics:

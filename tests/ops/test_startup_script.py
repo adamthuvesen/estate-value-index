@@ -17,10 +17,14 @@ def _write_artifact(model_dir: Path, filename: str, payload: bytes | None = None
     path = model_dir / filename
     path.write_bytes(payload)
     digest = hashlib.sha256(payload).hexdigest()
-    path.with_suffix(path.suffix + ".sha256").write_text(f"{digest}  {filename}\n", encoding="utf-8")
+    path.with_suffix(path.suffix + ".sha256").write_text(
+        f"{digest}  {filename}\n", encoding="utf-8"
+    )
 
 
-def _run_startup(tmp_path: Path, model_dir: Path, **env_overrides: str) -> subprocess.CompletedProcess:
+def _run_startup(
+    tmp_path: Path, model_dir: Path, **env_overrides: str
+) -> subprocess.CompletedProcess:
     env = {
         **os.environ,
         "MODEL_DIR": str(model_dir),

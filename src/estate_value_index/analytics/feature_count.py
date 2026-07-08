@@ -128,7 +128,9 @@ def run_recursive_feature_count_experiment(
     current_ranking = _rank_features(current_prepared, seed)
     evaluations = []
     for count in sorted(set(feature_counts), reverse=True):
-        selected_features = [row["feature"] for row in current_ranking[: min(count, len(current_ranking))]]
+        selected_features = [
+            row["feature"] for row in current_ranking[: min(count, len(current_ranking))]
+        ]
         subset = _subset_prepared(prepared, selected_features)
         evaluation = _evaluate_prepared_subset(
             subset,

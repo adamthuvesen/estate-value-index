@@ -322,7 +322,9 @@ def test_materialization_masks_ask_price_signals_before_engineering(monkeypatch,
         captured["price_per_sqm"] = df["price_per_sqm"].copy()
         return df
 
-    monkeypatch.setattr(feature_materialization, "create_optimized_features", capture_engineering_input)
+    monkeypatch.setattr(
+        feature_materialization, "create_optimized_features", capture_engineering_input
+    )
 
     feature_materialization.materialize_features(dry_run=True)
 

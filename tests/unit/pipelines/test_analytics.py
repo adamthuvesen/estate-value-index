@@ -167,7 +167,9 @@ class TestGenerateValueAnalysisTask:
         data_file = tmp_path / "data.json"
         data_file.write_text('{"listing_id": "1"}\n')
 
-        mocker.patch("estate_value_index.analytics.value_analysis.generate_value_analysis", return_value=None)
+        mocker.patch(
+            "estate_value_index.analytics.value_analysis.generate_value_analysis", return_value=None
+        )
 
         with pytest.raises(FileNotFoundError, match="Output file not created"):
             generate_value_analysis_task.fn(output_file=output_file, data_file=data_file)

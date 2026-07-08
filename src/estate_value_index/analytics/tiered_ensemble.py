@@ -554,7 +554,9 @@ def _build_result_payload(
             "high_min": gate_high_min,
             "oof_rows_by_gate": _count_labels(oof_gate),
             "test_rows_by_gate": _count_labels(test_gate),
-            "test_12m_plus_capture_rate": _capture_rate(y_test, test_gate, REPORT_HIGH_END_MIN_PRICE),
+            "test_12m_plus_capture_rate": _capture_rate(
+                y_test, test_gate, REPORT_HIGH_END_MIN_PRICE
+            ),
         },
         "blend_selection": {
             "global": global_blend_selection,
@@ -567,7 +569,9 @@ def _build_result_payload(
         "experts": expert_metrics,
         "overall_ensemble": _prediction_metrics(y_test, overall_blend_predictions),
         "gated_ensemble": _prediction_metrics(y_test, gated_blend_predictions),
-        "overall_delta_vs_global": _metric_delta(y_test, global_predictions, overall_blend_predictions),
+        "overall_delta_vs_global": _metric_delta(
+            y_test, global_predictions, overall_blend_predictions
+        ),
         "gated_delta_vs_global": _metric_delta(y_test, global_predictions, gated_blend_predictions),
         "by_price_band": _compare_groups(diagnostic_frame, "price_band"),
         "by_predicted_tier": _compare_groups(diagnostic_frame, "predicted_tier"),
@@ -623,10 +627,7 @@ def _weight_grid(
         raise ValueError("weight_step must divide 1.0 evenly")
 
     return [
-        {
-            name: float(part / units)
-            for name, part in zip(model_names, composition, strict=True)
-        }
+        {name: float(part / units) for name, part in zip(model_names, composition, strict=True)}
         for composition in _integer_compositions(units, len(model_names))
     ]
 
@@ -757,9 +758,7 @@ def _tier_table(tiers: list[dict[str, object]]) -> str:
     for tier in tiers:
         min_price = _fmt_sek(tier["min_price"]) if tier["min_price"] is not None else ""
         max_price = _fmt_sek(tier["max_price"]) if tier["max_price"] is not None else ""
-        lines.append(
-            f"| {tier['name']} | {min_price} | {max_price} | {tier['train_rows']:,} |"
-        )
+        lines.append(f"| {tier['name']} | {min_price} | {max_price} | {tier['train_rows']:,} |")
     return "\n".join(lines)
 
 

@@ -160,9 +160,7 @@ def test_generate_area_statistics_falls_back_when_area_avg_price_is_empty(tmp_pa
         encoding="utf-8",
     )
     value_analysis_path.write_text(
-        json.dumps(
-            {"metadata": {}, "properties": [{"area": "sodermalm", "is_rankable": True}]}
-        ),
+        json.dumps({"metadata": {}, "properties": [{"area": "sodermalm", "is_rankable": True}]}),
         encoding="utf-8",
     )
     raw_listings_path.write_text(

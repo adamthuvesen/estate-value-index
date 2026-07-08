@@ -46,7 +46,9 @@ def run_ppsqm_blend_experiment(
     prepared = _prepare_model_data(raw_train, raw_test, feature_set)
 
     base_predictions = _fit_base_predictions(prepared, seed)
-    ppsqm_predictions = _fit_ppsqm_predictions(prepared, seed, fallback_predictions=base_predictions)
+    ppsqm_predictions = _fit_ppsqm_predictions(
+        prepared, seed, fallback_predictions=base_predictions
+    )
 
     oof = _build_oof_blend_training_data(
         raw_train,
@@ -122,7 +124,9 @@ def select_best_blend_weight(
     candidates = []
     for weight in weights:
         prediction = blend_predictions(base_predictions, ppsqm_predictions, ppsqm_weight=weight)
-        candidates.append({"ppsqm_weight": float(weight), "mae": float(mean_absolute_error(y_true, prediction))})
+        candidates.append(
+            {"ppsqm_weight": float(weight), "mae": float(mean_absolute_error(y_true, prediction))}
+        )
     best = min(candidates, key=lambda candidate: candidate["mae"])
     return {
         "ppsqm_weight": best["ppsqm_weight"],
@@ -227,7 +231,9 @@ def _build_result_payload(
     diagnostic_frame["base_prediction"] = base_predictions
     diagnostic_frame["ppsqm_prediction"] = ppsqm_predictions
     diagnostic_frame["calibrated_prediction"] = blended_predictions
-    diagnostic_frame["sold_month"] = pd.to_datetime(diagnostic_frame["sold_date"]).dt.to_period("M").astype(str)
+    diagnostic_frame["sold_month"] = (
+        pd.to_datetime(diagnostic_frame["sold_date"]).dt.to_period("M").astype(str)
+    )
     diagnostic_frame["price_band"] = diagnostic_frame["sold_price"].apply(_price_band)
     diagnostic_frame["central_area"] = diagnostic_frame["area"].isin(
         {"ostermalm", "vasastan", "sodermalm", "kungsholmen"}

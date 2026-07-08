@@ -306,6 +306,6 @@ class TestPromoteModelToProduction:
 
         dests = [cmd[-1] for cmd in copied if "cp" in cmd]
         assert any(d.endswith(production_artifact_names(NO_LIST_MODEL_ID).model) for d in dests)
-        assert any(d.endswith(production_artifact_names(NO_LIST_MODEL_ID).sidecar) for d in dests), (
-            "sidecar must be promoted alongside the joblib"
-        )
+        assert any(
+            d.endswith(production_artifact_names(NO_LIST_MODEL_ID).sidecar) for d in dests
+        ), "sidecar must be promoted alongside the joblib"

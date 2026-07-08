@@ -281,7 +281,8 @@ def _download_models_from_gcs(models_dir: Path) -> None:
         models_dir.mkdir(parents=True, exist_ok=True)
 
         required_models = [
-            f"models/{filename}" for filename in required_production_artifact_files(DEFAULT_MODEL_PREFIX)
+            f"models/{filename}"
+            for filename in required_production_artifact_files(DEFAULT_MODEL_PREFIX)
         ]
 
         logger.info("Downloading %d required model files from GCS", len(required_models))
@@ -399,7 +400,9 @@ async def health_check():
     """Liveness probe; reports loaded models."""
     missing = _missing_required_models(MODEL_CACHE)
     if missing:
-        raise HTTPException(status_code=503, detail=f"Missing required models: {', '.join(missing)}")
+        raise HTTPException(
+            status_code=503, detail=f"Missing required models: {', '.join(missing)}"
+        )
 
     return HealthResponse(
         status="healthy", models_loaded=list(MODEL_CACHE.keys()), models_count=len(MODEL_CACHE)

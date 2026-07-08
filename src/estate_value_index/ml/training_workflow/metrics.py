@@ -17,8 +17,7 @@ def regression_metrics(y_true: pd.Series, y_pred: np.ndarray) -> dict[str, float
     valid_pct_mask = np.isfinite(true_values) & (true_values != 0)
     absolute_pct_error = np.full_like(true_values, np.nan, dtype=float)
     absolute_pct_error[valid_pct_mask] = np.abs(
-        (pred_values[valid_pct_mask] - true_values[valid_pct_mask])
-        / true_values[valid_pct_mask]
+        (pred_values[valid_pct_mask] - true_values[valid_pct_mask]) / true_values[valid_pct_mask]
     )
     # A zero (or missing) sold_price divides to inf; drop those rows from the
     # population instead of letting one bad row poison median_ape, which now

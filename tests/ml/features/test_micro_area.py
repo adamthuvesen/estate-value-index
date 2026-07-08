@@ -48,10 +48,7 @@ def test_coordinate_aliases_create_h3_cells() -> None:
 
 
 def test_micro_area_uses_res10_after_min_prior_count() -> None:
-    rows = [
-        _listing(f"P{i}", f"2024-01-{i + 1:02d}", 80_000 + i)
-        for i in range(20)
-    ]
+    rows = [_listing(f"P{i}", f"2024-01-{i + 1:02d}", 80_000 + i) for i in range(20)]
     rows.append(_listing("TARGET", "2024-02-01", 95_000))
 
     engineered = create_optimized_features(pd.DataFrame(rows)).set_index("listing_id")
@@ -59,12 +56,14 @@ def test_micro_area_uses_res10_after_min_prior_count() -> None:
     assert engineered.loc["TARGET", "micro_area_resolution_used"] == "h3_res10"
     assert engineered.loc["TARGET", "micro_area_ppsqm_count"] == 20
     assert engineered.loc["TARGET", "micro_area_ppsqm_median"] > 0
-    assert engineered.loc["TARGET", "micro_area_ppsqm_p75"] >= engineered.loc[
-        "TARGET", "micro_area_ppsqm_median"
-    ]
-    assert engineered.loc["TARGET", "micro_area_ppsqm_p90"] >= engineered.loc[
-        "TARGET", "micro_area_ppsqm_p75"
-    ]
+    assert (
+        engineered.loc["TARGET", "micro_area_ppsqm_p75"]
+        >= engineered.loc["TARGET", "micro_area_ppsqm_median"]
+    )
+    assert (
+        engineered.loc["TARGET", "micro_area_ppsqm_p90"]
+        >= engineered.loc["TARGET", "micro_area_ppsqm_p75"]
+    )
     assert engineered.loc["TARGET", "micro_area_upper_tail_ratio"] >= 1.0
 
 
@@ -180,12 +179,14 @@ def test_same_size_comp_uses_prior_h3_size_history() -> None:
     assert engineered.loc["TARGET", "same_size_scope_used"] == "h3_res9_size"
     assert engineered.loc["TARGET", "same_size_ppsqm_count"] == 5
     assert engineered.loc["TARGET", "same_size_ppsqm_median"] > 0
-    assert engineered.loc["TARGET", "same_size_ppsqm_p75"] >= engineered.loc[
-        "TARGET", "same_size_ppsqm_median"
-    ]
-    assert engineered.loc["TARGET", "same_size_ppsqm_p90"] >= engineered.loc[
-        "TARGET", "same_size_ppsqm_p75"
-    ]
+    assert (
+        engineered.loc["TARGET", "same_size_ppsqm_p75"]
+        >= engineered.loc["TARGET", "same_size_ppsqm_median"]
+    )
+    assert (
+        engineered.loc["TARGET", "same_size_ppsqm_p90"]
+        >= engineered.loc["TARGET", "same_size_ppsqm_p75"]
+    )
     assert engineered.loc["TARGET", "same_size_upper_tail_ratio"] >= 1.0
 
 
@@ -198,8 +199,7 @@ def test_h3_neighbor_features_use_prior_adjacent_cells() -> None:
     neighbor = next(cell for cell in h3.grid_disk(target_cell, 1) if cell != target_cell)
     lat, lon = h3.cell_to_latlng(neighbor)
     rows = [
-        _listing(f"P{i}", f"2024-01-{i + 1:02d}", 82_000 + i, lat=lat, lon=lon)
-        for i in range(3)
+        _listing(f"P{i}", f"2024-01-{i + 1:02d}", 82_000 + i, lat=lat, lon=lon) for i in range(3)
     ]
     rows.append(_listing("TARGET", "2024-02-01", 95_000, lat=59.315, lon=18.07))
 
@@ -207,10 +207,12 @@ def test_h3_neighbor_features_use_prior_adjacent_cells() -> None:
 
     assert engineered.loc["TARGET", "h3_neighbor_ppsqm_count"] == 3
     assert engineered.loc["TARGET", "h3_neighbor_ppsqm"] > 0
-    assert engineered.loc["TARGET", "h3_neighbor_ppsqm_p75"] >= engineered.loc[
-        "TARGET", "h3_neighbor_ppsqm"
-    ]
-    assert engineered.loc["TARGET", "h3_neighbor_ppsqm_p90"] >= engineered.loc[
-        "TARGET", "h3_neighbor_ppsqm_p75"
-    ]
+    assert (
+        engineered.loc["TARGET", "h3_neighbor_ppsqm_p75"]
+        >= engineered.loc["TARGET", "h3_neighbor_ppsqm"]
+    )
+    assert (
+        engineered.loc["TARGET", "h3_neighbor_ppsqm_p90"]
+        >= engineered.loc["TARGET", "h3_neighbor_ppsqm_p75"]
+    )
     assert engineered.loc["TARGET", "h3_neighbor_upper_tail_ratio"] >= 1.0

@@ -80,10 +80,18 @@ def run_model_suite_experiment(
             "listing_price_max": _max_variant(listing_max),
         },
         "source_reports": {
-            "no_list_price_simple": _report_paths(experiment_dir, no_list_feature_set, "market_normalized"),
-            "no_list_price_max": _report_paths(experiment_dir, no_list_feature_set, "tiered_ensemble"),
-            "listing_price_simple": _report_paths(experiment_dir, listing_feature_set, "market_normalized"),
-            "listing_price_max": _report_paths(experiment_dir, listing_feature_set, "tiered_ensemble"),
+            "no_list_price_simple": _report_paths(
+                experiment_dir, no_list_feature_set, "market_normalized"
+            ),
+            "no_list_price_max": _report_paths(
+                experiment_dir, no_list_feature_set, "tiered_ensemble"
+            ),
+            "listing_price_simple": _report_paths(
+                experiment_dir, listing_feature_set, "market_normalized"
+            ),
+            "listing_price_max": _report_paths(
+                experiment_dir, listing_feature_set, "tiered_ensemble"
+            ),
         },
     }
     _write_outputs(result, output_dir)

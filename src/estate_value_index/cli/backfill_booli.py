@@ -60,7 +60,9 @@ def write_window_config(base_config_file: Path, output_file: Path, window: DateW
 
     search_parameters = config.setdefault("search_parameters", {})
     if not isinstance(search_parameters, dict):
-        raise ValueError(f"Booli base config search_parameters must be an object: {base_config_file}")
+        raise ValueError(
+            f"Booli base config search_parameters must be an object: {base_config_file}"
+        )
     search_parameters["minSoldDate"] = window.start.isoformat()
     search_parameters["maxSoldDate"] = window.end.isoformat()
 

@@ -240,12 +240,8 @@ def build_feature_context(training_frame: pd.DataFrame) -> FeatureEngineeringCon
         same_size_stats_global=build_same_size_context_stats(
             training_frame, ["_micro_area_size_band"]
         ),
-        street_area_ppsqm_stats=build_address_context_stats(
-            training_frame, "_street_area_key"
-        ),
-        street_size_ppsqm_stats=build_address_context_stats(
-            training_frame, "_street_size_key"
-        ),
+        street_area_ppsqm_stats=build_address_context_stats(training_frame, "_street_area_key"),
+        street_size_ppsqm_stats=build_address_context_stats(training_frame, "_street_size_key"),
         address_ppsqm_stats=build_address_context_stats(training_frame, "_address_comp_key"),
         global_ppsqm_median=global_observed_ppsqm_median(training_frame),
     )

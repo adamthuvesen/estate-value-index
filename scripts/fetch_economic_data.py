@@ -24,16 +24,10 @@ DATA_DIR = Path(__file__).parent.parent / "data" / "reference" / "economy"
 RIKSBANK_POLICY_RATE_URL = (
     "https://api.riksbank.se/swea/v1/Observations/SECBREPOEFF/{from_date}/{to_date}"
 )
-KI_INDICATORS_URL = (
-    "https://statistik.konj.se/PXWeb/api/v1/en/KonjBar/Indikatorer/Indikatorm.px"
-)
-SCB_GDP_URL = (
-    "https://api.scb.se/OV0104/v1/doris/en/ssd/NR/NR0103/NR0103B/"
-    "NR0103ENS2010T10SKv"
-)
+KI_INDICATORS_URL = "https://statistik.konj.se/PXWeb/api/v1/en/KonjBar/Indikatorer/Indikatorm.px"
+SCB_GDP_URL = "https://api.scb.se/OV0104/v1/doris/en/ssd/NR/NR0103/NR0103B/NR0103ENS2010T10SKv"
 MAKLARSTATISTIK_CENTRAL_STOCKHOLM_URL = (
-    "https://www.maklarstatistik.se/omrade/riket/stockholms-lan/"
-    "stockholm/centrala-stockholm/"
+    "https://www.maklarstatistik.se/omrade/riket/stockholms-lan/stockholm/centrala-stockholm/"
 )
 
 KI_INDICATORS = ["KIFI", "BTOT", "BBYG", "bhus", "bhusmakro", "bhusmikro"]
@@ -183,9 +177,7 @@ def fetch_scb_gdp(session: requests.Session, quarters: list[str]) -> pd.DataFram
     return pd.DataFrame(rows).sort_values("quarter", key=lambda col: col.map(_quarter_key))
 
 
-def fetch_maklarstatistik_sales(
-    session: requests.Session, url: str
-) -> tuple[pd.DataFrame, str]:
+def fetch_maklarstatistik_sales(session: requests.Session, url: str) -> tuple[pd.DataFrame, str]:
     response = session.get(url, timeout=30)
     response.raise_for_status()
 
@@ -215,9 +207,7 @@ def fetch_maklarstatistik_sales(
     return pd.DataFrame(rows), area_name
 
 
-def update_interest_rates(
-    session: requests.Session, to_date: date, replace: bool
-) -> Path | None:
+def update_interest_rates(session: requests.Session, to_date: date, replace: bool) -> Path | None:
     path = DATA_DIR / "swedish_interest_rates_monthly.csv"
     existing = pd.read_csv(path)
     existing["year_month"] = existing["year_month"].astype(str)
@@ -240,13 +230,13 @@ def update_interest_rates(
         replace=replace,
         changed=len(updated) > len(existing),
     )
-    print(f"   Added {len(updated) - len(existing)} months; latest is {updated['year_month'].max()}.")
+    print(
+        f"   Added {len(updated) - len(existing)} months; latest is {updated['year_month'].max()}."
+    )
     return output
 
 
-def update_ki_indicators(
-    session: requests.Session, to_date: date, replace: bool
-) -> Path | None:
+def update_ki_indicators(session: requests.Session, to_date: date, replace: bool) -> Path | None:
     path = DATA_DIR / "swedish_ki_indicators_monthly.csv"
     existing = pd.read_csv(path)
     existing_periods = set(existing["period"].astype(str))
@@ -256,7 +246,9 @@ def update_ki_indicators(
     periods_to_fetch = [
         period
         for period in available
-        if _ki_period_key(latest_local) < _ki_period_key(period) <= _ki_period_key(max_complete_period)
+        if _ki_period_key(latest_local)
+        < _ki_period_key(period)
+        <= _ki_period_key(max_complete_period)
         and period not in existing_periods
     ]
 
@@ -289,8 +281,7 @@ def update_gdp(session: requests.Session, replace: bool) -> Path | None:
     quarters_to_fetch = [
         quarter
         for quarter in available
-        if _quarter_key(quarter) > _quarter_key(latest_local)
-        and quarter not in existing_quarters
+        if _quarter_key(quarter) > _quarter_key(latest_local) and quarter not in existing_quarters
     ]
 
     print("\n3. SCB GDP growth")
@@ -312,9 +303,7 @@ def update_gdp(session: requests.Session, replace: bool) -> Path | None:
     return output
 
 
-def update_sales_data(
-    session: requests.Session, sales_url: str, replace: bool
-) -> Path | None:
+def update_sales_data(session: requests.Session, sales_url: str, replace: bool) -> Path | None:
     path = DATA_DIR / "sales_data_48_months.csv"
     existing = pd.read_csv(path)
     fetched, area_name = fetch_maklarstatistik_sales(session, sales_url)

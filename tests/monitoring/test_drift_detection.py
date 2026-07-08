@@ -228,9 +228,7 @@ class TestModelMonitor:
             model_version="test-v1",
         )
 
-        monitor.reference_data["predicted_price"] = monitor.reference_data[
-            "sold_price"
-        ] * 1.02
+        monitor.reference_data["predicted_price"] = monitor.reference_data["sold_price"] * 1.02
 
         current_median_ape = monitor._median_ape(
             current_data_with_performance_degradation,
@@ -330,9 +328,7 @@ class TestModelMonitor:
         assert numeric == ["living_area"]
         assert categorical == ["area"]
 
-    def test_extracts_evidently_04_data_drift_table(
-        self, baseline_parquet_path: Path
-    ):
+    def test_extracts_evidently_04_data_drift_table(self, baseline_parquet_path: Path):
         monitor = ModelMonitor(
             reference_data_path=baseline_parquet_path,
             model_version="test-v1",

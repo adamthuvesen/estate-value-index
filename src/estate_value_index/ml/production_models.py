@@ -482,7 +482,9 @@ def persist_production_model(
     }
 
 
-def _prepare_raw_for_model(raw_frame: pd.DataFrame, *, requires_listing_price: bool) -> pd.DataFrame:
+def _prepare_raw_for_model(
+    raw_frame: pd.DataFrame, *, requires_listing_price: bool
+) -> pd.DataFrame:
     raw = raw_frame.copy()
     if not requires_listing_price:
         raw = mask_ask_price_signals(raw)
@@ -643,8 +645,7 @@ def _oof_final_blend(
     expert_predictions = _prediction_frame(
         global_predictions=global_blend,
         tier_predictions={
-            spec.name: oof[f"{spec.name}_prediction"].to_numpy(dtype=float)
-            for spec in tier_specs
+            spec.name: oof[f"{spec.name}_prediction"].to_numpy(dtype=float) for spec in tier_specs
         },
     )
     gate = prediction_tier_labels(
@@ -773,8 +774,12 @@ def _calibration_report(
             "n_adjusted": int(adjusted.sum()),
             "share_adjusted": float(adjusted.mean()),
             "median": float(np.median(adjusted_corrections)) if adjusted.any() else 0.0,
-            "p90": float(np.quantile(np.abs(adjusted_corrections), 0.90)) if adjusted.any() else 0.0,
-            "p95": float(np.quantile(np.abs(adjusted_corrections), 0.95)) if adjusted.any() else 0.0,
+            "p90": float(np.quantile(np.abs(adjusted_corrections), 0.90))
+            if adjusted.any()
+            else 0.0,
+            "p95": float(np.quantile(np.abs(adjusted_corrections), 0.95))
+            if adjusted.any()
+            else 0.0,
             "share_at_cap": float(at_cap.sum() / adjusted.sum()) if adjusted.any() else 0.0,
         },
     }
@@ -806,8 +811,7 @@ def _feature_importance_payload(model: TieredProductionModel) -> dict[str, objec
         if total <= 0:
             return {feature: float(value) for feature, value in zip(features, values, strict=False)}
         return {
-            feature: float(value / total)
-            for feature, value in zip(features, values, strict=False)
+            feature: float(value / total) for feature, value in zip(features, values, strict=False)
         }
 
     return {
