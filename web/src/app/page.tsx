@@ -7,11 +7,23 @@ import { MODEL_LABELS, SAMPLE_LISTINGS } from "@/lib/sample-data";
 // rather than baking a snapshot into the static build.
 export const dynamic = "force-dynamic";
 
+async function loadAreaNames(): Promise<string[]> {
+  // The predictor only needs FastAPI + models to work, so a missing/unavailable
+  // area-statistics file must not 500 the homepage — degrade to an empty list and
+  // let the form's free-text area field carry on.
+  try {
+    const areas = await getAreaOverviewList();
+    return areas
+      .map((area) => area.display_name)
+      .sort((a, b) => a.localeCompare(b, "sv"));
+  } catch (error) {
+    console.error("[HOME] Area list unavailable, rendering predictor without it:", error);
+    return [];
+  }
+}
+
 export default async function HomePage() {
-  const areas = await getAreaOverviewList();
-  const areaNames = areas
-    .map((area) => area.display_name)
-    .sort((a, b) => a.localeCompare(b, "sv"));
+  const areaNames = await loadAreaNames();
 
   return (
     <main className="min-h-screen bg-ledger-bg">
