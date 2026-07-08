@@ -1,5 +1,6 @@
 import { GET } from "../route";
 import { getAreaStatisticsData } from "@/lib/area-statistics-cache";
+import { DataFileMissingError } from "@/lib/data-file-errors";
 import type { AreaStatistics, AreaStatisticsData } from "@/lib/area-types";
 
 jest.mock("@/lib/area-statistics-cache", () => ({
@@ -103,7 +104,11 @@ describe("GET /api/area", () => {
 
   it("returns a 404 when the underlying data file is missing", async () => {
     mockedGetAreaStatisticsData.mockRejectedValue(
-      new Error("File not found: derived/area_statistics.json. GCS fallback is disabled."),
+      new DataFileMissingError(
+        "File not found: derived/area_statistics.json. GCS fallback is disabled.",
+        "derived/area_statistics.json",
+        "gs://bucket/derived/area_statistics.json",
+      ),
     );
 
     const response = await GET();
