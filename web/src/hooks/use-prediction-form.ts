@@ -197,8 +197,17 @@ export function usePredictionForm({
         if (!mounted) {
           return;
         }
-        setIsApiReady(response.ok);
-        if (!response.ok) {
+        // Predictions only need FastAPI + models. The overall health status can be 503
+        // when area_data is stale/missing, which must not block the predictor — so gate
+        // on the component statuses instead of response.ok.
+        const payload = (await response.json().catch(() => null)) as {
+          checks?: { fastapi?: { status?: string }; nextjs?: { status?: string } };
+        } | null;
+        const predictorReady =
+          payload?.checks?.fastapi?.status === "healthy" &&
+          payload?.checks?.nextjs?.status === "healthy";
+        setIsApiReady(predictorReady);
+        if (!predictorReady) {
           setTimeout(checkApi, 1000);
         }
       } catch (err) {
