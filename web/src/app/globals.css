@@ -401,28 +401,3 @@ select {
   background: #c4c4be;
   background-clip: content-box;
 }
-
-/* ---------- Recharts (light) ----------
-   Legacy global override; superseded by chart-theme.tsx and removed in Phase 7
-   once the four charts adopt the shared theme. */
-.recharts-cartesian-grid line {
-  stroke: #edede9;
-}
-.recharts-text {
-  fill: #63666e;
-}
-.recharts-sector:hover,
-.recharts-bar-rectangle:hover,
-.recharts-rectangle:hover {
-  filter: brightness(0.94) !important;
-  opacity: 1 !important;
-}
-.recharts-layer {
-  outline: none !important;
-}
-.recharts-tooltip-cursor {
-  fill: rgba(16, 17, 20, 0.04) !important;
-}
-.recharts-tooltip-wrapper {
-  outline: none !important;
-}
