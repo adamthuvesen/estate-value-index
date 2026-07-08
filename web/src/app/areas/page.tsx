@@ -9,6 +9,10 @@ import { isMissingDataError } from "@/lib/api-errors";
 import type { AreaOverview, AreaStatisticsMetadata } from "@/lib/area-types";
 import { formatDateSv, formatNumber, getStaleInfo } from "@/lib/format";
 
+// Area statistics load from a request-time cache (GCS-synced file); a static
+// build would bake in whatever existed at build time — often the missing-data panel.
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Areas",
   description:

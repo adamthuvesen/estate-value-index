@@ -52,7 +52,7 @@
     sans-serif;
 
   /* ---------- Type scale (size · line-height · tracking · weight) ---------- */
-  --text-display: 3.25rem; /* 52px */
+  --text-display: clamp(2.125rem, 1.06rem + 4.5vw, 3.25rem); /* 34px @375px → 52px */
   --text-display--line-height: 1.04;
   --text-display--letter-spacing: -0.022em;
   --text-display--font-weight: 600;
