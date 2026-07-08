@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { AREA_SECTIONS } from "@/components/area/section-registry";
 
 interface SectionNavigationProps {
   areaName: string;
@@ -8,12 +9,7 @@ interface SectionNavigationProps {
 
 const sections = [
   { id: "overview", label: "Overview" },
-  { id: "market", label: "Market" },
-  { id: "value", label: "Value" },
-  { id: "size", label: "Size" },
-  { id: "characteristics", label: "Characteristics" },
-  { id: "similar", label: "Similar areas" },
-  { id: "recent", label: "Recent sales" },
+  ...AREA_SECTIONS.map(({ id, title }) => ({ id, label: title })),
 ];
 
 export function SectionNavigation({ areaName }: SectionNavigationProps) {

@@ -1,56 +1,31 @@
-"use client";
-
 import Link from "next/link";
-import type { AreaOverview } from "@/lib/area-types";
+import type { ScoredArea } from "@/lib/similar-areas";
+import { PRICE_TIER_LABEL } from "@/lib/tiers";
 import { formatNumber, formatNumberOrDash, formatSek } from "@/lib/format";
 
 interface SimilarAreasProps {
-  currentArea: string;
-  currentPriceTier: string;
-  avgSoldPrice: number;
-  allAreas: AreaOverview[];
+  /** Pre-scored on the server via `selectSimilarAreas` — render-only here. */
+  areas: ScoredArea[];
 }
 
-export function SimilarAreas({ currentArea, currentPriceTier, avgSoldPrice, allAreas }: SimilarAreasProps) {
-  // Score similarity by price tier match (+3) and price proximity (+1 within 20%, +2 within 10%)
-  const similarAreas = allAreas
-    .filter((area) => area.area_name !== currentArea)
-    .map((area) => {
-      let score = 0;
-      if (area.price_tier === currentPriceTier) {
-        score += 3;
-      }
-      const priceDiff = Math.abs(area.avg_sold_price - avgSoldPrice) / avgSoldPrice;
-      if (priceDiff < 0.1) {
-        score += 2;
-      } else if (priceDiff < 0.2) {
-        score += 1;
-      }
-      return { ...area, similarityScore: score };
-    })
-    .sort((a, b) => b.similarityScore - a.similarityScore)
-    .slice(0, 3);
-
-  if (similarAreas.length === 0) {
+export function SimilarAreas({ areas }: SimilarAreasProps) {
+  if (areas.length === 0) {
     return null;
   }
-
-  const tierLabel: Record<string, string> = {
-    premium: "Premium",
-    upper: "Upper",
-    medium: "Medium",
-    budget: "Budget",
-  };
 
   return (
     <div>
       <div className="mb-6">
-        <h3 className="text-[17px] font-semibold tracking-tight text-ledger-text">Similar areas</h3>
-        <p className="text-[13px] text-ledger-muted">Comparable neighbourhoods based on price tier and market characteristics</p>
+        <h3 className="text-[17px] font-semibold tracking-tight text-ledger-text">
+          Similar areas
+        </h3>
+        <p className="text-[13px] text-ledger-muted">
+          Comparable neighbourhoods based on price tier and market characteristics
+        </p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
-        {similarAreas.map((area) => (
+        {areas.map((area) => (
           <Link
             key={area.area_name}
             href={`/area/${area.area_name}`}
@@ -62,22 +37,28 @@ export function SimilarAreas({ currentArea, currentPriceTier, avgSoldPrice, allA
                   {area.display_name}
                 </h4>
                 <span className="inline-flex shrink-0 rounded-pill border border-ledger-border bg-ledger-elevated px-2.5 py-0.5 text-[12px] font-medium text-ledger-muted">
-                  {tierLabel[area.price_tier] ?? area.price_tier}
+                  {PRICE_TIER_LABEL[area.price_tier] ?? area.price_tier}
                 </span>
               </div>
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-[13px]">
                   <span className="text-ledger-muted">Avg price</span>
-                  <span className="num font-medium text-ledger-text">{formatSek(area.avg_sold_price)}</span>
+                  <span className="num font-medium text-ledger-text">
+                    {formatSek(area.avg_sold_price)}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between text-[13px]">
                   <span className="text-ledger-muted">Properties</span>
-                  <span className="num font-medium text-ledger-text">{formatNumber(area.listing_count)}</span>
+                  <span className="num font-medium text-ledger-text">
+                    {formatNumber(area.listing_count)}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between text-[13px]">
                   <span className="text-ledger-muted">Undervalued</span>
-                  <span className="num font-medium text-val-exc">{formatNumberOrDash(area.undervalued_pct, 1)}%</span>
+                  <span className="num font-medium text-val-exc">
+                    {formatNumberOrDash(area.undervalued_pct, 1)}%
+                  </span>
                 </div>
               </div>
 

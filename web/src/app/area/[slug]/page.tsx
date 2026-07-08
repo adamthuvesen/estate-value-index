@@ -1,461 +1,213 @@
-"use client";
-
-import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import type { Metadata } from "next";
 import Link from "next/link";
-import type { AreaDetails, RoomFilter } from "@/lib/area-types";
-import {
-  formatDateSv,
-  formatNumber,
-  formatNumberOrDash,
-  formatPercent,
-  formatSek,
-  getStaleInfo,
-} from "@/lib/format";
-import { PriceTrendChart } from "@/components/area/price-trend-chart";
-import { ValueDistributionChart } from "@/components/area/value-distribution-chart";
-import { SizePriceChart } from "@/components/area/size-price-chart";
-import { ConstructionEraChart } from "@/components/area/construction-era-chart";
-import { SimilarAreas } from "@/components/area/similar-areas";
+import { notFound } from "next/navigation";
+import type { AreaStatistics, AreaStatisticsMetadata } from "@/lib/area-types";
+import { getAreaStatisticsData } from "@/lib/area-statistics-cache";
+import { getAreaOverviewList } from "@/lib/area-overview";
+import { selectSimilarAreas, type ScoredArea } from "@/lib/similar-areas";
+import { isMissingDataError } from "@/lib/api-errors";
+import { PRICE_TIER_LABEL } from "@/lib/tiers";
+import { formatDateSv, formatNumber, getStaleInfo } from "@/lib/format";
 import { SectionNavigation } from "@/components/area/section-navigation";
+import { RoomFilterProvider } from "@/components/area/room-filter-provider";
+import { parseRoomFilter } from "@/lib/room-filter";
 import { RoomFilterComponent } from "@/components/area/room-filter";
-import type { AreaOverview } from "@/lib/area-types";
+import { OverviewSection } from "@/components/area/sections/overview-section";
+import { MarketSection } from "@/components/area/sections/market-section";
+import { ValueSection } from "@/components/area/sections/value-section";
+import { SizeSection } from "@/components/area/sections/size-section";
+import { BuildingStockSection } from "@/components/area/sections/building-stock-section";
+import { RecentSalesSection } from "@/components/area/recent-sales-section";
+import { SimilarAreas } from "@/components/area/similar-areas";
 
-type ApiErrorResponse = {
-  error_code?: string;
-  error_message?: string;
-  remediation?: string;
-};
+// Area statistics load from a request-time cache (GCS-synced file); a static
+// build would bake in whatever existed at build time.
+export const dynamic = "force-dynamic";
 
-const buildAreaDetailErrorMessage = (payload: ApiErrorResponse | null, status: number) => {
-  if (payload?.error_code === "AREA_NOT_FOUND") {
-    return "Area not found. Please choose a different area.";
+interface AreaPageProps {
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{ rooms?: string }>;
+}
+
+export async function generateMetadata({ params }: AreaPageProps): Promise<Metadata> {
+  const { slug } = await params;
+
+  let area: AreaStatistics | undefined;
+  try {
+    const data = await getAreaStatisticsData();
+    area = data.areas[slug];
+  } catch {
+    return { title: "Area statistics" };
   }
-  if (payload?.error_code === "AREA_DATA_MISSING") {
-    return "Area statistics are not available yet. Run the enrichment pipeline or enable GCS downloads.";
+
+  if (!area) {
+    return { title: "Area not found" };
   }
-  if (payload?.error_code === "AREA_DATA_ERROR") {
-    return "Area statistics could not be loaded. Check the data pipeline and server logs.";
-  }
-  if (status === 404) {
-    return "Area not found. Please choose a different area.";
-  }
-  return "Failed to load area data. Please try again later.";
-};
 
-export default function AreaDetailPage() {
-  const params = useParams();
-  const areaSlug = params.slug as string;
+  const perSqm = area.overview.avg_price_per_sqm;
+  const description = [
+    perSqm ? `Average price ${formatNumber(perSqm)} kr/m²` : null,
+    `${formatNumber(area.overview.listing_count)} sold listings`,
+    `${formatNumber(area.market_dynamics.days_on_market_median)} days on market in ${area.display_name}`,
+  ]
+    .filter(Boolean)
+    .join(", ")
+    .concat(". Price trends, value analysis and building stock.");
 
-  const [data, setData] = useState<AreaDetails | null>(null);
-  const [allAreas, setAllAreas] = useState<AreaOverview[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedRoomFilter, setSelectedRoomFilter] = useState<RoomFilter>("all");
-
-  useEffect(() => {
-    const controller = new AbortController();
-
-    const fetchData = async () => {
-      try {
-        const [areaResponse, allAreasResponse] = await Promise.all([
-          fetch(`/api/area/${areaSlug}`, { signal: controller.signal }),
-          fetch("/api/area", { signal: controller.signal }),
-        ]);
-
-        if (!areaResponse.ok) {
-          const payload = (await areaResponse.json().catch(() => null)) as ApiErrorResponse | null;
-          throw new Error(buildAreaDetailErrorMessage(payload, areaResponse.status));
-        }
-
-        const areaData = await areaResponse.json();
-        setData(areaData);
-
-        if (allAreasResponse.ok) {
-          const allAreasData = await allAreasResponse.json();
-          setAllAreas(allAreasData.areas || []);
-        }
-      } catch (err) {
-        if (err instanceof DOMException && err.name === "AbortError") {
-          return;
-        }
-        console.error("Error fetching area data:", err);
-        const fallbackMessage = "Failed to load area data. Please try again later.";
-        if (err instanceof Error && err.message) {
-          const safeMessage =
-            err.message.includes("Area") || err.message.includes("Failed")
-              ? err.message
-              : fallbackMessage;
-          setError(safeMessage);
-        } else {
-          setError(fallbackMessage);
-        }
-      } finally {
-        if (!controller.signal.aborted) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    fetchData();
-
-    return () => {
-      controller.abort();
-    };
-  }, [areaSlug]);
-
-  const TIER_LABEL: Record<string, string> = {
-    premium: "Premium",
-    upper: "Upper",
-    medium: "Medium",
-    budget: "Budget",
+  const title = `${area.display_name} — Area statistics`;
+  return {
+    title,
+    description,
+    alternates: { canonical: `/area/${slug}` },
+    openGraph: { title, description },
+    twitter: { card: "summary", title, description },
   };
+}
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-ledger-bg">
-        <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
-          <div className="flex items-center justify-center py-24">
-            <div className="flex flex-col items-center gap-3">
-              <div className="h-8 w-8 animate-spin rounded-full border-2 border-ledger-border border-t-ledger-text" />
-              <p className="text-[13px] text-ledger-muted">Loading area…</p>
-            </div>
-          </div>
-        </div>
+/** Rendered inline for the known "statistics not generated yet" state. */
+function MissingDataPanel() {
+  return (
+    <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
+      <div className="mx-auto mt-4 max-w-xl rounded-2xl border border-ledger-border bg-ledger-surface px-6 py-12 text-center shadow-elev-1">
+        <p className="eyebrow text-val-over">Data unavailable</p>
+        <h1 className="mt-3 font-display text-title text-ledger-text">
+          Area statistics are not available yet
+        </h1>
+        <p className="mt-3 text-[14px] text-ledger-muted">
+          Run the enrichment pipeline or enable GCS downloads, then reload this page.
+        </p>
+        <Link href="/areas" className="ledger-btn focus-ring mt-6 inline-flex text-[13px]">
+          Back to all areas
+        </Link>
       </div>
-    );
+    </div>
+  );
+}
+
+export default async function AreaDetailPage({ params, searchParams }: AreaPageProps) {
+  const [{ slug }, { rooms }] = await Promise.all([params, searchParams]);
+  const initialFilter = parseRoomFilter(rooms);
+
+  let area: AreaStatistics | undefined;
+  let metadata: AreaStatisticsMetadata;
+  let similarAreas: ScoredArea[] = [];
+
+  try {
+    const data = await getAreaStatisticsData();
+    metadata = data.metadata;
+    area = data.areas[slug];
+
+    if (area) {
+      const allAreas = await getAreaOverviewList();
+      similarAreas = selectSimilarAreas(
+        {
+          area_name: area.area_name,
+          price_tier: area.price_tier,
+          avg_sold_price: area.overview.avg_sold_price,
+        },
+        allAreas,
+      );
+    }
+  } catch (error) {
+    if (isMissingDataError(error)) {
+      return <MissingDataPanel />;
+    }
+    throw error;
   }
 
-  if (error || !data) {
-    return (
-      <div className="min-h-screen bg-ledger-bg">
-        <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
-          <div className="mx-auto mt-4 max-w-xl rounded-2xl border border-ledger-border bg-ledger-surface px-6 py-12 text-center shadow-elev-1">
-            <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-val-over-tint">
-              <svg className="h-5 w-5 text-val-over" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" />
-              </svg>
-            </div>
-            <p className="mt-4 text-[14px] text-ledger-muted">{error || "Area not found."}</p>
-            <Link
-              href="/areas"
-              className="ledger-btn focus-ring mt-6 inline-flex text-[13px]"
-            >
-              Back to all areas
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
+  if (!area) {
+    notFound();
   }
 
-  const filteredData = data.by_room_count?.[selectedRoomFilter] ?? null;
-  const staleInfo = getStaleInfo(data.metadata.generated_at);
+  const staleInfo = getStaleInfo(metadata.generated_at);
 
   return (
-    <div className="min-h-screen bg-ledger-bg">
-      <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
-        <div className="relative">
-          <nav className="mb-8 text-[13px] text-ledger-muted">
-            <Link href="/" className="focus-ring transition-colors hover:text-ledger-text">
-              Home
-            </Link>
-            {" / "}
-            <Link href="/areas" className="focus-ring transition-colors hover:text-ledger-text">
-              Areas
-            </Link>
-            {" / "}
-            <span className="font-medium text-ledger-text">{data.display_name}</span>
-          </nav>
-
-          <div className="mb-8 text-center animate-fade-in-up">
-            <p className="text-[11px] font-semibold uppercase tracking-eyebrow text-ledger-accent">
-              Area report
-            </p>
-            <div className="mt-2 mb-3 flex flex-wrap items-center justify-center gap-3">
-              <h1 className="text-3xl font-semibold leading-[1.06] tracking-tight text-ledger-text sm:text-4xl">
-                {data.display_name}
-              </h1>
-              <span className="inline-flex rounded-pill border border-ledger-border bg-ledger-elevated px-3 py-1 text-[13px] font-medium text-ledger-muted">
-                {TIER_LABEL[data.price_tier] ?? data.price_tier}
-              </span>
-            </div>
-            {data.has_limited_data && (
-              <p className="text-[13px] text-val-over">
-                Limited data available ({data.sample_size} properties) — estimates may vary.
-              </p>
-            )}
-          </div>
-
-          {staleInfo?.isStale && (
-            <div className="mx-auto mb-8 max-w-2xl rounded-xl border border-val-over-line bg-val-over-tint px-4 py-3 text-center">
-              <p className="text-[13px] text-val-over">
-                Data is {Math.floor(staleInfo.ageDays)} days old — last updated {formatDateSv(staleInfo.generatedAt)}.
-              </p>
-            </div>
-          )}
-
-          <SectionNavigation areaName={data.display_name} />
-
-          <RoomFilterComponent
-            selectedFilter={selectedRoomFilter}
-            onFilterChange={setSelectedRoomFilter}
-            roomData={data.by_room_count}
-          />
-
-          <div id="overview" className="mx-auto mb-6 max-w-3xl">
-            <dl className="grid grid-cols-1 divide-y divide-ledger-border overflow-hidden rounded-2xl border border-ledger-border bg-ledger-surface shadow-elev-1 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-              <div className="px-5 py-4">
-                <dt className="text-[11px] font-semibold uppercase tracking-eyebrow text-ledger-dimmed">Average price per m²</dt>
-                <dd className="num mt-1 text-2xl font-semibold text-ledger-text">
-                  {(filteredData?.overview.avg_price_per_sqm ?? data.overview.avg_price_per_sqm)
-                    ? formatNumber(filteredData?.overview.avg_price_per_sqm ?? data.overview.avg_price_per_sqm)
-                    : "—"}
-                </dd>
-                <p className="mt-0.5 text-[12px] text-ledger-muted">
-                  Sold: <span className="num">{formatSek(filteredData?.overview.avg_sold_price ?? data.overview.avg_sold_price)}</span>
-                </p>
-              </div>
-              <div className="px-5 py-4">
-                <dt className="text-[11px] font-semibold uppercase tracking-eyebrow text-ledger-dimmed">Market activity</dt>
-                <dd className="num mt-1 text-2xl font-semibold text-ledger-text">
-                  {formatNumber(filteredData?.overview.listing_count ?? data.overview.listing_count)}
-                </dd>
-                <p className="mt-0.5 text-[12px] text-ledger-muted">Total properties</p>
-              </div>
-              <div className="px-5 py-4">
-                <dt className="text-[11px] font-semibold uppercase tracking-eyebrow text-ledger-dimmed">Days on market</dt>
-                <dd className="num mt-1 text-2xl font-semibold text-ledger-text">
-                  {formatNumber(filteredData?.market_dynamics.days_on_market_median ?? data.market_dynamics.days_on_market_median)}
-                </dd>
-                <p className="mt-0.5 text-[12px] text-ledger-muted">Median listing duration</p>
-              </div>
-            </dl>
-          </div>
-          <div id="market" className="mb-6 ledger-card p-5 sm:p-6">
-        <h2 className="mb-4 text-lg font-semibold tracking-tight text-ledger-text">Market dynamics</h2>
-
-        <div className="mb-5">
-          <PriceTrendChart
-            median_price_3m={data.overview.median_price_3m}
-            median_price_6m={data.overview.median_price_6m}
-            median_price_12m={data.overview.median_price_12m}
-            monthly_prices={data.overview.monthly_prices}
-            avgLivingArea={data.size_analysis.size_distribution.living_area.mean}
-          />
-        </div>
-
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-eyebrow text-ledger-dimmed">Price change (mean)</p>
-            <p
-              className={`num mt-2 text-2xl font-semibold ${
-                (filteredData?.market_dynamics.price_change_mean ?? data.market_dynamics.price_change_mean) > 0
-                  ? "text-val-exc"
-                  : "text-val-high"
-              }`}
-            >
-              {(filteredData?.market_dynamics.price_change_mean ?? data.market_dynamics.price_change_mean) > 0 ? "+" : ""}
-              {formatSek(filteredData?.market_dynamics.price_change_mean ?? data.market_dynamics.price_change_mean)}
-            </p>
-          </div>
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-eyebrow text-ledger-dimmed">Volatility</p>
-            <p className="num mt-2 text-2xl font-semibold text-ledger-text">
-              {formatSek(filteredData?.market_dynamics.volatility ?? data.market_dynamics.volatility)}
-            </p>
-          </div>
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-eyebrow text-ledger-dimmed">Sales volume (3M)</p>
-            <p className="num mt-2 text-2xl font-semibold text-ledger-text">
-              {formatNumber(data.market_dynamics.sales_volume_3m)}
-            </p>
-            <p className="num mt-1 text-[12px] text-ledger-muted">
-              6M: {formatNumber(data.market_dynamics.sales_volume_6m)} · 12M:{" "}
-              {formatNumber(data.market_dynamics.sales_volume_12m)}
-            </p>
-          </div>
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-eyebrow text-ledger-dimmed">Liquidity score</p>
-            <p className="num mt-2 text-2xl font-semibold text-ledger-text">
-              {formatNumberOrDash(filteredData?.market_dynamics.liquidity ?? data.market_dynamics.liquidity, 2)}
-            </p>
-          </div>
-        </div>
-      </div>
-          <div id="value" className="mb-6 ledger-card p-5 sm:p-6">
-        <h2 className="mb-4 text-lg font-semibold tracking-tight text-ledger-text">Value insights</h2>
-        <div className="mb-5 grid gap-3 sm:grid-cols-3">
-          <div className="rounded-xl border border-val-exc-line bg-val-exc-tint p-4">
-            <p className="text-[11px] font-semibold uppercase tracking-eyebrow text-val-exc">Undervalued properties</p>
-            <p className="num mt-1.5 text-2xl font-semibold text-val-exc">
-              {formatPercent(filteredData?.value_insights.undervalued_pct ?? data.value_insights.undervalued_pct)}
-            </p>
-            <p className="mt-1 text-[12px] text-val-exc">
-              <span className="num">{formatNumber(filteredData?.value_insights.undervalued_count ?? data.value_insights.undervalued_count)}</span> properties
-            </p>
-          </div>
-          <div className="rounded-xl border border-ledger-border bg-ledger-elevated p-4">
-            <p className="text-[11px] font-semibold uppercase tracking-eyebrow text-ledger-dimmed">Avg value score</p>
-            <p className="num mt-1.5 text-2xl font-semibold text-ledger-text">
-              {formatNumberOrDash(filteredData?.value_insights.avg_value_score ?? data.value_insights.avg_value_score, 1)}
-            </p>
-            <p className="mt-1 text-[12px] text-ledger-muted">
-              Median: <span className="num">{formatNumberOrDash(filteredData?.value_insights.median_value_score ?? data.value_insights.median_value_score, 1)}</span>
-            </p>
-          </div>
-          <div className="rounded-xl border border-ledger-border bg-ledger-elevated p-4">
-            <p className="text-[11px] font-semibold uppercase tracking-eyebrow text-ledger-dimmed">Avg prediction delta</p>
-            <p
-              className={`num mt-2 text-2xl font-semibold ${
-                (filteredData?.value_insights.avg_prediction_delta ?? data.value_insights.avg_prediction_delta) > 0
-                  ? "text-val-exc"
-                  : "text-val-high"
-              }`}
-            >
-              {(filteredData?.value_insights.avg_prediction_delta ?? data.value_insights.avg_prediction_delta) > 0 ? "+" : ""}
-              {formatSek(filteredData?.value_insights.avg_prediction_delta ?? data.value_insights.avg_prediction_delta)}
-            </p>
-          </div>
-        </div>
-
-        <div>
-          <ValueDistributionChart
-            value_tier_distribution={filteredData?.value_insights.value_tier_distribution ?? data.value_insights.value_tier_distribution}
-          />
-        </div>
-      </div>
-          <div id="size" className="mb-6 ledger-card p-5 sm:p-6">
-        <h2 className="mb-4 text-lg font-semibold tracking-tight text-ledger-text">Size analysis</h2>
-
-        <div className="mb-5">
-          <SizePriceChart price_by_size={data.size_analysis.price_by_size} />
-        </div>
-
-        <div>
-          <h3 className="mb-3 text-[14px] font-semibold tracking-tight text-ledger-text">Property size distribution</h3>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="rounded-lg border border-ledger-border bg-ledger-elevated p-4">
-              <p className="text-[11px] font-semibold uppercase tracking-eyebrow text-ledger-dimmed">Living area (m²)</p>
-              <p className="num mt-1.5 text-xl font-semibold text-ledger-text">
-                {formatNumber(data.size_analysis.size_distribution.living_area.median)} m²
-              </p>
-              <div className="mt-2 space-y-1 text-[12px] text-ledger-muted">
-                <p>Mean: <span className="num">{formatNumber(data.size_analysis.size_distribution.living_area.mean)}</span> m²</p>
-                <p>
-                  Range: <span className="num">{formatNumber(data.size_analysis.size_distribution.living_area.min)}</span> –{" "}
-                  <span className="num">{formatNumber(data.size_analysis.size_distribution.living_area.max)}</span> m²
-                </p>
-              </div>
-            </div>
-            <div className="rounded-xl border border-ledger-border bg-ledger-elevated p-4">
-              <p className="mb-3 text-[11px] font-semibold uppercase tracking-eyebrow text-ledger-dimmed">Room distribution</p>
-              <div className="space-y-2">
-                {Object.entries(data.size_analysis.size_distribution.room_distribution)
-                  .sort(([a], [b]) => {
-                    if (a === "4+") return 1;
-                    if (b === "4+") return -1;
-                    return parseInt(a) - parseInt(b);
-                  })
-                  .map(([rooms, count]) => (
-                    <div key={rooms} className="flex items-center justify-between text-[13px]">
-                      <span className="text-ledger-muted">{rooms} room{rooms !== "1" ? "s" : ""}</span>
-                      <span className="num font-medium text-ledger-text">{formatNumber(count)}</span>
-                    </div>
-                  ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-          <div id="characteristics" className="mb-6 ledger-card p-5 sm:p-6">
-        <h2 className="mb-4 text-lg font-semibold tracking-tight text-ledger-text">Property characteristics</h2>
-
-        <div className="mb-5 grid gap-3 sm:grid-cols-2">
-          <div className="rounded-xl border border-ledger-border bg-ledger-elevated p-4">
-            <div className="flex items-center justify-between">
-              <p className="text-[11px] font-semibold uppercase tracking-eyebrow text-ledger-dimmed">Elevator</p>
-              <span className="num text-2xl font-semibold text-ledger-text">
-                {formatPercent(
-                  filteredData?.property_characteristics.elevator_pct ?? data.property_characteristics.elevator_pct
-                )}
-              </span>
-            </div>
-            <p className="mt-2 text-[12px] text-ledger-muted">of properties have elevator access</p>
-          </div>
-          <div className="rounded-xl border border-ledger-border bg-ledger-elevated p-4">
-            <div className="flex items-center justify-between">
-              <p className="text-[11px] font-semibold uppercase tracking-eyebrow text-ledger-dimmed">Balcony</p>
-              <span className="num text-2xl font-semibold text-ledger-text">
-                {formatPercent(
-                  filteredData?.property_characteristics.balcony_pct ?? data.property_characteristics.balcony_pct
-                )}
-              </span>
-            </div>
-            <p className="mt-2 text-[12px] text-ledger-muted">of properties have a balcony</p>
-          </div>
-        </div>
-
-        <div>
-          <ConstructionEraChart
-            construction_era={filteredData?.construction_era ?? data.construction_era}
-          />
-        </div>
-      </div>
-
-          {allAreas.length > 0 && (
-            <>              <div id="similar" className="mb-6 ledger-card p-5 sm:p-6">
-                <SimilarAreas
-                  currentArea={data.area_name}
-                  currentPriceTier={data.price_tier}
-                  avgSoldPrice={data.overview.avg_sold_price}
-                  allAreas={allAreas}
-                />
-              </div>
-            </>
-          )}
-          <div id="recent" className="mb-6 ledger-card p-5 sm:p-6">
-        <div className="mb-6 flex items-center justify-between gap-3">
-          <h2 className="text-2xl font-semibold tracking-tight text-ledger-text">Recent sales</h2>
-          <Link
-            href={`/value-finder?area=${data.area_name}`}
-            className="ledger-btn focus-ring text-[13px]"
-          >
-            View all
+    <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
+      <div className="relative">
+        <nav className="mb-8 text-[13px] text-ledger-muted">
+          <Link href="/" className="focus-ring transition-colors hover:text-ledger-text">
+            Home
           </Link>
-        </div>
-        <div className="divide-y divide-ledger-border overflow-hidden rounded-xl border border-ledger-border">
-          {(filteredData?.recent_properties ?? data.recent_properties).map((property) => (
-            <div
-              key={property.listing_id}
-              className="flex items-center justify-between gap-3 px-3 py-2 transition-colors hover:bg-ledger-elevated/50"
-            >
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[13px] font-medium text-ledger-text">{property.address}</p>
-                <p className="truncate text-[11px] text-ledger-muted">
-                  <span className="num">{formatNumber(property.living_area)}</span> m² · <span className="num">{property.rooms}</span> rooms · sold {property.sold_date}
-                </p>
-              </div>
-              <div className="shrink-0 text-right">
-                <p className="num text-[13px] font-semibold text-ledger-text">{formatSek(property.sold_price)}</p>
-                <p className="num text-[11px] text-ledger-muted">{formatSek(property.price_per_sqm)}/m²</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-          <div className="ledger-card p-6 text-center">
-        <h3 className="text-lg font-semibold tracking-tight text-ledger-text">Find properties in {data.display_name}</h3>
-        <p className="mt-2 text-[14px] text-ledger-muted">
-          Browse all <span className="num">{formatNumber(data.overview.listing_count)}</span> properties and discover undervalued opportunities.
-        </p>
-        <Link
-          href={`/value-finder?area=${data.area_name}`}
-          className="ledger-btn-primary focus-ring mt-4 inline-flex text-[13px]"
-        >
-          Explore {data.display_name} properties
-        </Link>
+          {" / "}
+          <Link href="/areas" className="focus-ring transition-colors hover:text-ledger-text">
+            Areas
+          </Link>
+          {" / "}
+          <span className="font-medium text-ledger-text">{area.display_name}</span>
+        </nav>
+
+        <div className="mb-8 text-center animate-fade-in-up">
+          <p className="eyebrow text-ledger-accent">Area report</p>
+          <div className="mt-2 mb-3 flex flex-wrap items-center justify-center gap-3">
+            <h1 className="font-display text-headline text-ledger-text">{area.display_name}</h1>
+            <span className="inline-flex rounded-pill border border-ledger-border bg-ledger-elevated px-3 py-1 text-[13px] font-medium text-ledger-muted">
+              {PRICE_TIER_LABEL[area.price_tier] ?? area.price_tier}
+            </span>
           </div>
+          {area.has_limited_data && (
+            <p className="text-[13px] text-val-over">
+              Limited data available ({area.sample_size} properties) — estimates may vary.
+            </p>
+          )}
+        </div>
+
+        {staleInfo?.isStale && (
+          <div className="mx-auto mb-8 max-w-2xl rounded-xl border border-val-over-line bg-val-over-tint px-4 py-3 text-center">
+            <p className="text-[13px] text-val-over">
+              Data is {Math.floor(staleInfo.ageDays)} days old — last updated{" "}
+              {formatDateSv(staleInfo.generatedAt)}.
+            </p>
+          </div>
+        )}
+
+        <SectionNavigation areaName={area.display_name} />
+
+        <RoomFilterProvider initialFilter={initialFilter} roomData={area.by_room_count}>
+          <RoomFilterComponent />
+
+          <OverviewSection overview={area.overview} marketDynamics={area.market_dynamics} />
+
+          <MarketSection
+            overview={area.overview}
+            marketDynamics={area.market_dynamics}
+            avgLivingArea={area.size_analysis.size_distribution.living_area.mean}
+          />
+
+          <ValueSection valueInsights={area.value_insights} />
+
+          <SizeSection sizeAnalysis={area.size_analysis} />
+
+          <BuildingStockSection
+            characteristics={area.property_characteristics}
+            constructionEra={area.construction_era}
+          />
+
+          {similarAreas.length > 0 && (
+            <div id="similar" className="ledger-card mb-6 p-5 sm:p-6">
+              <SimilarAreas areas={similarAreas} />
+            </div>
+          )}
+
+          <RecentSalesSection
+            recentProperties={area.recent_properties}
+            areaName={area.area_name}
+          />
+        </RoomFilterProvider>
+
+        <div className="ledger-card p-6 text-center">
+          <h3 className="text-lg font-semibold tracking-tight text-ledger-text">
+            Find properties in {area.display_name}
+          </h3>
+          <p className="mt-2 text-[14px] text-ledger-muted">
+            Browse all <span className="num">{formatNumber(area.overview.listing_count)}</span>{" "}
+            properties and discover undervalued opportunities.
+          </p>
+          <Link
+            href={`/value-finder?area=${area.area_name}`}
+            className="ledger-btn-primary focus-ring mt-4 inline-flex text-[13px]"
+          >
+            Explore {area.display_name} properties
+          </Link>
         </div>
       </div>
     </div>
