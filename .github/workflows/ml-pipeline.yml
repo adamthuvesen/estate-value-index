@@ -75,6 +75,10 @@ jobs:
       BIGQUERY_TABLE_LISTINGS: ${{ vars.BIGQUERY_TABLE_LISTINGS || 'listings' }}
       BIGQUERY_DATASET_FEATURES: ${{ vars.BIGQUERY_DATASET_FEATURES || 'booli_features' }}
       BIGQUERY_TABLE_FEATURES: ${{ vars.BIGQUERY_TABLE_FEATURES || 'engineered_features' }}
+      # The pipeline runs against a temporary local Prefect server. Its analytics
+      # heartbeat writes to an ephemeral SQLite and logs noisy "database is locked"
+      # tracebacks under concurrency. We get nothing from that telemetry.
+      PREFECT_SERVER_ANALYTICS_ENABLED: "false"
 
     permissions:
       contents: read
