@@ -637,8 +637,9 @@ def _persist_evaluation_model(
         context=feature_context,
     )
 
-    # Save model and metrics
-    joblib.dump(pipeline_lgbm, resolved_model_dir / f"{prefix}_lgbm.joblib")
+    # Save model and metrics under the canonical artifact names that
+    # upload_model_artifacts expects ({prefix}.joblib, {prefix}_metrics.json).
+    joblib.dump(pipeline_lgbm, resolved_model_dir / f"{prefix}.joblib")
 
     with open(resolved_model_dir / f"{prefix}_feature_context.json", "w", encoding="utf-8") as f:
         json.dump(context_payload, f, indent=2, ensure_ascii=False)
@@ -667,7 +668,7 @@ def _persist_evaluation_model(
         "note": "For production performance, run: uv run python -m estate_value_index.cli value-analysis",
     }
 
-    with open(resolved_model_dir / f"{prefix}_metrics_lgbm.json", "w", encoding="utf-8") as f:
+    with open(resolved_model_dir / f"{prefix}_metrics.json", "w", encoding="utf-8") as f:
         json.dump(metrics_lgbm, f, indent=2, ensure_ascii=False)
 
     with open(resolved_model_dir / f"{prefix}_feature_importance.json", "w", encoding="utf-8") as f:
@@ -769,7 +770,7 @@ def run_training(config: TrainingConfig) -> float:
             final_results["categorical_features"],
         )
 
-    model_path = resolved_model_dir / f"{prefix}_lgbm.joblib"
+    model_path = resolved_model_dir / f"{prefix}.joblib"
     if config.hyperparameter_tuning:
         logger.info("Hyperparameter-tuned model saved to: %s (LGBM - Tuned)", model_path)
         logger.info("Hyperparameter tuning and training completed successfully")
