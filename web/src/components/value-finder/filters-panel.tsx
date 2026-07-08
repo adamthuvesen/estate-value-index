@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { DualRangeSlider } from "@/components/ui/dual-range-slider";
 import { formatSek } from "@/lib/format";
+import { VALUE_TIER_STYLES } from "@/lib/tiers";
 import {
   VALUE_TIERS,
   type ValueFinderFilters,
-  type ValueTier,
 } from "@/lib/value-finder-types";
 
 interface FiltersPanelProps {
@@ -21,21 +22,8 @@ interface FiltersPanelProps {
   isLoading?: boolean;
 }
 
-const VALUE_TIER_DOT: Record<ValueTier, string> = {
-  "Excellent Value": "bg-val-exc",
-  "Great Value": "bg-val-great",
-  "Good Value": "bg-val-good",
-  "Fair Value": "bg-val-fair",
-  Overvalued: "bg-val-over",
-  "Highly Overvalued": "bg-val-high",
-};
-
 function FieldLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="mb-3 text-[11px] font-semibold uppercase tracking-eyebrow text-ledger-dimmed">
-      {children}
-    </div>
-  );
+  return <div className="eyebrow mb-3">{children}</div>;
 }
 
 export function FiltersPanel({
@@ -88,7 +76,7 @@ export function FiltersPanel({
           className="focus-ring flex items-center gap-2 lg:pointer-events-none"
           aria-expanded={mobileOpen}
         >
-          <h2 className="text-[15px] font-semibold text-ledger-text">Filters</h2>
+          <h2 className="eyebrow text-ledger-text">Filters</h2>
           {activeFilterCount > 0 && (
             <span className="ledger-badge-active num">{activeFilterCount}</span>
           )}
@@ -136,8 +124,8 @@ export function FiltersPanel({
                     disabled={isLoading}
                     className="disabled:cursor-not-allowed disabled:opacity-40"
                   />
-                  <span className={`h-2 w-2 shrink-0 rounded-full ${VALUE_TIER_DOT[tier]}`} aria-hidden />
-                  <span className="text-[13px] font-medium text-ledger-text">{tier}</span>
+                  <span className={`h-2 w-2 shrink-0 rounded-full ${VALUE_TIER_STYLES[tier].dot}`} aria-hidden />
+                  <span className="text-[13px] font-medium text-ledger-text">{VALUE_TIER_STYLES[tier].label}</span>
                 </label>
               );
             })}
@@ -149,51 +137,47 @@ export function FiltersPanel({
 
         <RangeField
           label="Value score"
-          value={`${filters.min_value_score ?? valueScoreRange.min}–${filters.max_value_score ?? valueScoreRange.max}`}
           min={valueScoreRange.min}
           max={valueScoreRange.max}
           minValue={filters.min_value_score ?? valueScoreRange.min}
           maxValue={filters.max_value_score ?? valueScoreRange.max}
-          onMin={(v) => onFiltersChange({ min_value_score: v })}
-          onMax={(v) => onFiltersChange({ max_value_score: v })}
-          disabled={isLoading}
+          format={(lo, hi) => `${lo}–${hi}`}
+          onCommit={(lo, hi) =>
+            onFiltersChange({ min_value_score: lo, max_value_score: hi })
+          }
         />
 
         <RangeField
           label="Price"
-          value={`${formatSek(filters.min_price ?? priceRange.min)} – ${formatSek(filters.max_price ?? priceRange.max)}`}
           min={priceRange.min}
           max={priceRange.max}
           step={100000}
           minValue={filters.min_price ?? priceRange.min}
           maxValue={filters.max_price ?? priceRange.max}
-          onMin={(v) => onFiltersChange({ min_price: v })}
-          onMax={(v) => onFiltersChange({ max_price: v })}
-          disabled={isLoading}
+          format={(lo, hi) => `${formatSek(lo)} – ${formatSek(hi)}`}
+          onCommit={(lo, hi) => onFiltersChange({ min_price: lo, max_price: hi })}
         />
 
         <RangeField
           label="Living area"
-          value={`${filters.min_living_area ?? livingAreaRange.min}–${filters.max_living_area ?? livingAreaRange.max} m²`}
           min={livingAreaRange.min}
           max={livingAreaRange.max}
           minValue={filters.min_living_area ?? livingAreaRange.min}
           maxValue={filters.max_living_area ?? livingAreaRange.max}
-          onMin={(v) => onFiltersChange({ min_living_area: v })}
-          onMax={(v) => onFiltersChange({ max_living_area: v })}
-          disabled={isLoading}
+          format={(lo, hi) => `${lo}–${hi} m²`}
+          onCommit={(lo, hi) =>
+            onFiltersChange({ min_living_area: lo, max_living_area: hi })
+          }
         />
 
         <RangeField
           label="Rooms"
-          value={`${filters.min_rooms ?? roomsRange.min}–${filters.max_rooms ?? roomsRange.max}`}
           min={roomsRange.min}
           max={roomsRange.max}
           minValue={filters.min_rooms ?? roomsRange.min}
           maxValue={filters.max_rooms ?? roomsRange.max}
-          onMin={(v) => onFiltersChange({ min_rooms: v })}
-          onMax={(v) => onFiltersChange({ max_rooms: v })}
-          disabled={isLoading}
+          format={(lo, hi) => `${lo}–${hi}`}
+          onCommit={(lo, hi) => onFiltersChange({ min_rooms: lo, max_rooms: hi })}
         />
 
         {/* Areas */}
@@ -297,63 +281,51 @@ export function FiltersPanel({
 
 function RangeField({
   label,
-  value,
   min,
   max,
   step,
   minValue,
   maxValue,
-  onMin,
-  onMax,
-  disabled,
+  format,
+  onCommit,
 }: {
   label: string;
-  value: string;
   min: number;
   max: number;
   step?: number;
   minValue: number;
   maxValue: number;
-  onMin: (v: number) => void;
-  onMax: (v: number) => void;
-  disabled?: boolean;
+  format: (low: number, high: number) => string;
+  onCommit: (low: number, high: number) => void;
 }) {
+  // Live readout follows the drag; the URL update fires only on release.
+  const [display, setDisplay] = useState<[number, number]>([minValue, maxValue]);
+
+  // Re-sync the readout when the committed pair changes (URL nav / clear all).
+  const signature = `${minValue}:${maxValue}`;
+  const [prevSignature, setPrevSignature] = useState(signature);
+  if (signature !== prevSignature) {
+    setPrevSignature(signature);
+    setDisplay([minValue, maxValue]);
+  }
+
   return (
     <div className="px-5 py-5">
       <div className="mb-3 flex items-baseline justify-between gap-2">
-        <span className="text-[11px] font-semibold uppercase tracking-eyebrow text-ledger-dimmed">
-          {label}
+        <span className="eyebrow">{label}</span>
+        <span className="num text-[12px] font-medium text-ledger-muted">
+          {format(display[0], display[1])}
         </span>
-        <span className="num text-[12px] font-medium text-ledger-muted">{value}</span>
       </div>
-      <div className="space-y-3">
-        <div className="flex items-center gap-2.5">
-          <span className="w-8 shrink-0 text-[11px] text-ledger-dimmed">Min</span>
-          <input
-            type="range"
-            min={min}
-            max={max}
-            step={step}
-            value={minValue}
-            onChange={(e) => onMin(Number(e.target.value))}
-            disabled={disabled}
-            className="w-full disabled:cursor-not-allowed disabled:opacity-40"
-          />
-        </div>
-        <div className="flex items-center gap-2.5">
-          <span className="w-8 shrink-0 text-[11px] text-ledger-dimmed">Max</span>
-          <input
-            type="range"
-            min={min}
-            max={max}
-            step={step}
-            value={maxValue}
-            onChange={(e) => onMax(Number(e.target.value))}
-            disabled={disabled}
-            className="w-full disabled:cursor-not-allowed disabled:opacity-40"
-          />
-        </div>
-      </div>
+      <DualRangeSlider
+        min={min}
+        max={max}
+        step={step}
+        value={[minValue, maxValue]}
+        onChange={setDisplay}
+        onCommit={([low, high]) => onCommit(low, high)}
+        ariaLabel={[`Minimum ${label.toLowerCase()}`, `Maximum ${label.toLowerCase()}`]}
+      />
     </div>
   );
 }

@@ -3,7 +3,6 @@ import type { SortField, SortOrder } from "@/lib/value-finder-types";
 interface SortControlsProps {
   sortField: SortField;
   sortOrder: SortOrder;
-  totalResults: number;
   pageSize: number;
   onSortChange: (field: SortField, order: SortOrder) => void;
   onPageSizeChange: (size: number) => void;
@@ -19,6 +18,11 @@ const sortOptions: { value: SortField; label: string }[] = [
   { value: "living_area", label: "Living area" },
 ];
 
+/** Human label for a sort field — shared with the figure caption meta. */
+export function sortFieldLabel(field: SortField): string {
+  return sortOptions.find((o) => o.value === field)?.label ?? field;
+}
+
 const pageSizeOptions = [20, 50, 100];
 
 const selectClass =
@@ -31,24 +35,13 @@ const chevron =
 export function SortControls({
   sortField,
   sortOrder,
-  totalResults,
   pageSize,
   onSortChange,
   onPageSizeChange,
   isLoading = false,
 }: SortControlsProps) {
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-ledger-border bg-ledger-surface px-4 py-3 shadow-elev-1 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex items-center gap-2.5">
-        <span className="num text-[15px] font-semibold text-ledger-text">
-          {totalResults.toLocaleString("en-US")}
-        </span>
-        <span className="text-[13px] text-ledger-muted">
-          {totalResults === 1 ? "home" : "homes"}
-        </span>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
         <div className="flex items-center gap-1.5">
           <label htmlFor="sort-field" className="text-[13px] text-ledger-muted">
             Sort
@@ -107,7 +100,6 @@ export function SortControls({
             ))}
           </select>
         </div>
-      </div>
     </div>
   );
 }

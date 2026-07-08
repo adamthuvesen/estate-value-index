@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Badge } from "@/components/ui/badge";
 import { formatSek, titleCaseArea } from "@/lib/format";
 import { FALLBACK_TIER, VALUE_TIER_STYLES } from "@/lib/tiers";
 import type { ValueProperty, ValueTier } from "@/lib/value-finder-types";
@@ -44,14 +45,20 @@ export function PropertyCard({ property }: PropertyCardProps) {
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3
-            className="truncate text-[15px] font-semibold leading-tight text-ledger-text"
+            className="truncate font-display text-[15px] font-semibold leading-tight text-ledger-text"
             title={property.address}
           >
             {property.address}
           </h3>
           <p className="mt-1 flex items-center gap-1.5 truncate text-[12px]">
             <span className="truncate text-ledger-muted">
-              {titleCaseArea(property.area)} · {titleCaseArea(property.municipality)}
+              <Link
+                href={`/area/${property.area}`}
+                className="focus-ring font-medium text-ledger-muted underline-offset-2 transition-colors hover:text-ledger-accent hover:underline hover:decoration-ledger-accent/50"
+              >
+                {titleCaseArea(property.area)}
+              </Link>{" "}
+              · {titleCaseArea(property.municipality)}
             </span>
             <span aria-hidden className="text-ledger-border-emphasis">·</span>
             <span className={`inline-flex shrink-0 items-center gap-1 font-medium ${tier.text}`}>
@@ -168,28 +175,31 @@ function InsufficientDataCard({ property }: PropertyCardProps) {
   });
 
   return (
-    <article className="ledger-card group flex flex-col p-4 opacity-90">
+    <article className="flex flex-col rounded-ledger border border-dashed border-ledger-border-emphasis bg-ledger-elevated/50 p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3
-            className="truncate text-[15px] font-semibold leading-tight text-ledger-text"
+            className="truncate font-display text-[15px] font-semibold leading-tight text-ledger-text"
             title={property.address}
           >
             {property.address}
           </h3>
           <p className="mt-1 truncate text-[12px] text-ledger-muted">
-            {titleCaseArea(property.area)} · {titleCaseArea(property.municipality)}
+            <Link
+              href={`/area/${property.area}`}
+              className="focus-ring font-medium text-ledger-muted underline-offset-2 transition-colors hover:text-ledger-accent hover:underline hover:decoration-ledger-accent/50"
+            >
+              {titleCaseArea(property.area)}
+            </Link>{" "}
+            · {titleCaseArea(property.municipality)}
           </p>
         </div>
-        <span
-          className="shrink-0 rounded-md border border-ledger-border bg-ledger-elevated px-2 py-1 text-[11px] font-medium text-ledger-muted"
-          title="Not enough data to score this property's value"
-        >
-          Insufficient data
-        </span>
+        <Badge variant="neutral" className="shrink-0">
+          Not ranked
+        </Badge>
       </div>
 
-      <p className="mt-3 rounded-lg border border-ledger-border bg-ledger-elevated/60 px-3 py-2.5 text-[12px] text-ledger-muted">
+      <p className="mt-3 rounded-lg border border-ledger-border bg-ledger-surface px-3 py-2.5 text-[12px] text-ledger-muted">
         {reason} — not ranked. Sold for{" "}
         <span className="num font-medium text-ledger-text">
           {formatSek(property.sold_price)}
