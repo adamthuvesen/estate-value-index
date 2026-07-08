@@ -1,80 +1,73 @@
 # AGENTS.md
 
-**estate-value-index** is a Swedish real estate ML system: authorized listing ingestion -> **BigQuery** -> **LightGBM** -> **Next.js** + **FastAPI**. Python 3.11+ with **uv**; Node 20+ for `web/`.
+**estate-value-index** predicts Swedish real estate values: authorized listing
+ingestion -> BigQuery -> LightGBM -> Next.js + FastAPI. Python 3.11+ via
+**uv**; Node 20+ for `web/`; Next.js 15; Prefect 3.
 
-User-level guidance (tone, principles, git etiquette) lives in `~/.claude/CLAUDE.md` and `~/dotfiles/agents/AGENTS.md` and is *not* duplicated here. This file is for project-specific facts.
+This file is project facts only. Tone, principles, and git etiquette live in
+the user-level `~/.claude/CLAUDE.md` and `~/dotfiles/agents/AGENTS.md`.
 
-**Read next**
+## Read next
 
-- [docs/architecture.md](docs/architecture.md): architecture, runtime shape, and system boundaries
-- [docs/data-pipeline.md](docs/data-pipeline.md): ingestion, BigQuery, feature materialization, and pipeline rules
-- [docs/ml-and-models.md](docs/ml-and-models.md): training, feature context, model artifacts, and ML checks
-- [docs/api-web-deploy.md](docs/api-web-deploy.md): FastAPI, Next.js, container startup, and deploy notes
+Read the matching guide before touching that part of the system:
 
----
+- [docs/architecture.md](docs/architecture.md): system shape, entry points, dependency direction, conventions
+- [docs/data-pipeline.md](docs/data-pipeline.md): ingestion, BigQuery, environment vars, leakage rules
+- [docs/ml-and-models.md](docs/ml-and-models.md): training contract, feature context, model artifacts
+- [docs/api-web-deploy.md](docs/api-web-deploy.md): FastAPI, Next.js routes, container, Cloud Run
 
-## Critical rules
+`docs/internal/` (git-ignored) holds model metrics, experiment reports, and
+research notes. Put performance numbers and experiment results there, never in
+the public docs tree. Index: `docs/internal/README.md`.
 
-**MUST**
+## Rules
 
-- `uv sync --all-extras`, then run Python via `uv run ...` (no manual `activate` needed; `uv run` always uses the project venv)
-- Run **`uv run pytest`** before commit; for web changes also `cd web && npm test` (and lint/typecheck as needed)
-- Read the matching guide under [docs/](docs/) when you touch pipeline, ML, API, or deploy
-- Use `--dry-run` on CLIs that support it when outcomes are uncertain
+- Run Python via `uv run ...` after `uv sync --all-extras`. Never pip, never manual activate.
+- Run `uv run pytest` before commit; `cd web && npm test` for web changes.
+- Never commit to `main` directly; branch and PR.
+- Never hand-edit `web/models/` (generated training output).
+- Never use `localStorage` / `sessionStorage` in web code.
+- Never interpolate ad hoc strings into BigQuery SQL. Use the parameterized /
+  operator-only patterns in [src/estate_value_index/utils/bigquery_safety.py](src/estate_value_index/utils/bigquery_safety.py).
+- Respect `sold_date` chronology: temporal splits for evaluation, no future
+  rows in aggregates. Check: `uv run pytest tests/ml/test_temporal_leakage.py`.
+- Use `--dry-run` on CLIs that support it when the outcome is uncertain.
+- If a doc disagrees with code, fix the doc in the same change.
 
-**NEVER**
-
-- Commit to **main** directly (use a branch/PR)
-- Hand-edit **web/models/** (training outputs)
-- Use **localStorage** / **sessionStorage** in **web** artifacts
-- **Trust** ad hoc strings in BigQuery SQL; use operator-only / parameterized patterns (see [src/estate_value_index/utils/bigquery_safety.py](src/estate_value_index/utils/bigquery_safety.py), [docs/data-pipeline.md](docs/data-pipeline.md))
-
----
-
-## Essential commands
+## Commands
 
 ```bash
-uv sync --all-extras           # create/update the .venv
-uv run pytest                  # run tests (no manual activate needed)
-cd web && npm run dev          # app on localhost:3000
+uv sync --all-extras             # create/update the .venv
+uv run pytest                    # tests
+cd web && npm run dev            # app on localhost:3000
+./scripts/deploy_cloud_run.sh    # deploy (see docs/api-web-deploy.md)
 ```
 
-**Train (typical):** `GCS_ENABLED=false uv run python -m estate_value_index.cli train-production-models --data-source bigquery --model-dir web/models`
-**Pipeline (orchestrated):** e.g. `uv run python -m estate_value_index.pipelines.core.complete_pipeline --quick` (see [docs/data-pipeline.md](docs/data-pipeline.md) and `complete_pipeline --help`)
-**Deploy:** `./scripts/deploy_cloud_run.sh` (see [docs/api-web-deploy.md](docs/api-web-deploy.md))
+Typical local training:
 
----
+```bash
+GCS_ENABLED=false uv run python -m estate_value_index.cli train-production-models \
+  --data-source bigquery --model-dir web/models
+```
 
-## Environment & BigQuery
+Orchestrated pipeline: `uv run python -m estate_value_index.pipelines.core.complete_pipeline --quick`
+(see `--help` and [docs/data-pipeline.md](docs/data-pipeline.md)).
 
-Required `.env` vars, optional knobs, config precedence, and BigQuery dataset/table names: [docs/data-pipeline.md](docs/data-pipeline.md#environment). Precedence is environment -> [config/pipeline_config.yaml](config/pipeline_config.yaml) -> code defaults.
+Config precedence: environment -> [config/pipeline_config.yaml](config/pipeline_config.yaml)
+-> code defaults. Required env vars: [docs/data-pipeline.md](docs/data-pipeline.md#environment).
 
----
+## Where things live
 
-## Key file pointers
-
-| Path | Role |
-| ---- | ---- |
-| `src/estate_value_index/cli/train_production_models.py` | Production training entry |
-| [api_server.py](api_server.py) | FastAPI prediction service |
-| `src/estate_value_index/ml/` | Features, loader, training |
-| `src/estate_value_index/pipelines/core/complete_pipeline.py` | Main orchestrated pipeline |
-| `web/src/app/api/` | Next.js API routes (`runtime = 'nodejs'` where needed) |
-| [config/pipeline_config.yaml](config/pipeline_config.yaml) | Thresholds, ingestion defaults |
-| [tests/conftest.py](tests/conftest.py) | Shared fixtures |
-| [Dockerfile](Dockerfile) / [scripts/startup.sh](scripts/startup.sh) | Container, GCS model sync |
-
----
+- Entry points, boundaries, and the full module map: [docs/architecture.md](docs/architecture.md)
+- FastAPI prediction service: [api_server.py](api_server.py)
+- ML (features, loading, training): `src/estate_value_index/ml/`
+- Shared test fixtures (start here for exploration): [tests/conftest.py](tests/conftest.py)
+- Container and GCS model sync: [Dockerfile](Dockerfile), [scripts/startup.sh](scripts/startup.sh)
 
 ## Gotchas
 
-Read the matching guide before editing. The gotchas live with the code they bite:
+The traps live with the code they bite; the guides carry the detail:
 
-- **Temporal leakage, feature context, categoricals**: [docs/ml-and-models.md](docs/ml-and-models.md)
-- **Models (GCS sync, not baked in image), `GCS_ENABLED` across CI/dev/prod**: [docs/api-web-deploy.md](docs/api-web-deploy.md)
-
-If a doc disagrees with code, fix the doc in the same change.
-
-**Exploration:** [tests/conftest.py](tests/conftest.py).
-
-**Workflow:** search for existing patterns; test incrementally. **Versions:** **uv** (not pip), Python 3.11+, Node 20+, Next.js 15, LightGBM
+- Temporal leakage, feature context, categorical handling: [docs/ml-and-models.md](docs/ml-and-models.md)
+- Models sync from GCS at startup (not baked into the image); `GCS_ENABLED`
+  differs across CI/dev/prod: [docs/api-web-deploy.md](docs/api-web-deploy.md)

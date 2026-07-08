@@ -78,6 +78,8 @@ intentionally git-ignored.
 ```bash
 uv run python -m estate_value_index.cli train-production-models --data-source bigquery
 uv run python -m estate_value_index.cli model-suite-experiment
-uv run python -m estate_value_index.cli feature-count-experiment --method rfe --feature-set no_list_price_h3_market_street --normalized-weight 0.55 --counts 30 25 20 15 12 10 8
-uv run python -m estate_value_index.cli feature-count-experiment --method rfe --feature-set listing_price_h3_market_street --normalized-weight 0.30 --counts 30 25 20 15 12 10 8
+uv run python -m estate_value_index.cli feature-count-experiment --help
 ```
+
+Tuned experiment invocations (feature sets, weights, counts) live in
+`docs/internal/ml-feature-selection.md`.
