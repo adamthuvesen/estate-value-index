@@ -206,7 +206,7 @@ export function PriceTrendChart({ median_price_3m, median_price_6m, median_price
               boxShadow: "0 4px 14px rgba(16,17,20,0.08)",
               color: "#16171A",
             }}
-            formatter={(value: number) => [formatTooltipPrice(value), displayPerSqm ? "Median price/m²" : "Median price"]}
+            formatter={(value) => [formatTooltipPrice(Number(value)), displayPerSqm ? "Median price/m²" : "Median price"]}
             labelFormatter={(label) => {
               const point = data.find((d) => d.month === label);
               return point ? `${label} (${point.label})` : label;

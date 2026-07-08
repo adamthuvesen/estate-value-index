@@ -61,8 +61,8 @@ export function ValueDistributionChart({ value_tier_distribution }: ValueDistrib
               boxShadow: "0 4px 14px rgba(16,17,20,0.08)",
               color: "#16171A",
             }}
-            formatter={(value: number) => [
-              `${formatRawNumber(value)} properties (${((value / total) * 100).toFixed(1)}%)`,
+            formatter={(value) => [
+              `${formatRawNumber(Number(value))} properties (${((Number(value) / total) * 100).toFixed(1)}%)`,
               "Count",
             ]}
             labelStyle={{ fontWeight: 600, color: "#63666E", fontSize: 12 }}

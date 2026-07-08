@@ -64,11 +64,11 @@ export function SizePriceChart({ price_by_size }: SizePriceChartProps) {
               boxShadow: "0 4px 14px rgba(16,17,20,0.08)",
               color: "#16171A",
             }}
-            formatter={(value: number, _name, item) => [
-              `${formatSek(value)} · ${formatRawNumber(item?.payload?.count ?? 0)} sold`,
+            formatter={(value, _name, item) => [
+              `${formatSek(Number(value))} · ${formatRawNumber(item?.payload?.count ?? 0)} sold`,
               "Median price",
             ]}
-            labelFormatter={(label: string) => `${label} m²`}
+            labelFormatter={(label) => `${String(label)} m²`}
             labelStyle={{ fontWeight: 600, color: "#63666E", marginBottom: 8, fontSize: 12 }}
             itemStyle={{ color: "#16171A", fontSize: 13, fontWeight: 600 }}
           />
