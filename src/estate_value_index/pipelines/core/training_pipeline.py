@@ -124,20 +124,27 @@ def _run_local_training(config: TrainingFlowConfig, results: dict, logger: Logge
     metrics_file = Path(config.local_model_dir) / production_artifact_names(
         NO_LIST_MODEL_ID, config.model_prefix
     ).metrics
-    if metrics_file.exists():
-        validation_results = validate_model_performance_task(
-            metrics_path=metrics_file,
-            max_median_ape=config.max_median_ape,
-            max_rmse=config.max_rmse,
+    if not metrics_file.exists():
+        results["success"] = False
+        raise RuntimeError(
+            f"Training reported success but no metrics file was written: {metrics_file}. "
+            "Cannot validate model performance."
         )
-        results["steps"]["validation"] = validation_results
-        results["validation_passed"] = validation_results["validation_passed"]
-        results["validation_median_ape_passed"] = validation_results["validation_passed"]
-        results["metrics"] = {
-            "mae": validation_results["mae"],
-            "rmse": validation_results.get("rmse"),
-            "r2": validation_results.get("r2"),
-        }
+
+    validation_results = validate_model_performance_task(
+        metrics_path=metrics_file,
+        max_median_ape=config.max_median_ape,
+        max_rmse=config.max_rmse,
+    )
+    results["steps"]["validation"] = validation_results
+    results["validation_passed"] = validation_results["validation_passed"]
+    results["validation_median_ape_passed"] = validation_results["validation_passed"]
+    results["metrics"] = {
+        "median_ape": validation_results["median_ape"],
+        "mae": validation_results["mae"],
+        "rmse": validation_results.get("rmse"),
+        "r2": validation_results.get("r2"),
+    }
 
     logger.info("=" * 80)
     logger.info("Local training flow completed")
@@ -419,6 +426,7 @@ def _validate_and_promote_stage(
     # ml-pipeline.yml reads this key; without it the workflow defaulted to True.
     results["validation_median_ape_passed"] = validation_results["validation_passed"]
     results["metrics"] = {
+        "median_ape": validation_results["median_ape"],
         "mae": validation_results["mae"],
         "rmse": validation_results.get("rmse"),
         "r2": validation_results.get("r2"),

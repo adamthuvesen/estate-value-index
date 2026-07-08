@@ -227,7 +227,10 @@ jobs:
 
           # Extract metrics
           metrics = result.get('stages', {}).get('training', {}).get('metrics', {})
-          median_ape = metrics.get('median_ape', 0)
+          median_ape = metrics.get('median_ape')
+          if median_ape is None:
+              print('❌ median_ape missing from pipeline metrics — cannot evaluate quality gate')
+              sys.exit(1)
 
           # Quality gate: MdAPE threshold (kept in sync with DEFAULT_MEDIAN_APE_THRESHOLD)
           if median_ape > 0.08:
