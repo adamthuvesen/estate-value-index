@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { Inter, JetBrains_Mono, Schibsted_Grotesk } from "next/font/google";
 
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
@@ -19,6 +19,12 @@ const jetbrainsMono = JetBrains_Mono({
   variable: "--font-jetbrains-mono",
   subsets: ["latin"],
   weight: ["400", "500", "700"],
+  display: "swap",
+});
+
+const schibstedGrotesk = Schibsted_Grotesk({
+  variable: "--font-schibsted",
+  subsets: ["latin"],
   display: "swap",
 });
 
@@ -53,8 +59,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.variable} ${jetbrainsMono.variable} bg-tactical-bg min-h-screen font-sans antialiased`}>
+    <html
+      lang="en"
+      suppressHydrationWarning
+      className={`${inter.variable} ${jetbrainsMono.variable} ${schibstedGrotesk.variable}`}
+    >
+      <body className="bg-ledger-bg min-h-screen font-sans antialiased">
         <div className="relative flex min-h-screen flex-col">
           <SiteHeader />
           <main className="flex-1">

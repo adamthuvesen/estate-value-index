@@ -18,9 +18,9 @@ type PredictionFormProps = {
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 };
 
-const fieldLabel = "text-[12px] font-medium text-tactical-muted";
+const fieldLabel = "text-[12px] font-medium text-ledger-muted";
 const fieldControl =
-  "rounded-sm border border-tactical-border bg-tactical-surface px-3 py-2 text-[14px] text-tactical-text transition-colors placeholder:text-tactical-dimmed hover:border-tactical-border-emphasis focus:border-tactical-accent focus:shadow-focus focus:outline-hidden";
+  "rounded-sm border border-ledger-border bg-ledger-surface px-3 py-2 text-[14px] text-ledger-text transition-colors placeholder:text-ledger-dimmed hover:border-ledger-border-emphasis focus:border-ledger-accent focus:shadow-focus focus:outline-hidden";
 
 export function PredictionForm({
   formData,
@@ -36,10 +36,10 @@ export function PredictionForm({
   onSubmit,
 }: PredictionFormProps) {
   return (
-    <form onSubmit={onSubmit} className="tactical-card space-y-6 p-6">
+    <form onSubmit={onSubmit} className="ledger-card space-y-6 p-6">
       <div className="flex items-baseline justify-between gap-3">
-        <h3 className="text-[15px] font-semibold text-tactical-text">Property details</h3>
-        <span className="tactical-badge-inactive">{modelLabel}</span>
+        <h3 className="text-[15px] font-semibold text-ledger-text">Property details</h3>
+        <span className="ledger-badge-inactive">{modelLabel}</span>
       </div>
 
       {/* Sample presets */}
@@ -55,8 +55,8 @@ export function PredictionForm({
                 onClick={() => onSampleLoad(index)}
                 className={`rounded-pill border px-3 py-1.5 text-[13px] font-medium transition-colors ${
                   selected
-                    ? "border-tactical-text bg-tactical-text text-white"
-                    : "border-tactical-border bg-tactical-surface text-tactical-muted hover:border-tactical-border-emphasis hover:text-tactical-text"
+                    ? "border-ledger-text bg-ledger-text text-white"
+                    : "border-ledger-border bg-ledger-surface text-ledger-muted hover:border-ledger-border-emphasis hover:text-ledger-text"
                 }`}
               >
                 {listing.name}
@@ -174,11 +174,11 @@ export function PredictionForm({
         </label>
       </div>
 
-      <div className="flex flex-col gap-3 border-t border-tactical-border pt-5 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-[13px] text-tactical-muted">
-          Estimating with <span className="font-medium text-tactical-text">{modelLabel}</span>
+      <div className="flex flex-col gap-3 border-t border-ledger-border pt-5 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-[13px] text-ledger-muted">
+          Estimating with <span className="font-medium text-ledger-text">{modelLabel}</span>
         </p>
-        <button type="submit" disabled={isLoading || !isApiReady} className="tactical-btn-primary">
+        <button type="submit" disabled={isLoading || !isApiReady} className="ledger-btn-primary">
           {!isApiReady ? "Starting model…" : isLoading ? "Estimating…" : "Estimate value"}
         </button>
       </div>

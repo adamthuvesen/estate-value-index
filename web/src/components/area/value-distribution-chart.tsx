@@ -26,8 +26,8 @@ export function ValueDistributionChart({ value_tier_distribution }: ValueDistrib
 
   if (data.length === 0) {
     return (
-      <div className="flex items-center justify-center rounded-lg border border-tactical-border bg-tactical-elevated p-8">
-        <p className="text-[13px] text-tactical-muted">No value tier data available.</p>
+      <div className="flex items-center justify-center rounded-lg border border-ledger-border bg-ledger-elevated p-8">
+        <p className="text-[13px] text-ledger-muted">No value tier data available.</p>
       </div>
     );
   }
@@ -37,8 +37,8 @@ export function ValueDistributionChart({ value_tier_distribution }: ValueDistrib
   return (
     <div>
       <div className="mb-3">
-        <h3 className="text-[14px] font-semibold tracking-tight text-tactical-text">Value distribution</h3>
-        <p className="text-[12px] text-tactical-muted">Properties per value tier</p>
+        <h3 className="text-[14px] font-semibold tracking-tight text-ledger-text">Value distribution</h3>
+        <p className="text-[12px] text-ledger-muted">Properties per value tier</p>
       </div>
 
       <ResponsiveContainer width="100%" height={Math.max(150, data.length * 34 + 16)}>

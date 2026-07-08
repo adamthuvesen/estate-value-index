@@ -155,24 +155,24 @@ function ValueFinderContent() {
   const currentFilters = getFiltersFromUrl();
 
   return (
-    <div className="min-h-screen bg-tactical-bg">
+    <div className="min-h-screen bg-ledger-bg">
       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
         {/* Hero */}
         <header className="mx-auto max-w-2xl text-center animate-fade-in-up">
-          <p className="font-mono text-[12px] font-semibold uppercase tracking-tactical-wide text-tactical-accent">
+          <p className="font-mono text-[12px] font-semibold uppercase tracking-eyebrow text-ledger-accent">
             Value Finder
           </p>
-          <h1 className="mt-3 text-4xl font-semibold leading-[1.06] tracking-tight text-tactical-text sm:text-[46px]">
+          <h1 className="mt-3 text-4xl font-semibold leading-[1.06] tracking-tight text-ledger-text sm:text-[46px]">
             Find undervalued
             <br className="hidden sm:block" /> Stockholm homes
           </h1>
-          <p className="mx-auto mt-4 max-w-xl text-[15px] leading-relaxed text-tactical-muted">
+          <p className="mx-auto mt-4 max-w-xl text-[15px] leading-relaxed text-ledger-muted">
             Every recent sale, scored against the model&rsquo;s estimate. Filter by value tier to surface
             the widest gaps between price paid and predicted worth.
           </p>
 
           {metadata && (
-            <dl className="mx-auto mt-8 flex max-w-md items-stretch justify-center divide-x divide-tactical-border rounded-2xl border border-tactical-border bg-tactical-surface shadow-elev-1">
+            <dl className="mx-auto mt-8 flex max-w-md items-stretch justify-center divide-x divide-ledger-border rounded-2xl border border-ledger-border bg-ledger-surface shadow-elev-1">
               <Stat
                 value={metadata.statistics.total_properties.toLocaleString("en-US")}
                 label="Properties"
@@ -228,8 +228,8 @@ function ValueFinderContent() {
             {isLoading && (
               <div className="flex items-center justify-center py-24">
                 <div className="flex flex-col items-center gap-3">
-                  <div className="h-8 w-8 animate-spin rounded-full border-2 border-tactical-border border-t-tactical-text" />
-                  <p className="text-[13px] text-tactical-muted">Loading properties…</p>
+                  <div className="h-8 w-8 animate-spin rounded-full border-2 border-ledger-border border-t-ledger-text" />
+                  <p className="text-[13px] text-ledger-muted">Loading properties…</p>
                 </div>
               </div>
             )}
@@ -254,17 +254,17 @@ function ValueFinderContent() {
             )}
 
             {!isLoading && properties && properties.properties.length === 0 && (
-              <div className="mt-6 rounded-2xl border border-tactical-border bg-tactical-surface px-6 py-16 text-center shadow-elev-1">
-                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-tactical-elevated">
-                  <svg className="h-6 w-6 text-tactical-dimmed" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="mt-6 rounded-2xl border border-ledger-border bg-ledger-surface px-6 py-16 text-center shadow-elev-1">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-ledger-elevated">
+                  <svg className="h-6 w-6 text-ledger-dimmed" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                   </svg>
                 </div>
-                <h3 className="mt-4 text-lg font-semibold text-tactical-text">No matches</h3>
-                <p className="mx-auto mt-1.5 max-w-sm text-[14px] text-tactical-muted">
+                <h3 className="mt-4 text-lg font-semibold text-ledger-text">No matches</h3>
+                <p className="mx-auto mt-1.5 max-w-sm text-[14px] text-ledger-muted">
                   Nothing fits these filters. Try widening the range or clearing a tier.
                 </p>
-                <button onClick={handleClearFilters} className="tactical-btn-primary mx-auto mt-5">
+                <button onClick={handleClearFilters} className="ledger-btn-primary mx-auto mt-5">
                   Clear all filters
                 </button>
               </div>
@@ -279,8 +279,8 @@ function ValueFinderContent() {
 function Stat({ value, label }: { value: string; label: string }) {
   return (
     <div className="flex flex-1 flex-col items-center px-5 py-4">
-      <dd className="num text-2xl font-semibold text-tactical-text">{value}</dd>
-      <dt className="mt-1 text-[12px] text-tactical-muted">{label}</dt>
+      <dd className="num text-2xl font-semibold text-ledger-text">{value}</dd>
+      <dt className="mt-1 text-[12px] text-ledger-muted">{label}</dt>
     </div>
   );
 }
@@ -288,10 +288,10 @@ function Stat({ value, label }: { value: string; label: string }) {
 export default function ValueFinderPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-tactical-bg flex items-center justify-center">
+      <div className="min-h-screen bg-ledger-bg flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-tactical-border border-t-tactical-text" />
-          <p className="text-[13px] text-tactical-muted">Loading…</p>
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-ledger-border border-t-ledger-text" />
+          <p className="text-[13px] text-ledger-muted">Loading…</p>
         </div>
       </div>
     }>

@@ -26,8 +26,8 @@ export function SizePriceChart({ price_by_size }: SizePriceChartProps) {
 
   if (data.length === 0) {
     return (
-      <div className="flex items-center justify-center rounded-lg border border-tactical-border bg-tactical-elevated p-8">
-        <p className="text-[13px] text-tactical-muted">No size data available.</p>
+      <div className="flex items-center justify-center rounded-lg border border-ledger-border bg-ledger-elevated p-8">
+        <p className="text-[13px] text-ledger-muted">No size data available.</p>
       </div>
     );
   }
@@ -35,8 +35,8 @@ export function SizePriceChart({ price_by_size }: SizePriceChartProps) {
   return (
     <div>
       <div className="mb-3">
-        <h3 className="text-[14px] font-semibold tracking-tight text-tactical-text">Sold price by size</h3>
-        <p className="text-[12px] text-tactical-muted">Median sold price across living-area bands (m²)</p>
+        <h3 className="text-[14px] font-semibold tracking-tight text-ledger-text">Sold price by size</h3>
+        <p className="text-[12px] text-ledger-muted">Median sold price across living-area bands (m²)</p>
       </div>
 
       <ResponsiveContainer width="100%" height={200}>
@@ -82,19 +82,19 @@ export function SizePriceChart({ price_by_size }: SizePriceChartProps) {
 
       <div className="mt-4 overflow-x-auto">
         <table className="w-full">
-          <thead className="border-b border-tactical-border">
+          <thead className="border-b border-ledger-border">
             <tr>
-              <th className="px-4 py-2 text-left text-[11px] font-semibold uppercase tracking-tactical-wide text-tactical-dimmed">Size (m²)</th>
-              <th className="px-4 py-2 text-right text-[11px] font-semibold uppercase tracking-tactical-wide text-tactical-dimmed">Median price</th>
-              <th className="px-4 py-2 text-right text-[11px] font-semibold uppercase tracking-tactical-wide text-tactical-dimmed">Properties</th>
+              <th className="px-4 py-2 text-left text-[11px] font-semibold uppercase tracking-eyebrow text-ledger-dimmed">Size (m²)</th>
+              <th className="px-4 py-2 text-right text-[11px] font-semibold uppercase tracking-eyebrow text-ledger-dimmed">Median price</th>
+              <th className="px-4 py-2 text-right text-[11px] font-semibold uppercase tracking-eyebrow text-ledger-dimmed">Properties</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-tactical-border">
+          <tbody className="divide-y divide-ledger-border">
             {data.map((row) => (
-              <tr key={row.bucket} className="transition-colors hover:bg-tactical-elevated/50">
-                <td className="px-4 py-2 text-[13px] font-medium text-tactical-text">{row.bucket}</td>
-                <td className="num px-4 py-2 text-right text-[13px] text-tactical-text">{formatSek(row.median_price)}</td>
-                <td className="num px-4 py-2 text-right text-[13px] text-tactical-muted">{formatRawNumber(row.count)}</td>
+              <tr key={row.bucket} className="transition-colors hover:bg-ledger-elevated/50">
+                <td className="px-4 py-2 text-[13px] font-medium text-ledger-text">{row.bucket}</td>
+                <td className="num px-4 py-2 text-right text-[13px] text-ledger-text">{formatSek(row.median_price)}</td>
+                <td className="num px-4 py-2 text-right text-[13px] text-ledger-muted">{formatRawNumber(row.count)}</td>
               </tr>
             ))}
           </tbody>

@@ -22,8 +22,8 @@ const ERA_ORDER = ["Pre-1900", "1900-1950", "1950-1980", "1980-2000", "2000+"];
 export function ConstructionEraChart({ construction_era }: ConstructionEraChartProps) {
   if (!construction_era.median_year || Object.keys(construction_era.era_distribution).length === 0) {
     return (
-      <div className="flex items-center justify-center rounded-xl border border-tactical-border bg-tactical-elevated p-8">
-        <p className="text-[13px] text-tactical-muted">No construction era data available.</p>
+      <div className="flex items-center justify-center rounded-xl border border-ledger-border bg-ledger-elevated p-8">
+        <p className="text-[13px] text-ledger-muted">No construction era data available.</p>
       </div>
     );
   }
@@ -41,28 +41,28 @@ export function ConstructionEraChart({ construction_era }: ConstructionEraChartP
   return (
     <div>
       <div className="mb-3">
-        <h3 className="text-[14px] font-semibold tracking-tight text-tactical-text">Building age distribution</h3>
-        <p className="text-[12px] text-tactical-muted">Properties by construction era</p>
+        <h3 className="text-[14px] font-semibold tracking-tight text-ledger-text">Building age distribution</h3>
+        <p className="text-[12px] text-ledger-muted">Properties by construction era</p>
       </div>
 
       <div className="mb-4 grid gap-2 sm:grid-cols-4">
-        <div className="rounded-lg border border-tactical-border bg-tactical-elevated px-3 py-2.5">
-          <p className="text-[10px] font-semibold uppercase tracking-tactical-wide text-tactical-dimmed">Median built year</p>
-          <p className="num mt-1 text-lg font-semibold text-tactical-text">{construction_era.median_year}</p>
+        <div className="rounded-lg border border-ledger-border bg-ledger-elevated px-3 py-2.5">
+          <p className="text-[10px] font-semibold uppercase tracking-eyebrow text-ledger-dimmed">Median built year</p>
+          <p className="num mt-1 text-lg font-semibold text-ledger-text">{construction_era.median_year}</p>
         </div>
-        <div className="rounded-lg border border-tactical-border bg-tactical-elevated px-3 py-2.5">
-          <p className="text-[10px] font-semibold uppercase tracking-tactical-wide text-tactical-dimmed">Average age</p>
-          <p className="num mt-1 text-lg font-semibold text-tactical-text">
+        <div className="rounded-lg border border-ledger-border bg-ledger-elevated px-3 py-2.5">
+          <p className="text-[10px] font-semibold uppercase tracking-eyebrow text-ledger-dimmed">Average age</p>
+          <p className="num mt-1 text-lg font-semibold text-ledger-text">
             {construction_era.avg_age ? `${construction_era.avg_age} yrs` : "—"}
           </p>
         </div>
-        <div className="rounded-lg border border-tactical-border bg-tactical-elevated px-3 py-2.5">
-          <p className="text-[10px] font-semibold uppercase tracking-tactical-wide text-tactical-dimmed">Oldest building</p>
-          <p className="num mt-1 text-lg font-semibold text-tactical-text">{construction_era.oldest || "—"}</p>
+        <div className="rounded-lg border border-ledger-border bg-ledger-elevated px-3 py-2.5">
+          <p className="text-[10px] font-semibold uppercase tracking-eyebrow text-ledger-dimmed">Oldest building</p>
+          <p className="num mt-1 text-lg font-semibold text-ledger-text">{construction_era.oldest || "—"}</p>
         </div>
-        <div className="rounded-lg border border-tactical-border bg-tactical-elevated px-3 py-2.5">
-          <p className="text-[10px] font-semibold uppercase tracking-tactical-wide text-tactical-dimmed">Newest building</p>
-          <p className="num mt-1 text-lg font-semibold text-tactical-text">{construction_era.newest || "—"}</p>
+        <div className="rounded-lg border border-ledger-border bg-ledger-elevated px-3 py-2.5">
+          <p className="text-[10px] font-semibold uppercase tracking-eyebrow text-ledger-dimmed">Newest building</p>
+          <p className="num mt-1 text-lg font-semibold text-ledger-text">{construction_era.newest || "—"}</p>
         </div>
       </div>
 
@@ -97,14 +97,14 @@ export function ConstructionEraChart({ construction_era }: ConstructionEraChartP
 
       <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {data.map((item) => (
-          <div key={item.era} className="flex items-center justify-between rounded-lg border border-tactical-border bg-tactical-elevated px-3 py-2 transition-colors hover:border-tactical-border-emphasis">
+          <div key={item.era} className="flex items-center justify-between rounded-lg border border-ledger-border bg-ledger-elevated px-3 py-2 transition-colors hover:border-ledger-border-emphasis">
             <div className="flex items-center gap-3">
               <div className="h-3 w-3 rounded-full" style={{ backgroundColor: item.color }}></div>
-              <span className="text-[13px] font-medium text-tactical-text">{item.era}</span>
+              <span className="text-[13px] font-medium text-ledger-text">{item.era}</span>
             </div>
             <div className="text-right">
-              <span className="num text-[15px] font-semibold text-tactical-text">{formatRawNumber(item.count)}</span>
-              <span className="num ml-1 text-[12px] text-tactical-muted">({((item.count / total) * 100).toFixed(1)}%)</span>
+              <span className="num text-[15px] font-semibold text-ledger-text">{formatRawNumber(item.count)}</span>
+              <span className="num ml-1 text-[12px] text-ledger-muted">({((item.count / total) * 100).toFixed(1)}%)</span>
             </div>
           </div>
         ))}

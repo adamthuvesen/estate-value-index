@@ -36,9 +36,9 @@ export function PredictionApp({ sampleListings, defaultAreas, modelLabels }: Pre
   } = usePredictionForm({ sampleListings, defaultAreas, modelLabels });
 
   return (
-    <div className="tactical-section-gap">
+    <div className="space-y-6">
       <div className="grid gap-6 lg:grid-cols-3">
-        <section className="lg:col-span-2 tactical-section-gap">
+        <section className="lg:col-span-2 space-y-6">
           <ListingPrefill
             listingUrl={listingUrl}
             onListingUrlChange={setListingUrl}

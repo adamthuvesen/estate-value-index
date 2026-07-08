@@ -1,22 +1,32 @@
 @import 'tailwindcss';
 
-@theme {
-  --color-tactical-bg: #fbfbfa;
-  --color-tactical-surface: #ffffff;
-  --color-tactical-elevated: #f4f4f2;
-  --color-tactical-border: #e9e9e4;
-  --color-tactical-border-emphasis: #d7d7d1;
-  --color-tactical-text: #16171a;
-  --color-tactical-muted: #63666e;
-  --color-tactical-dimmed: #767980;
-  --color-tactical-accent: #0b62ff;
-  --color-tactical-accent-hover: #0a54db;
-  --color-tactical-accent-soft: #4c8cff;
-  --color-tactical-success: #157f4b;
-  --color-tactical-success-dim: #2e9d63;
-  --color-tactical-neutral: #8a8d95;
-  --color-tactical-neutral-hover: #63666e;
+/* ============================================================
+   Nordic Ledger — a Swedish property register, taken literally.
+   Color is rationed: neutrals carry the chrome, the diverging
+   `val.*` scale is the only place saturated hues carry meaning,
+   and Baltic ink (`ledger-accent`) is the single interactive hue.
+   ============================================================ */
 
+@theme {
+  /* ---------- Ledger neutrals + accent ---------- */
+  --color-ledger-bg: #fbfbfa;
+  --color-ledger-surface: #ffffff;
+  --color-ledger-elevated: #f4f2ec; /* the one paper-adjacent warm neutral */
+  --color-ledger-border: #e9e9e4;
+  --color-ledger-border-emphasis: #d7d7d1;
+  --color-ledger-text: #16171a;
+  --color-ledger-muted: #63666e;
+  --color-ledger-dimmed: #767980;
+  --color-ledger-accent: #17458f; /* Baltic ink, ~8.3:1 on white */
+  --color-ledger-accent-hover: #123770;
+  --color-ledger-accent-soft: #3d6cb0;
+  --color-ledger-accent-tint: #eef2f9; /* active washes */
+  --color-ledger-success: #157f4b;
+  --color-ledger-success-dim: #2e9d63;
+  --color-ledger-neutral: #8a8d95;
+  --color-ledger-neutral-hover: #63666e;
+
+  /* ---------- Value scale (diverging, meaning-carrying) ---------- */
   --color-val-exc: #157f4b;
   --color-val-exc-tint: #e7f4ec;
   --color-val-exc-line: #bfe3cd;
@@ -31,67 +41,81 @@
   --color-val-high-tint: #fbebe9;
   --color-val-high-line: #f1cfc9;
 
-  --color-background: hsl(var(--background));
-  --color-foreground: hsl(var(--foreground));
-
-  --color-card: hsl(var(--card));
-  --color-card-foreground: hsl(var(--card-foreground));
-
-  --color-popover: hsl(var(--popover));
-  --color-popover-foreground: hsl(var(--popover-foreground));
-
-  --color-primary: hsl(var(--primary));
-  --color-primary-foreground: hsl(var(--primary-foreground));
-
-  --color-secondary: hsl(var(--secondary));
-  --color-secondary-foreground: hsl(var(--secondary-foreground));
-
-  --color-muted: hsl(var(--muted));
-  --color-muted-foreground: hsl(var(--muted-foreground));
-
-  --color-accent: hsl(var(--accent));
-  --color-accent-foreground: hsl(var(--accent-foreground));
-
-  --color-destructive: hsl(var(--destructive));
-  --color-destructive-foreground: hsl(var(--destructive-foreground));
-
-  --color-border: hsl(var(--border));
-  --color-input: hsl(var(--input));
-  --color-ring: hsl(var(--ring));
-
-  --color-chart-1: hsl(var(--chart-1));
-  --color-chart-2: hsl(var(--chart-2));
-  --color-chart-3: hsl(var(--chart-3));
-  --color-chart-4: hsl(var(--chart-4));
-  --color-chart-5: hsl(var(--chart-5));
-
+  /* ---------- Fonts ---------- */
   --font-sans:
     var(--font-inter), system-ui, -apple-system, Segoe UI, sans-serif;
   --font-mono:
     var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo, Monaco,
     Consolas, Liberation Mono, Courier New, monospace;
+  --font-display:
+    var(--font-schibsted), var(--font-inter), system-ui, -apple-system,
+    sans-serif;
 
+  /* ---------- Type scale (size · line-height · tracking · weight) ---------- */
+  --text-display: 3.25rem; /* 52px */
+  --text-display--line-height: 1.04;
+  --text-display--letter-spacing: -0.022em;
+  --text-display--font-weight: 600;
+
+  --text-headline: 2.125rem; /* 34px */
+  --text-headline--line-height: 1.1;
+  --text-headline--letter-spacing: -0.018em;
+  --text-headline--font-weight: 600;
+
+  --text-title: 1.375rem; /* 22px */
+  --text-title--line-height: 1.2;
+  --text-title--letter-spacing: -0.012em;
+  --text-title--font-weight: 600;
+
+  --text-heading: 1.0625rem; /* 17px */
+  --text-heading--line-height: 1.3;
+  --text-heading--letter-spacing: -0.006em;
+  --text-heading--font-weight: 600;
+
+  --text-body: 0.9375rem; /* 15px */
+  --text-body--line-height: 1.55;
+  --text-body--letter-spacing: 0em;
+  --text-body--font-weight: 400;
+
+  --text-body-sm: 0.8125rem; /* 13px */
+  --text-body-sm--line-height: 1.5;
+  --text-body-sm--letter-spacing: 0em;
+  --text-body-sm--font-weight: 400;
+
+  --text-caption: 0.75rem; /* 12px */
+  --text-caption--line-height: 1.4;
+  --text-caption--letter-spacing: 0em;
+  --text-caption--font-weight: 400;
+
+  --text-eyebrow: 0.6875rem; /* 11px */
+  --text-eyebrow--line-height: 1.2;
+  --text-eyebrow--letter-spacing: 0.08em;
+  --text-eyebrow--font-weight: 600;
+
+  /* ---------- Radii ---------- */
   --radius-lg: 12px;
   --radius-md: 10px;
   --radius-sm: 8px;
-  --radius-tactical: 9px;
+  --radius-ledger: 9px;
   --radius-pill: 999px;
 
-  --tracking-tactical: 0em;
-  --tracking-tactical-wide: 0.08em;
+  /* ---------- Tracking ---------- */
+  --tracking-eyebrow: 0.08em;
 
-  --ease-tactical: cubic-bezier(0.22, 0.61, 0.36, 1);
+  /* ---------- Motion ---------- */
+  --ease-ledger: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --transition-duration-ledger: 180ms;
 
-  --transition-duration-tactical: 180ms;
-
+  /* ---------- Elevation + focus ---------- */
   --shadow-elev-1:
     0 1px 2px rgba(16, 17, 20, 0.04), 0 1px 3px rgba(16, 17, 20, 0.05);
   --shadow-elev-2:
     0 4px 14px rgba(16, 17, 20, 0.07), 0 2px 5px rgba(16, 17, 20, 0.05);
   --shadow-elev-3:
     0 12px 32px rgba(16, 17, 20, 0.1), 0 4px 10px rgba(16, 17, 20, 0.06);
-  --shadow-focus: 0 0 0 3px rgba(11, 98, 255, 0.18);
+  --shadow-focus: 0 0 0 3px rgba(23, 69, 143, 0.2);
 
+  /* ---------- Keyframe animations ---------- */
   --animate-fade-in-up: fade-in-up 0.5s cubic-bezier(0.22, 0.61, 0.36, 1) both;
   --animate-fade-in: fade-in 0.4s ease-out both;
   --animate-gauge-grow: gauge-grow 0.7s cubic-bezier(0.22, 0.61, 0.36, 1) both;
@@ -124,149 +148,87 @@
   }
 }
 
-/*
-  The default border color has changed to `currentcolor` in Tailwind CSS v4,
-  so we've added these compatibility styles to make sure everything still
-  looks the same as it did with Tailwind CSS v3.
-
-  If we ever want to remove these styles, we need to add an explicit border
-  color utility to any element that depends on these defaults.
-*/
-@layer base {
-  *,
-  ::after,
-  ::before,
-  ::backdrop,
-  ::file-selector-button {
-    border-color: var(--color-gray-200, currentcolor);
-  }
+/* ---------- Card ---------- */
+@utility ledger-card {
+  @apply bg-ledger-surface border border-ledger-border rounded-ledger relative;
+  @apply shadow-elev-1 transition-all duration-ledger ease-ledger;
 }
 
-@utility tactical-card {
-  /* ---------- Card ---------- */
-  @apply bg-tactical-surface border border-tactical-border rounded-tactical relative;
-  @apply shadow-elev-1 transition-all duration-tactical ease-tactical;
+@utility ledger-card-hover {
+  @apply transition-all duration-ledger ease-ledger;
+  @apply hover:-translate-y-0.5 hover:shadow-elev-2 hover:border-ledger-border-emphasis;
 }
 
-@utility tactical-card-hover {
-  @apply transition-all duration-tactical ease-tactical;
-  @apply hover:-translate-y-0.5 hover:shadow-elev-2 hover:border-tactical-border-emphasis;
-}
-
-@utility tactical-corners {
-  /* Corner accents are a tactical relic — neutralized to no-ops so any
-     remaining usages don't paint crosshairs on the calm layout. */
-  @apply relative;
-}
-
-@utility tactical-card-corner-tl {
-  @apply relative;
-}
-
-@utility tactical-card-corner-tr {
-  @apply relative;
-}
-
-@utility tactical-card-corner-bl {
-  @apply relative;
-}
-
-@utility tactical-card-corner-br {
-  @apply relative;
-}
-
-@utility tactical-btn {
-  /* ---------- Buttons ---------- */
-  @apply inline-flex items-center justify-center gap-2 bg-tactical-surface border border-tactical-border text-tactical-text;
+/* ---------- Buttons (legacy recipes; retired once pages adopt <Button/>) ---------- */
+@utility ledger-btn {
+  @apply inline-flex items-center justify-center gap-2 bg-ledger-surface border border-ledger-border text-ledger-text;
   @apply px-4 py-2.5 rounded-sm text-sm font-medium;
-  @apply transition-all duration-tactical ease-tactical;
-  @apply hover:bg-tactical-elevated hover:border-tactical-border-emphasis;
+  @apply transition-all duration-ledger ease-ledger;
+  @apply hover:bg-ledger-elevated hover:border-ledger-border-emphasis;
   @apply active:scale-[0.98];
   @apply disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100;
 }
 
-@utility tactical-btn-primary {
+@utility ledger-btn-primary {
   /* Primary = ink black, Apple/Vercel style */
-  @apply inline-flex items-center justify-center gap-2 bg-tactical-text text-white border border-tactical-text;
+  @apply inline-flex items-center justify-center gap-2 bg-ledger-text text-white border border-ledger-text;
   @apply px-4 py-2.5 rounded-sm text-sm font-medium;
-  @apply transition-all duration-tactical ease-tactical;
+  @apply transition-all duration-ledger ease-ledger;
   @apply hover:bg-[#2B2C31] hover:border-[#2B2C31];
   @apply active:scale-[0.98];
   @apply disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100;
 }
 
-@utility tactical-btn-neutral {
-  @apply tactical-btn text-tactical-muted;
-  @apply hover:text-tactical-text;
+@utility ledger-btn-neutral {
+  @apply ledger-btn text-ledger-muted;
+  @apply hover:text-ledger-text;
 }
 
-@utility tactical-input {
-  /* ---------- Input ---------- */
-  @apply bg-tactical-surface border border-tactical-border rounded-sm;
-  @apply px-3 py-2 text-sm text-tactical-text placeholder:text-tactical-dimmed;
-  @apply transition-all duration-tactical ease-tactical;
-  @apply focus:border-tactical-accent focus:shadow-focus focus:outline-hidden;
+/* ---------- Input ---------- */
+@utility ledger-input {
+  @apply bg-ledger-surface border border-ledger-border rounded-sm;
+  @apply px-3 py-2 text-sm text-ledger-text placeholder:text-ledger-dimmed;
+  @apply transition-all duration-ledger ease-ledger;
+  @apply focus:border-ledger-accent focus:shadow-focus focus:outline-hidden;
 }
 
-@utility tactical-badge {
-  /* ---------- Badges ---------- */
+/* ---------- Badges (legacy recipes; retired once pages adopt <Badge/>) ---------- */
+@utility ledger-badge {
   @apply inline-flex items-center justify-center gap-1;
   @apply px-2.5 py-0.5 rounded-pill border;
-  @apply text-[11px] font-semibold tracking-tactical-wide;
+  @apply text-[11px] font-semibold tracking-eyebrow;
 }
 
-@utility tactical-badge-active {
-  @apply tactical-badge border-transparent bg-tactical-accent text-white;
+@utility ledger-badge-active {
+  @apply ledger-badge border-transparent bg-ledger-accent text-white;
 }
 
-@utility tactical-badge-inactive {
-  @apply tactical-badge border-tactical-border text-tactical-muted bg-tactical-surface;
+@utility ledger-badge-inactive {
+  @apply ledger-badge border-ledger-border text-ledger-muted bg-ledger-surface;
 }
 
-@utility tactical-badge-alert {
-  @apply tactical-badge border-val-high-line bg-val-high-tint text-val-high;
+@utility ledger-badge-alert {
+  @apply ledger-badge border-val-high-line bg-val-high-tint text-val-high;
 }
 
-@utility tactical-label {
-  /* ---------- Label / eyebrow ---------- */
-  @apply text-[11px] font-semibold uppercase tracking-tactical-wide text-tactical-dimmed font-mono;
+/* ---------- Eyebrow (mono kicker label) ---------- */
+@utility eyebrow {
+  @apply text-[11px] font-semibold uppercase tracking-eyebrow text-ledger-dimmed font-mono;
 }
 
-@utility tactical-focus-ring {
-  /* ---------- Focus ring ---------- */
-  @apply focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-tactical-accent/50 focus-visible:ring-offset-2 focus-visible:ring-offset-tactical-bg rounded-sm;
+/* ---------- Focus ring ---------- */
+@utility focus-ring {
+  @apply focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ledger-accent/50 focus-visible:ring-offset-2 focus-visible:ring-offset-ledger-bg rounded-sm;
 }
 
-@utility tactical-section-separator {
-  /* ---------- Section separator ---------- */
-  @apply border-t border-tactical-border my-12;
-}
-
-@utility tactical-header-xl {
-  /* ---------- Headers ---------- */
-  @apply text-4xl md:text-5xl font-semibold tracking-tactical text-tactical-text;
-}
-
-@utility tactical-header-lg {
-  @apply text-2xl md:text-3xl font-semibold tracking-tactical text-tactical-text;
-}
-
-@utility tactical-header-md {
-  @apply text-xl md:text-2xl font-semibold tracking-tactical text-tactical-text;
-}
-
-@utility tactical-header-sm {
-  @apply text-lg md:text-xl font-semibold tracking-tactical text-tactical-text;
-}
-
+/* ---------- Data typography ---------- */
 @utility num {
-  /* ---------- Data typography ---------- */
   @apply font-mono tabular-nums;
 }
 
+/* ---------- Fair-value gauge (signature element) ---------- */
 @utility value-gauge {
-  /* ---------- Fair-value gauge (signature element) ---------- */
-  @apply relative h-1.5 w-full rounded-pill bg-tactical-elevated overflow-hidden;
+  @apply relative h-1.5 w-full rounded-pill bg-ledger-elevated overflow-hidden;
 }
 
 @utility value-gauge-fill {
@@ -278,78 +240,29 @@
   text-wrap: balance;
 }
 
-@utility prose-muted {
-  color: var(--muted-foreground);
-}
-
 @utility animate-fade-in {
   animation: fade-in 0.4s ease-out both;
 }
 
-@utility terminal-text {
-  @apply font-mono text-sm leading-relaxed;
-}
-
-@utility tactical-section-gap {
-  @apply space-y-6;
-}
-
-@layer utilities {
-  /* ============================================================
-   Nordic Ledger — light, Scandinavian-calm design system
-   Color is rationed: neutrals for chrome, the diverging
-   value scale is the only place saturated hues carry meaning.
-   ============================================================ */
-
-  :root {
-    --radius: 9px;
-
-    --background: #fbfbfa;
-    --foreground: #16171a;
-    --card: #ffffff;
-    --card-foreground: #16171a;
-    --popover: #ffffff;
-    --popover-foreground: #16171a;
-    --primary: #16171a;
-    --primary-foreground: #ffffff;
-    --secondary: #f4f4f2;
-    --secondary-foreground: #16171a;
-    --muted: #f1f2f1;
-    --muted-foreground: #63666e;
-    --accent: #0b62ff;
-    --accent-foreground: #ffffff;
-    --destructive: #c0392b;
-    --border: #e9e9e4;
-    --input: #ffffff;
-    --ring: #0b62ff;
-
-    /* Chart palette — legible on white */
-    --chart-1: #0b62ff; /* brand blue */
-    --chart-2: #157f4b; /* value green */
-    --chart-3: #c2681c; /* amber */
-    --chart-4: #c0392b; /* clay red */
-    --chart-5: #8a8d95; /* neutral */
-
-    --sidebar: #ffffff;
-    --sidebar-foreground: #16171a;
-    --sidebar-primary: #16171a;
-    --sidebar-primary-foreground: #ffffff;
-    --sidebar-accent: #f4f4f2;
-    --sidebar-accent-foreground: #16171a;
-    --sidebar-border: #e9e9e4;
-    --sidebar-ring: #0b62ff;
-  }
-}
-
 @layer base {
-  * {
-    border-color: var(--border);
+  /*
+    Tailwind v4 defaults border-color to `currentcolor`; pin it to the ledger
+    hairline so untargeted borders keep the register's calm neutral.
+  */
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-ledger-border, currentcolor);
   }
+
   html {
     scroll-behavior: smooth;
   }
+
   body {
-    @apply bg-tactical-bg text-tactical-text font-sans;
+    @apply bg-ledger-bg text-ledger-text font-sans;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -362,8 +275,8 @@
   }
 
   ::selection {
-    background: rgba(11, 98, 255, 0.14);
-    color: #16171A;
+    background: rgba(23, 69, 143, 0.14);
+    color: #16171a;
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -380,28 +293,28 @@
 
 /* ---------- Checkbox ---------- */
 input[type="checkbox"] {
-  @apply appearance-none w-[18px] h-[18px] border border-tactical-border-emphasis bg-tactical-surface rounded-[5px];
+  @apply appearance-none w-[18px] h-[18px] border border-ledger-border-emphasis bg-ledger-surface rounded-[5px];
   @apply cursor-pointer transition-all duration-150;
   flex-shrink: 0;
 }
 input[type="checkbox"]:hover {
-  @apply border-tactical-accent;
+  @apply border-ledger-accent;
 }
 input[type="checkbox"]:checked {
-  @apply bg-tactical-accent border-tactical-accent;
+  @apply bg-ledger-accent border-ledger-accent;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 16 16' fill='%23ffffff' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M12.207 4.793a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-2-2a1 1 0 011.414-1.414L6.5 9.086l4.293-4.293a1 1 0 011.414 0z'/%3E%3C/svg%3E");
 }
 input[type="checkbox"]:focus-visible {
-  @apply outline-hidden ring-2 ring-tactical-accent/40 ring-offset-1;
+  @apply outline-hidden ring-2 ring-ledger-accent/40 ring-offset-1;
 }
 
 /* ---------- Range slider ---------- */
 input[type="range"] {
-  @apply h-1.5 appearance-none bg-tactical-elevated rounded-pill cursor-pointer;
+  @apply h-1.5 appearance-none bg-ledger-elevated rounded-pill cursor-pointer;
 }
 input[type="range"]::-webkit-slider-thumb {
-  @apply appearance-none w-[18px] h-[18px] bg-tactical-surface rounded-full cursor-pointer;
-  border: 1.5px solid #16171A;
+  @apply appearance-none w-[18px] h-[18px] bg-ledger-surface rounded-full cursor-pointer;
+  border: 1.5px solid #16171a;
   box-shadow: 0 1px 3px rgba(16, 17, 20, 0.18);
   transition: box-shadow 150ms ease, transform 150ms ease;
 }
@@ -409,35 +322,67 @@ input[type="range"]::-webkit-slider-thumb:hover {
   transform: scale(1.1);
 }
 input[type="range"]::-moz-range-thumb {
-  @apply appearance-none w-[18px] h-[18px] bg-tactical-surface rounded-full cursor-pointer;
-  border: 1.5px solid #16171A;
+  @apply appearance-none w-[18px] h-[18px] bg-ledger-surface rounded-full cursor-pointer;
+  border: 1.5px solid #16171a;
   box-shadow: 0 1px 3px rgba(16, 17, 20, 0.18);
 }
 input[type="range"]::-webkit-slider-runnable-track {
-  @apply h-1.5 bg-tactical-elevated rounded-pill;
+  @apply h-1.5 bg-ledger-elevated rounded-pill;
 }
 input[type="range"]::-moz-range-track {
-  @apply h-1.5 bg-tactical-elevated rounded-pill;
+  @apply h-1.5 bg-ledger-elevated rounded-pill;
 }
 input[type="range"]:focus {
   outline: none;
 }
 input[type="range"]:focus-visible::-webkit-slider-thumb {
-  box-shadow: 0 0 0 4px rgba(11, 98, 255, 0.18);
+  box-shadow: 0 0 0 4px rgba(23, 69, 143, 0.2);
 }
 input[type="range"]:disabled {
   @apply opacity-40 cursor-not-allowed;
 }
 
+/* ---------- Dual-range slider (two thumbs, one filled ink track) ----------
+   Both native inputs overlay the same shared track. Only the thumbs receive
+   pointer events so each thumb stays grabbable; the filled ink segment between
+   them is a positioned child driven by inline left/right. */
+.range-dual {
+  @apply relative h-1.5 w-full;
+}
+.range-dual__track {
+  @apply absolute inset-0 rounded-pill bg-ledger-elevated;
+}
+.range-dual__fill {
+  @apply absolute inset-y-0 rounded-pill bg-ledger-text;
+}
+.range-dual input[type="range"] {
+  @apply absolute inset-0 m-0 w-full bg-transparent;
+  pointer-events: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.range-dual input[type="range"]::-webkit-slider-runnable-track {
+  @apply bg-transparent;
+}
+.range-dual input[type="range"]::-moz-range-track {
+  @apply bg-transparent;
+}
+.range-dual input[type="range"]::-webkit-slider-thumb {
+  pointer-events: auto;
+}
+.range-dual input[type="range"]::-moz-range-thumb {
+  pointer-events: auto;
+}
+
 /* ---------- Select ---------- */
 select {
-  @apply bg-tactical-surface text-tactical-text;
+  @apply bg-ledger-surface text-ledger-text;
 }
 
 /* ---------- Scrollbar ---------- */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #D7D7D1 transparent;
+  scrollbar-color: #d7d7d1 transparent;
 }
 *::-webkit-scrollbar {
   width: 10px;
@@ -447,22 +392,24 @@ select {
   background: transparent;
 }
 *::-webkit-scrollbar-thumb {
-  background: #DDDDD8;
+  background: #ddddd8;
   border-radius: 999px;
   border: 3px solid transparent;
   background-clip: content-box;
 }
 *::-webkit-scrollbar-thumb:hover {
-  background: #C4C4BE;
+  background: #c4c4be;
   background-clip: content-box;
 }
 
-/* ---------- Recharts (light) ---------- */
+/* ---------- Recharts (light) ----------
+   Legacy global override; superseded by chart-theme.tsx and removed in Phase 7
+   once the four charts adopt the shared theme. */
 .recharts-cartesian-grid line {
-  stroke: #EDEDE9;
+  stroke: #edede9;
 }
 .recharts-text {
-  fill: #63666E;
+  fill: #63666e;
 }
 .recharts-sector:hover,
 .recharts-bar-rectangle:hover,

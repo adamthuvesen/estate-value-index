@@ -89,8 +89,8 @@ export function PriceTrendChart({ median_price_3m, median_price_6m, median_price
 
   if (baseData.length === 0) {
     return (
-      <div className="flex items-center justify-center rounded-xl border border-tactical-border bg-tactical-elevated p-8">
-        <p className="text-[13px] text-tactical-muted">Not enough historical price data.</p>
+      <div className="flex items-center justify-center rounded-xl border border-ledger-border bg-ledger-elevated p-8">
+        <p className="text-[13px] text-ledger-muted">Not enough historical price data.</p>
       </div>
     );
   }
@@ -127,20 +127,20 @@ export function PriceTrendChart({ median_price_3m, median_price_6m, median_price
     <div>
       <div className="mb-3 flex items-center justify-between">
         <div>
-          <h3 className="text-[14px] font-semibold tracking-tight text-tactical-text">Price trend</h3>
-          <p className="text-[12px] text-tactical-muted">
+          <h3 className="text-[14px] font-semibold tracking-tight text-ledger-text">Price trend</h3>
+          <p className="text-[12px] text-ledger-muted">
             {displayPerSqm ? "Median price per m² over time" : "Median sold prices over time"}
           </p>
         </div>
         <div className="flex items-center gap-4">
           {canShowPerSqm && (
-            <div className="flex items-center gap-1 rounded-pill border border-tactical-border bg-tactical-elevated p-1">
+            <div className="flex items-center gap-1 rounded-pill border border-ledger-border bg-ledger-elevated p-1">
               <button
                 onClick={() => setShowPerSqm(true)}
                 className={`rounded-pill px-3 py-1.5 text-[13px] font-medium transition-colors ${
                   showPerSqm
-                    ? "bg-tactical-text text-white"
-                    : "text-tactical-muted hover:text-tactical-text"
+                    ? "bg-ledger-text text-white"
+                    : "text-ledger-muted hover:text-ledger-text"
                 }`}
               >
                 Price/m²
@@ -149,8 +149,8 @@ export function PriceTrendChart({ median_price_3m, median_price_6m, median_price
                 onClick={() => setShowPerSqm(false)}
                 className={`rounded-pill px-3 py-1.5 text-[13px] font-medium transition-colors ${
                   !showPerSqm
-                    ? "bg-tactical-text text-white"
-                    : "text-tactical-muted hover:text-tactical-text"
+                    ? "bg-ledger-text text-white"
+                    : "text-ledger-muted hover:text-ledger-text"
                 }`}
               >
                 Total price
@@ -159,7 +159,7 @@ export function PriceTrendChart({ median_price_3m, median_price_6m, median_price
           )}
           {actualDataPoints.length >= 2 && (
             <div className="text-right">
-              <p className="text-[11px] font-semibold uppercase tracking-tactical-wide text-tactical-dimmed">
+              <p className="text-[11px] font-semibold uppercase tracking-eyebrow text-ledger-dimmed">
                 {actualDataPoints[actualDataPoints.length - 1].monthsAgo === 1 && actualDataPoints[0].monthsAgo === 12
                   ? "12-month change"
                   : `${actualDataPoints[0].monthsAgo}-month change`}

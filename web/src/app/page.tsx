@@ -31,16 +31,16 @@ export default function HomePage() {
   }, []);
 
   return (
-    <main className="min-h-screen bg-tactical-bg">
+    <main className="min-h-screen bg-ledger-bg">
       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
         <header className="mx-auto max-w-2xl text-center animate-fade-in-up">
-          <p className="font-mono text-[12px] font-semibold uppercase tracking-tactical-wide text-tactical-accent">
+          <p className="font-mono text-[12px] font-semibold uppercase tracking-eyebrow text-ledger-accent">
             Predictor
           </p>
-          <h1 className="mt-3 text-4xl font-semibold leading-[1.06] tracking-tight text-tactical-text sm:text-[46px]">
+          <h1 className="mt-3 text-4xl font-semibold leading-[1.06] tracking-tight text-ledger-text sm:text-[46px]">
             What&rsquo;s this home worth?
           </h1>
-          <p className="mx-auto mt-4 max-w-xl text-[15px] leading-relaxed text-tactical-muted">
+          <p className="mx-auto mt-4 max-w-xl text-[15px] leading-relaxed text-ledger-muted">
             Import a Booli listing or enter the details, and the model estimates its market value
             from thousands of Stockholm sales.
           </p>
@@ -58,8 +58,8 @@ export default function HomePage() {
           {isLoadingAreas && (
             <div className="flex items-center justify-center py-24">
               <div className="flex flex-col items-center gap-3">
-                <div className="h-8 w-8 animate-spin rounded-full border-2 border-tactical-border border-t-tactical-text" />
-                <p className="text-[13px] text-tactical-muted">Loading areas…</p>
+                <div className="h-8 w-8 animate-spin rounded-full border-2 border-ledger-border border-t-ledger-text" />
+                <p className="text-[13px] text-ledger-muted">Loading areas…</p>
               </div>
             </div>
           )}

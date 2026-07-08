@@ -50,22 +50,22 @@ export function Pagination({
 
   if (totalPages <= 1) {
     return (
-      <div className="flex items-center justify-center py-6 text-[13px] text-tactical-muted">
+      <div className="flex items-center justify-center py-6 text-[13px] text-ledger-muted">
         Showing all {totalResults.toLocaleString("en-US")} {totalResults === 1 ? "home" : "homes"}
       </div>
     );
   }
 
   const arrowBtn =
-    "tactical-btn tactical-focus-ring h-9 px-3 text-[13px] disabled:opacity-40";
+    "ledger-btn focus-ring h-9 px-3 text-[13px] disabled:opacity-40";
 
   return (
     <div className="flex flex-col items-center gap-4 py-8">
-      <p className="num text-[13px] text-tactical-muted">
-        <span className="font-semibold text-tactical-text">{startResult.toLocaleString("en-US")}</span>–
-        <span className="font-semibold text-tactical-text">{endResult.toLocaleString("en-US")}</span>{" "}
+      <p className="num text-[13px] text-ledger-muted">
+        <span className="font-semibold text-ledger-text">{startResult.toLocaleString("en-US")}</span>–
+        <span className="font-semibold text-ledger-text">{endResult.toLocaleString("en-US")}</span>{" "}
         <span className="font-sans">of</span>{" "}
-        <span className="font-semibold text-tactical-text">{totalResults.toLocaleString("en-US")}</span>
+        <span className="font-semibold text-ledger-text">{totalResults.toLocaleString("en-US")}</span>
       </p>
 
       <nav className="flex items-center gap-1.5" aria-label="Pagination">
@@ -79,7 +79,7 @@ export function Pagination({
           {getPageNumbers().map((page, index) => {
             if (page === "...") {
               return (
-                <span key={`ellipsis-${index}`} className="px-1.5 text-tactical-dimmed">
+                <span key={`ellipsis-${index}`} className="px-1.5 text-ledger-dimmed">
                   …
                 </span>
               );
@@ -91,10 +91,10 @@ export function Pagination({
                 key={pageNum}
                 onClick={() => handlePageClick(pageNum)}
                 disabled={isLoading}
-                className={`tactical-focus-ring num h-9 min-w-9 rounded-sm px-2.5 text-[13px] font-medium transition-colors duration-tactical ${
+                className={`focus-ring num h-9 min-w-9 rounded-sm px-2.5 text-[13px] font-medium transition-colors duration-ledger ${
                   isCurrent
-                    ? "bg-tactical-text text-white"
-                    : "border border-tactical-border bg-tactical-surface text-tactical-text hover:bg-tactical-elevated disabled:opacity-40"
+                    ? "bg-ledger-text text-white"
+                    : "border border-ledger-border bg-ledger-surface text-ledger-text hover:bg-ledger-elevated disabled:opacity-40"
                 }`}
                 aria-label={`Go to page ${pageNum}`}
                 aria-current={isCurrent ? "page" : undefined}

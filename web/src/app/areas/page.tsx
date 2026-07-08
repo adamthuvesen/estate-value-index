@@ -109,33 +109,33 @@ export default function AreasPage() {
   const gradientClass = (normalized: number): string => {
     if (normalized >= 0.8) return "text-val-high font-semibold";
     if (normalized >= 0.6) return "text-val-over";
-    if (normalized >= 0.4) return "text-tactical-muted";
+    if (normalized >= 0.4) return "text-ledger-muted";
     if (normalized >= 0.2) return "text-val-great";
     return "text-val-exc font-semibold";
   };
 
   const getPricePerSqmColor = (value: number | null, allAreas: AreaOverview[]) => {
-    if (value === null) return "text-tactical-dimmed";
+    if (value === null) return "text-ledger-dimmed";
     const validPrices = allAreas.map((a) => a.avg_price_per_sqm).filter((p): p is number => p !== null);
-    if (validPrices.length === 0) return "text-tactical-dimmed";
+    if (validPrices.length === 0) return "text-ledger-dimmed";
     const min = Math.min(...validPrices);
     const max = Math.max(...validPrices);
     const range = max - min;
-    if (range === 0) return "text-tactical-muted";
+    if (range === 0) return "text-ledger-muted";
     return gradientClass((value - min) / range);
   };
 
-  const getPriceChangeColor = (value: number) => (value > 0 ? "text-val-exc" : value < 0 ? "text-val-high" : "text-tactical-muted");
+  const getPriceChangeColor = (value: number) => (value > 0 ? "text-val-exc" : value < 0 ? "text-val-high" : "text-ledger-muted");
 
   const SortButton = ({ field, label, align = "left" }: { field: keyof AreaOverview; label: string; align?: "left" | "right" }) => (
     <button
       onClick={() => handleSort(field)}
-      className={`flex w-full items-center gap-1 text-[11px] font-semibold uppercase tracking-tactical-wide text-tactical-dimmed transition-colors hover:text-tactical-text ${
+      className={`flex w-full items-center gap-1 text-[11px] font-semibold uppercase tracking-eyebrow text-ledger-dimmed transition-colors hover:text-ledger-text ${
         align === "right" ? "justify-end" : "justify-start"
       }`}
     >
       {label}
-      <span className={`text-[10px] ${sortField === field ? "text-tactical-accent" : "text-transparent"}`}>
+      <span className={`text-[10px] ${sortField === field ? "text-ledger-accent" : "text-transparent"}`}>
         {sortField === field ? (sortOrder === "asc" ? "↑" : "↓") : "↕"}
       </span>
     </button>
@@ -146,8 +146,8 @@ export default function AreasPage() {
       <PageShell>
         <div className="flex items-center justify-center py-24">
           <div className="flex flex-col items-center gap-3">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-tactical-border border-t-tactical-text" />
-            <p className="text-[13px] text-tactical-muted">Loading areas…</p>
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-ledger-border border-t-ledger-text" />
+            <p className="text-[13px] text-ledger-muted">Loading areas…</p>
           </div>
         </div>
       </PageShell>
@@ -157,13 +157,13 @@ export default function AreasPage() {
   if (error) {
     return (
       <PageShell>
-        <div className="mx-auto mt-4 max-w-xl rounded-2xl border border-tactical-border bg-tactical-surface px-6 py-12 text-center shadow-elev-1">
+        <div className="mx-auto mt-4 max-w-xl rounded-2xl border border-ledger-border bg-ledger-surface px-6 py-12 text-center shadow-elev-1">
           <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-val-over-tint">
             <svg className="h-5 w-5 text-val-over" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" />
             </svg>
           </div>
-          <p className="mt-4 text-[14px] text-tactical-muted">{error}</p>
+          <p className="mt-4 text-[14px] text-ledger-muted">{error}</p>
         </div>
       </PageShell>
     );
@@ -182,7 +182,7 @@ export default function AreasPage() {
         </div>
       )}
 
-      <dl className="mx-auto mt-8 flex max-w-md items-stretch justify-center divide-x divide-tactical-border rounded-2xl border border-tactical-border bg-tactical-surface shadow-elev-1">
+      <dl className="mx-auto mt-8 flex max-w-md items-stretch justify-center divide-x divide-ledger-border rounded-2xl border border-ledger-border bg-ledger-surface shadow-elev-1">
         <Stat value={String(data?.metadata.total_areas ?? "—")} label="Areas" />
         <Stat value={formatNumber(data?.metadata.total_properties || 0)} label="Properties" />
         <Stat
@@ -192,11 +192,11 @@ export default function AreasPage() {
         />
       </dl>
 
-      <div className="mt-10 overflow-hidden rounded-2xl border border-tactical-border bg-tactical-surface shadow-elev-1">
+      <div className="mt-10 overflow-hidden rounded-2xl border border-ledger-border bg-ledger-surface shadow-elev-1">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-tactical-border">
+              <tr className="border-b border-ledger-border">
                 <th className="px-4 py-3 text-left"><SortButton field="display_name" label="Area" /></th>
                 <th className="px-4 py-3 text-left"><SortButton field="price_tier" label="Tier" /></th>
                 <th className="px-4 py-3 text-right"><SortButton field="avg_sold_price" label="Avg price" align="right" /></th>
@@ -207,13 +207,13 @@ export default function AreasPage() {
                 <th className="px-4 py-3 text-right"><SortButton field="days_on_market_median" label="Days" align="right" /></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-tactical-border">
+            <tbody className="divide-y divide-ledger-border">
               {areas.map((area) => (
-                <tr key={area.area_name} className="group transition-colors hover:bg-tactical-elevated/50">
+                <tr key={area.area_name} className="group transition-colors hover:bg-ledger-elevated/50">
                   <td className="px-4 py-3">
                     <Link
                       href={`/area/${area.area_name}`}
-                      className="tactical-focus-ring inline-flex items-center gap-2 text-[13px] font-medium text-tactical-text transition-colors group-hover:text-tactical-accent"
+                      className="focus-ring inline-flex items-center gap-2 text-[13px] font-medium text-ledger-text transition-colors group-hover:text-ledger-accent"
                     >
                       {area.display_name}
                       {area.has_limited_data && (
@@ -224,27 +224,27 @@ export default function AreasPage() {
                     </Link>
                   </td>
                   <td className="px-4 py-3">
-                    <span className="inline-flex rounded-pill border border-tactical-border bg-tactical-elevated px-2.5 py-0.5 text-[12px] font-medium text-tactical-muted">
+                    <span className="inline-flex rounded-pill border border-ledger-border bg-ledger-elevated px-2.5 py-0.5 text-[12px] font-medium text-ledger-muted">
                       {TIER_LABEL[area.price_tier] ?? area.price_tier}
                     </span>
                   </td>
-                  <td className="num whitespace-nowrap px-4 py-3 text-right text-[13px] text-tactical-text">
+                  <td className="num whitespace-nowrap px-4 py-3 text-right text-[13px] text-ledger-text">
                     {formatSek(area.avg_sold_price)}
                   </td>
                   <td className={`num whitespace-nowrap px-4 py-3 text-right text-[13px] ${getPricePerSqmColor(area.avg_price_per_sqm, areas)}`}>
                     {area.avg_price_per_sqm ? `${formatNumber(area.avg_price_per_sqm)}` : "—"}
                   </td>
-                  <td className="num whitespace-nowrap px-4 py-3 text-right text-[13px] text-tactical-muted">
+                  <td className="num whitespace-nowrap px-4 py-3 text-right text-[13px] text-ledger-muted">
                     {formatNumber(area.listing_count)}
                   </td>
                   <td className={`num whitespace-nowrap px-4 py-3 text-right text-[13px] ${getPriceChangeColor(area.price_change_mean)}`}>
                     {area.price_change_mean > 0 ? "+" : ""}
                     {formatSek(area.price_change_mean)}
                   </td>
-                  <td className="num whitespace-nowrap px-4 py-3 text-right text-[13px] text-tactical-muted">
+                  <td className="num whitespace-nowrap px-4 py-3 text-right text-[13px] text-ledger-muted">
                     {formatNumberOrDash(area.undervalued_pct, 1)}%
                   </td>
-                  <td className="num whitespace-nowrap px-4 py-3 text-right text-[13px] text-tactical-muted">
+                  <td className="num whitespace-nowrap px-4 py-3 text-right text-[13px] text-ledger-muted">
                     {formatNumber(area.days_on_market_median)}
                   </td>
                 </tr>
@@ -254,7 +254,7 @@ export default function AreasPage() {
         </div>
       </div>
 
-      <p className="mt-5 text-center text-[13px] text-tactical-dimmed">
+      <p className="mt-5 text-center text-[13px] text-ledger-dimmed">
         Select any area for detailed analytics.
       </p>
     </PageShell>
@@ -263,16 +263,16 @@ export default function AreasPage() {
 
 function PageShell({ children, totalAreas }: { children: React.ReactNode; totalAreas?: number }) {
   return (
-    <div className="min-h-screen bg-tactical-bg">
+    <div className="min-h-screen bg-ledger-bg">
       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
         <header className="mx-auto max-w-2xl text-center animate-fade-in-up">
-          <p className="font-mono text-[12px] font-semibold uppercase tracking-tactical-wide text-tactical-accent">
+          <p className="font-mono text-[12px] font-semibold uppercase tracking-eyebrow text-ledger-accent">
             Areas
           </p>
-          <h1 className="mt-3 text-4xl font-semibold leading-[1.06] tracking-tight text-tactical-text sm:text-[46px]">
+          <h1 className="mt-3 text-4xl font-semibold leading-[1.06] tracking-tight text-ledger-text sm:text-[46px]">
             Stockholm neighbourhoods
           </h1>
-          <p className="mx-auto mt-4 max-w-xl text-[15px] leading-relaxed text-tactical-muted">
+          <p className="mx-auto mt-4 max-w-xl text-[15px] leading-relaxed text-ledger-muted">
             Market statistics{typeof totalAreas === "number" ? ` across ${totalAreas} areas` : ""} — prices, momentum,
             and where the model finds the most undervalued homes.
           </p>
@@ -287,13 +287,13 @@ function Stat({ value, label, small = false }: { value: string; label: string; s
   return (
     <div className="flex flex-1 flex-col items-center px-4 py-4">
       <dd
-        className={`num whitespace-nowrap font-semibold text-tactical-text ${
+        className={`num whitespace-nowrap font-semibold text-ledger-text ${
           small ? "text-base" : "text-2xl"
         }`}
       >
         {value}
       </dd>
-      <dt className="mt-1 text-[12px] text-tactical-muted">{label}</dt>
+      <dt className="mt-1 text-[12px] text-ledger-muted">{label}</dt>
     </div>
   );
 }

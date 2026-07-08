@@ -32,7 +32,7 @@ const VALUE_TIER_DOT: Record<ValueTier, string> = {
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mb-3 text-[11px] font-semibold uppercase tracking-tactical-wide text-tactical-dimmed">
+    <div className="mb-3 text-[11px] font-semibold uppercase tracking-eyebrow text-ledger-dimmed">
       {children}
     </div>
   );
@@ -80,20 +80,20 @@ export function FiltersPanel({
       : [];
 
   return (
-    <div className="tactical-card overflow-hidden">
-      <div className="flex items-center justify-between border-b border-tactical-border px-5 py-4">
+    <div className="ledger-card overflow-hidden">
+      <div className="flex items-center justify-between border-b border-ledger-border px-5 py-4">
         <button
           type="button"
           onClick={() => setMobileOpen((v) => !v)}
-          className="tactical-focus-ring flex items-center gap-2 lg:pointer-events-none"
+          className="focus-ring flex items-center gap-2 lg:pointer-events-none"
           aria-expanded={mobileOpen}
         >
-          <h2 className="text-[15px] font-semibold text-tactical-text">Filters</h2>
+          <h2 className="text-[15px] font-semibold text-ledger-text">Filters</h2>
           {activeFilterCount > 0 && (
-            <span className="tactical-badge-active num">{activeFilterCount}</span>
+            <span className="ledger-badge-active num">{activeFilterCount}</span>
           )}
           <svg
-            className={`h-4 w-4 text-tactical-dimmed transition-transform lg:hidden ${mobileOpen ? "rotate-180" : ""}`}
+            className={`h-4 w-4 text-ledger-dimmed transition-transform lg:hidden ${mobileOpen ? "rotate-180" : ""}`}
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -105,14 +105,14 @@ export function FiltersPanel({
           <button
             onClick={onClearFilters}
             disabled={isLoading}
-            className="tactical-focus-ring text-[13px] font-medium text-tactical-accent transition-colors hover:text-tactical-accent-hover disabled:opacity-40"
+            className="focus-ring text-[13px] font-medium text-ledger-accent transition-colors hover:text-ledger-accent-hover disabled:opacity-40"
           >
             Clear all
           </button>
         )}
       </div>
 
-      <div className={`${mobileOpen ? "block" : "hidden"} divide-y divide-tactical-border lg:block`}>
+      <div className={`${mobileOpen ? "block" : "hidden"} divide-y divide-ledger-border lg:block`}>
         {/* Value tier */}
         <div className="px-5 py-5">
           <FieldLabel>Value tier</FieldLabel>
@@ -122,7 +122,7 @@ export function FiltersPanel({
               return (
                 <label
                   key={tier}
-                  className="flex cursor-pointer items-center gap-2.5 rounded-md py-1 transition-colors hover:bg-tactical-elevated/60"
+                  className="flex cursor-pointer items-center gap-2.5 rounded-md py-1 transition-colors hover:bg-ledger-elevated/60"
                 >
                   <input
                     type="checkbox"
@@ -137,12 +137,12 @@ export function FiltersPanel({
                     className="disabled:cursor-not-allowed disabled:opacity-40"
                   />
                   <span className={`h-2 w-2 shrink-0 rounded-full ${VALUE_TIER_DOT[tier]}`} aria-hidden />
-                  <span className="text-[13px] font-medium text-tactical-text">{tier}</span>
+                  <span className="text-[13px] font-medium text-ledger-text">{tier}</span>
                 </label>
               );
             })}
           </div>
-          <p className="mt-3 text-[12px] leading-relaxed text-tactical-dimmed">
+          <p className="mt-3 text-[12px] leading-relaxed text-ledger-dimmed">
             A property counts as good value when it sold at least 5% or 200k kr below the model estimate.
           </p>
         </div>
@@ -199,20 +199,20 @@ export function FiltersPanel({
         {/* Areas */}
         <div className="px-5 py-5">
           <FieldLabel>
-            Areas {selectedAreas.length > 0 && <span className="text-tactical-accent">({selectedAreas.length})</span>}
+            Areas {selectedAreas.length > 0 && <span className="text-ledger-accent">({selectedAreas.length})</span>}
           </FieldLabel>
           <input
             type="text"
             placeholder="Search areas…"
             value={areaSearch}
             onChange={(e) => setAreaSearch(e.target.value)}
-            className="tactical-input mb-3 w-full"
+            className="ledger-input mb-3 w-full"
           />
           <div className="space-y-1">
             {filteredAreas.map((area) => (
               <label
                 key={area}
-                className="flex cursor-pointer items-center gap-2.5 rounded-md py-1 transition-colors hover:bg-tactical-elevated/60"
+                className="flex cursor-pointer items-center gap-2.5 rounded-md py-1 transition-colors hover:bg-ledger-elevated/60"
               >
                 <input
                   type="checkbox"
@@ -221,7 +221,7 @@ export function FiltersPanel({
                   disabled={isLoading}
                   className="disabled:cursor-not-allowed disabled:opacity-40"
                 />
-                <span className="text-[13px] text-tactical-text">{area}</span>
+                <span className="text-[13px] text-ledger-text">{area}</span>
               </label>
             ))}
           </div>
@@ -242,7 +242,7 @@ export function FiltersPanel({
                 return (
                   <label
                     key={type}
-                    className="flex cursor-pointer items-center gap-2.5 rounded-md py-1 transition-colors hover:bg-tactical-elevated/60"
+                    className="flex cursor-pointer items-center gap-2.5 rounded-md py-1 transition-colors hover:bg-ledger-elevated/60"
                   >
                     <input
                       type="checkbox"
@@ -256,7 +256,7 @@ export function FiltersPanel({
                       disabled={isLoading}
                       className="disabled:cursor-not-allowed disabled:opacity-40"
                     />
-                    <span className="text-[13px] text-tactical-text">{type}</span>
+                    <span className="text-[13px] text-ledger-text">{type}</span>
                   </label>
                 );
               })}
@@ -268,7 +268,7 @@ export function FiltersPanel({
         <div className="px-5 py-5">
           <FieldLabel>Amenities</FieldLabel>
           <div className="space-y-1">
-            <label className="flex cursor-pointer items-center gap-2.5 rounded-md py-1 transition-colors hover:bg-tactical-elevated/60">
+            <label className="flex cursor-pointer items-center gap-2.5 rounded-md py-1 transition-colors hover:bg-ledger-elevated/60">
               <input
                 type="checkbox"
                 checked={filters.has_elevator === true}
@@ -276,9 +276,9 @@ export function FiltersPanel({
                 disabled={isLoading}
                 className="disabled:cursor-not-allowed disabled:opacity-40"
               />
-              <span className="text-[13px] text-tactical-text">Elevator</span>
+              <span className="text-[13px] text-ledger-text">Elevator</span>
             </label>
-            <label className="flex cursor-pointer items-center gap-2.5 rounded-md py-1 transition-colors hover:bg-tactical-elevated/60">
+            <label className="flex cursor-pointer items-center gap-2.5 rounded-md py-1 transition-colors hover:bg-ledger-elevated/60">
               <input
                 type="checkbox"
                 checked={filters.has_balcony === true}
@@ -286,7 +286,7 @@ export function FiltersPanel({
                 disabled={isLoading}
                 className="disabled:cursor-not-allowed disabled:opacity-40"
               />
-              <span className="text-[13px] text-tactical-text">Balcony</span>
+              <span className="text-[13px] text-ledger-text">Balcony</span>
             </label>
           </div>
         </div>
@@ -321,14 +321,14 @@ function RangeField({
   return (
     <div className="px-5 py-5">
       <div className="mb-3 flex items-baseline justify-between gap-2">
-        <span className="text-[11px] font-semibold uppercase tracking-tactical-wide text-tactical-dimmed">
+        <span className="text-[11px] font-semibold uppercase tracking-eyebrow text-ledger-dimmed">
           {label}
         </span>
-        <span className="num text-[12px] font-medium text-tactical-muted">{value}</span>
+        <span className="num text-[12px] font-medium text-ledger-muted">{value}</span>
       </div>
       <div className="space-y-3">
         <div className="flex items-center gap-2.5">
-          <span className="w-8 shrink-0 text-[11px] text-tactical-dimmed">Min</span>
+          <span className="w-8 shrink-0 text-[11px] text-ledger-dimmed">Min</span>
           <input
             type="range"
             min={min}
@@ -341,7 +341,7 @@ function RangeField({
           />
         </div>
         <div className="flex items-center gap-2.5">
-          <span className="w-8 shrink-0 text-[11px] text-tactical-dimmed">Max</span>
+          <span className="w-8 shrink-0 text-[11px] text-ledger-dimmed">Max</span>
           <input
             type="range"
             min={min}
