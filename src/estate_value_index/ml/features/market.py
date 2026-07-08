@@ -10,7 +10,10 @@ from estate_value_index.ml.features.context import FeatureEngineeringContext, _e
 """Market-level economic features from local reference data."""
 
 
-ECONOMY_DIR = Path(__file__).resolve().parents[4] / "data" / "reference" / "economy"
+# Resolved against the working directory (project root locally, /app in the
+# training and serving containers), matching poi.py's GEO_DATA_DIR. A __file__
+# relative path breaks once the package is installed to site-packages.
+ECONOMY_DIR = Path("data/reference/economy")
 
 MARKET_FEATURE_DEFAULTS: dict[str, float] = {
     "market_interest_rate": 0.0,

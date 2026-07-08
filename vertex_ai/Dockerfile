@@ -21,6 +21,12 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 COPY src/ src/
 
+# Runtime reference data and feature-selection config the trainer reads from the
+# working directory (/app). Without these, market features fall back to zeros and
+# market-index normalization fails with "At least one positive market index".
+COPY config/ config/
+COPY data/reference/ data/reference/
+
 # Install exact locked versions from uv.lock.
 RUN uv export --frozen --no-dev --no-hashes --extra ml --extra monitoring --extra vertex --extra geo --no-emit-project \
         --format requirements-txt -o /tmp/requirements.txt \
