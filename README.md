@@ -20,8 +20,8 @@ These choices shaped the system and the failure modes it checks for.
 
 - **Chronological splits, never random.** Production evaluation splits on `sold_date`; a naive
   random row split leaks future prices into training and flatters the metric. Area and
-  time aggregates are built so they can't peek at rows from the future either. `MAX_MAE_THRESHOLD`
-  is re-baselined against honest temporal MAE, not a shuffled holdout. See
+  time aggregates are built so they can't peek at rows from the future either. `MAX_MEDIAN_APE_THRESHOLD`
+  is re-baselined against honest temporal MdAPE, not a shuffled holdout. See
   `tests/ml/test_temporal_leakage.py`.
 - **Inference feature context matches training.** Train/serve skew is a common failure mode, so area
   normalization (`normalize_area_for_model()` for Booli's `Property - Area - City` strings) and

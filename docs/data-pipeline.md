@@ -37,7 +37,7 @@ BIGQUERY_TABLE_FEATURES=engineered_features
 GCS_BUCKET=your-gcs-bucket
 ```
 
-Optional knobs (examples): `GCS_ENABLED`, `MAX_MAE_THRESHOLD`, `DATA_SOURCE`, `MODEL_PREFIX`, `MODEL_OUTPUT_DIR`, `DEBUG`, `TRUST_PROXY_HEADERS`.
+Optional knobs (examples): `GCS_ENABLED`, `MAX_MEDIAN_APE_THRESHOLD`, `DATA_SOURCE`, `MODEL_PREFIX`, `MODEL_OUTPUT_DIR`, `DEBUG`, `TRUST_PROXY_HEADERS`.
 
 Optional signed Booli API credentials for local/private catch-up runs:
 
