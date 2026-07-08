@@ -1,5 +1,7 @@
 "use client";
 
+/* eslint-disable react-hooks/static-components -- SortButton closes over sort state; Phase 2 hoists it into areas-table.tsx */
+
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { AreaListResponse, AreaOverview } from "@/lib/area-types";
