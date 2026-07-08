@@ -272,6 +272,7 @@ input[type="range"]::-webkit-slider-thumb {
   @apply appearance-none w-[18px] h-[18px] bg-ledger-surface rounded-full cursor-pointer;
   border: 1.5px solid #16171a;
   box-shadow: 0 1px 3px rgba(16, 17, 20, 0.18);
+  margin-top: -6px;
   transition: box-shadow 150ms ease, transform 150ms ease;
 }
 input[type="range"]::-webkit-slider-thumb:hover {
@@ -303,16 +304,16 @@ input[type="range"]:disabled {
    pointer events so each thumb stays grabbable; the filled ink segment between
    them is a positioned child driven by inline left/right. */
 .range-dual {
-  @apply relative h-1.5 w-full;
+  @apply relative h-8 w-full;
 }
 .range-dual__track {
-  @apply absolute inset-0 rounded-pill bg-ledger-elevated;
+  @apply absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 rounded-pill bg-ledger-elevated;
 }
 .range-dual__fill {
-  @apply absolute inset-y-0 rounded-pill bg-ledger-text;
+  @apply absolute top-1/2 h-1.5 -translate-y-1/2 rounded-pill bg-ledger-text;
 }
 .range-dual input[type="range"] {
-  @apply absolute inset-0 m-0 w-full bg-transparent;
+  @apply absolute inset-0 m-0 h-full w-full bg-transparent;
   pointer-events: none;
   -webkit-appearance: none;
   appearance: none;
