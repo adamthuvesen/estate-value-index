@@ -39,7 +39,7 @@ uv run pytest                  # run tests (no manual activate needed)
 cd web && npm run dev          # app on localhost:3000
 ```
 
-**Train (typical):** `GCS_ENABLED=false uv run python -m estate_value_index.cli train-production-models --data-source bigquery --model-dir web/models`  
+**Train (typical):** `GCS_ENABLED=false uv run python -m estate_value_index.cli train-production-models --data-source bigquery --model-dir web/models`
 **Pipeline (orchestrated):** e.g. `uv run python -m estate_value_index.pipelines.core.complete_pipeline --quick` (see [docs/data-pipeline.md](docs/data-pipeline.md) and `complete_pipeline --help`)
 **Deploy:** `./scripts/deploy_cloud_run.sh` (see [docs/api-web-deploy.md](docs/api-web-deploy.md))
 

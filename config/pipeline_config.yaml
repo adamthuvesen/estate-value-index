@@ -1,11 +1,7 @@
 # Pipeline Configuration
 # Central configuration for Estate Value Index ML pipeline.
 #
-# Every key below is actually read by src/estate_value_index/utils/settings.py.
-# This file previously carried ~200 lines of aspirational config (BigQuery
-# partitioning, GCS prefixes, deployment sizing, monitoring thresholds, feature
-# engineering knobs, checkpointing, pipeline modes) that nothing in the
-# codebase consumed — verified by grepping every key across src/ and scripts/.
+# Every key below is read by src/estate_value_index/utils/settings.py.
 # Deployment sizing lives in scripts/deploy_cloud_run.sh; drift thresholds live
 # in src/estate_value_index/monitoring/drift_detection.py; scraping filters
 # live in the per-run JSON configs under src/estate_value_index/ingestion/config/.

@@ -10,8 +10,7 @@ type CurrentArea = Pick<AreaOverview, "area_name" | "price_tier" | "avg_sold_pri
 /**
  * Rank areas most similar to `current`, excluding `current` itself.
  *
- * Score (verbatim from the old `SimilarAreas` component):
- * +3 same price tier · +2 avg sold price within 10% · +1 within 20%.
+ * Score: +3 same price tier · +2 avg sold price within 10% · +1 within 20%.
  * Ties keep input order (stable sort); returns at most `n`.
  */
 export function selectSimilarAreas(

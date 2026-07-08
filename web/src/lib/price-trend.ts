@@ -64,9 +64,9 @@ function isReal(raw: number | null | undefined): raw is number {
 /**
  * Build a 12-month price series with gaps preserved — no forward/back fill.
  *
- * The old chart fabricated a continuous line by filling missing months; this
- * keeps nulls so the chart can honestly break the line. `mode` tells the
- * consumer what to render:
+ * Nulls are kept for missing months so the chart can honestly break the line
+ * rather than fabricating a continuous one. `mode` tells the consumer what to
+ * render:
  * - "line"    — ≥3 real monthly points
  * - "medians" — <3 real points but 3/6/12-month medians exist (dumbbell fallback)
  * - "empty"   — no real points and no medians
