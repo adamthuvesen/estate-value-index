@@ -1,6 +1,5 @@
 "use client";
 
-import { ListingPrefill } from "@/components/prediction/listing-prefill";
 import { PredictionForm } from "@/components/prediction/prediction-form";
 import { PredictionResults } from "@/components/prediction/prediction-results";
 import { usePredictionForm } from "@/hooks/use-prediction-form";
@@ -36,47 +35,41 @@ export function PredictionApp({ sampleListings, defaultAreas, modelLabels }: Pre
   } = usePredictionForm({ sampleListings, defaultAreas, modelLabels });
 
   return (
-    <div className="space-y-6">
-      <div className="grid gap-6 lg:grid-cols-3">
-        <section className="lg:col-span-2 space-y-6">
-          <ListingPrefill
-            listingUrl={listingUrl}
-            onListingUrlChange={setListingUrl}
-            onPrefill={handlePrefillFromUrl}
-            isPrefilling={isPrefilling}
-            isLoading={isLoading}
-          />
-
-          <PredictionForm
-            formData={formData}
-            areaOptions={areaOptions}
-            sampleListings={sampleListings}
-            selectedSampleIndex={selectedSampleIndex}
-            modelLabel={modelLabel}
-            modelLabels={modelLabels}
-            isLoading={isLoading}
-            isApiReady={isApiReady}
-            onFieldChange={handleFieldChange}
-            onSampleLoad={handleSampleLoad}
-            onSubmit={handleSubmit}
-          />
-
-          {error && (
-            <div className="rounded-xl border border-val-high-line bg-val-high-tint p-4">
-              <p className="text-[13px] font-medium text-val-high">{error}</p>
-            </div>
-          )}
-        </section>
-
-        <PredictionResults
-          prediction={prediction}
+    <div className="grid gap-8 lg:grid-cols-3">
+      <section className="space-y-4 lg:col-span-2">
+        <PredictionForm
+          formData={formData}
+          areaOptions={areaOptions}
+          sampleListings={sampleListings}
+          selectedSampleIndex={selectedSampleIndex}
           modelLabel={modelLabel}
-          currencyFormatter={currencyFormatter}
-          priceDifference={priceDifference}
-          differencePercent={differencePercent}
-          isAboveAsking={isAboveAsking}
+          modelLabels={modelLabels}
+          isLoading={isLoading}
+          isApiReady={isApiReady}
+          listingUrl={listingUrl}
+          isPrefilling={isPrefilling}
+          onListingUrlChange={setListingUrl}
+          onPrefill={handlePrefillFromUrl}
+          onFieldChange={handleFieldChange}
+          onSampleLoad={handleSampleLoad}
+          onSubmit={handleSubmit}
         />
-      </div>
+
+        {error && (
+          <div className="rounded-ledger border border-val-high-line bg-val-high-tint p-4">
+            <p className="text-body-sm font-medium text-val-high">{error}</p>
+          </div>
+        )}
+      </section>
+
+      <PredictionResults
+        prediction={prediction}
+        modelLabel={modelLabel}
+        currencyFormatter={currencyFormatter}
+        priceDifference={priceDifference}
+        differencePercent={differencePercent}
+        isAboveAsking={isAboveAsking}
+      />
     </div>
   );
 }
