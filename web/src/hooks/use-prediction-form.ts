@@ -8,6 +8,7 @@ import type {
   PredictionResult,
   SampleListing,
 } from "@/lib/prediction-types";
+import { estimateRange } from "@/lib/estimate-range";
 
 export interface UsePredictionOptions {
   sampleListings: SampleListing[];
@@ -283,10 +284,12 @@ export function usePredictionForm({
   const modelLabel = modelLabels[resolvedModelKey] ?? modelLabels[formData.model] ?? "Auto";
 
   const listingPriceValue = Number(formData.listing_price || 0);
-  const displayedEstimateValue = prediction?.rounded_predicted_price ?? prediction?.predicted_price ?? null;
+  const rawEstimate = prediction?.rounded_predicted_price ?? prediction?.predicted_price ?? null;
+  // The UI shows a value window, never the raw point estimate.
+  const displayedEstimateRange = rawEstimate !== null ? estimateRange(rawEstimate) : null;
   const anchorPrice = prediction?.input_data.listing_price ?? listingPriceValue;
-  const priceDifference = displayedEstimateValue !== null && anchorPrice > 0
-    ? displayedEstimateValue - anchorPrice
+  const priceDifference = displayedEstimateRange !== null && anchorPrice > 0
+    ? displayedEstimateRange.center - anchorPrice
     : null;
   const differencePercent = priceDifference !== null && anchorPrice > 0
     ? (priceDifference / anchorPrice) * 100
@@ -310,6 +313,7 @@ export function usePredictionForm({
     handlePrefillFromUrl,
     handleSubmit,
     modelLabel,
+    displayedEstimateRange,
     priceDifference,
     differencePercent,
     isAboveAsking,

@@ -29,6 +29,7 @@ export function PredictionApp({ sampleListings, defaultAreas, modelLabels }: Pre
     handlePrefillFromUrl,
     handleSubmit,
     modelLabel,
+    displayedEstimateRange,
     priceDifference,
     differencePercent,
     isAboveAsking,
@@ -66,6 +67,7 @@ export function PredictionApp({ sampleListings, defaultAreas, modelLabels }: Pre
         prediction={prediction}
         modelLabel={modelLabel}
         currencyFormatter={currencyFormatter}
+        estimateRange={displayedEstimateRange}
         priceDifference={priceDifference}
         differencePercent={differencePercent}
         isAboveAsking={isAboveAsking}

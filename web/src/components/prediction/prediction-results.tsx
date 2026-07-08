@@ -2,11 +2,15 @@
 
 import { FigureFrame } from "@/components/ui/figure-frame";
 import type { PredictionResult } from "@/lib/prediction-types";
+import type { EstimateRange } from "@/lib/estimate-range";
+import { formatNumber } from "@/lib/format";
 
 type PredictionResultsProps = {
   prediction: PredictionResult | null;
   modelLabel: string;
   currencyFormatter: Intl.NumberFormat;
+  /** The displayed value window — the raw point estimate is never shown. */
+  estimateRange: EstimateRange | null;
   priceDifference: number | null;
   differencePercent: number | null;
   isAboveAsking: boolean | null;
@@ -19,6 +23,7 @@ export function PredictionResults({
   prediction,
   modelLabel,
   currencyFormatter,
+  estimateRange,
   priceDifference,
   differencePercent,
   isAboveAsking,
@@ -33,18 +38,19 @@ export function PredictionResults({
         footnote={prediction ? TIP_FOOTNOTE : undefined}
         className="lg:sticky lg:top-20"
       >
-        {prediction ? (
+        {prediction && estimateRange ? (
           <div className="space-y-6">
             <div>
-              <p className="num font-display text-display leading-none text-ledger-text">
-                {formatDisplayPrice(currencyFormatter, prediction.rounded_predicted_price)}
+              <p className="num font-display text-headline leading-tight text-ledger-text">
+                <span className="block">{formatNumber(estimateRange.min)} –</span>
+                <span className="block">
+                  {formatNumber(estimateRange.max)}{" "}
+                  <span className="text-title text-ledger-muted">kr</span>
+                </span>
               </p>
-              <IntervalBar
-                min={prediction.price_range_min}
-                estimate={prediction.rounded_predicted_price}
-                max={prediction.price_range_max}
-                formatter={currencyFormatter}
-              />
+              <p className="mt-2 text-caption text-ledger-dimmed">
+                ±{formatNumber(estimateRange.halfWidth)} kr window around the model estimate
+              </p>
             </div>
 
             {priceDifference !== null && (
@@ -121,48 +127,6 @@ export function PredictionResults({
       </FigureFrame>
     </div>
   );
-}
-
-/** Horizontal interval bar: ink ticks at min/max with a marker at the estimate on an elevated track. */
-function IntervalBar({
-  min,
-  estimate,
-  max,
-  formatter,
-}: {
-  min: number;
-  estimate: number;
-  max: number;
-  formatter: Intl.NumberFormat;
-}) {
-  const range = max - min;
-  const pct = range > 0 ? Math.min(100, Math.max(0, ((estimate - min) / range) * 100)) : 50;
-
-  return (
-    <div className="mt-5">
-      <span className="eyebrow text-ledger-dimmed">Estimated range</span>
-      <div className="relative mt-2.5 h-2 rounded-pill bg-ledger-elevated">
-        <span
-          className="absolute inset-y-0 left-0 rounded-pill bg-ledger-accent/15"
-          style={{ width: `${pct}%` }}
-        />
-        <span className="absolute left-0 top-1/2 h-3.5 w-0.5 -translate-y-1/2 bg-ledger-text" />
-        <span className="absolute right-0 top-1/2 h-3.5 w-0.5 -translate-y-1/2 bg-ledger-text" />
-        <span
-          className="absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-ledger-surface bg-ledger-text"
-          style={{ left: `${pct}%` }}
-        />
-      </div>
-      <div className="num mt-2 flex justify-between text-caption text-ledger-dimmed">
-        <span>{formatDisplayPrice(formatter, min)}</span>
-        <span>{formatDisplayPrice(formatter, max)}</span>
-      </div>
-    </div>
-  );
-}
-
-function formatDisplayPrice(formatter: Intl.NumberFormat, value: number): string {
-  return formatter.format(value).replace(/\u00a0/g, " ");
 }
 
 function Row({
