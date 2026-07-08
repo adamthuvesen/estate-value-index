@@ -14,40 +14,6 @@ redistributable Booli dataset. Real listings, geocodes, trained models, private 
 and production metrics are left out. Bring your own lawful data access,
 BigQuery, GCS, and `.env` for production-like runs.
 
-## Engineering decisions
-
-These choices shaped the system and the failure modes it checks for.
-
-- **Chronological splits, never random.** Production evaluation splits on `sold_date`; a naive
-  random row split leaks future prices into training and flatters the metric. Area and
-  time aggregates are built so they can't peek at rows from the future either. `MAX_MEDIAN_APE_THRESHOLD`
-  is re-baselined against honest temporal MdAPE, not a shuffled holdout. See
-  `tests/ml/test_temporal_leakage.py`.
-- **Inference feature context matches training.** Train/serve skew is a common failure mode, so area
-  normalization (`normalize_area_for_model()` for Booli's `Property - Area - City` strings) and
-  the pandas `category` + LightGBM categorical contract are shared between the trainer and
-  `api_server.py` rather than reimplemented per side.
-- **Models are verified, not trusted.** Serving loads model artifacts with `.sha256` sidecars;
-  `scripts/startup.sh` refuses to boot if a required download fails or a sidecar is missing,
-  so a corrupted or partial sync fails loud instead of serving garbage.
-- **Models live in GCS, not the image.** Training output is git-ignored and never baked into the
-  container; `scripts/startup.sh` syncs artifacts from GCS at boot when `GCS_ENABLED=true`. The image
-  stays generic and models version independently of deploys.
-- **BigQuery SQL is parameterized or operator-only.** Dynamic SQL goes through
-  `utils/bigquery_safety.py` (structured Filter API, bound parameters); ad hoc string
-  fragments are treated as trusted operator input only, never user data.
-  `tests/ml/test_filter_api_contract.py` and `tests/utils/test_no_unsafe_sql.py` keep call sites honest.
-- **The runtime service account can only read its bucket.** Cloud Run runs under a dedicated
-  least-privilege SA with bucket-scoped GCS object-read and nothing else: no BigQuery and no
-  project Editor. The request path only reads artifacts. `deploy_cloud_run.sh` attaches the
-  service account and refuses to deploy if it's missing, so the service can't silently fall back
-  to the broad default identity.
-- **One-way dependency layering.** Imports flow `cli`/`pipelines` -> domain (`ml`, `ingestion`,
-  `analytics`) -> `utils`. `utils/` imports no domain code; orchestration calls down, never up.
-
-Some engineered signals are heuristic and hand-tuned, so feature importances get re-checked
-after retrains rather than assumed stable.
-
 ## Stack
 
 | Layer | Tech |
@@ -71,8 +37,7 @@ Authorized listing source -> BigQuery raw listings -> engineered features -> Lig
 The composed path is `pipelines/core/complete_pipeline.py`, which chains ingestion, feature
 materialization, training, and deploy. Each stage also runs on its own (`data_pipeline.py`,
 `training_pipeline.py`, `deployment_pipeline.py`). Start with
-[docs/architecture.md](docs/architecture.md) for the full map;
-[AGENTS.md](AGENTS.md) holds the coding-agent rules.
+[docs/architecture.md](docs/architecture.md) for the full map.
 
 ## Setup
 
@@ -191,6 +156,26 @@ uv run python -m estate_value_index.cli crawl --max-pages 10
 # Deploy to Cloud Run
 ./scripts/deploy_cloud_run.sh
 ```
+
+## Engineering decisions
+
+Why the system is built the way it is, and the failure mode each choice guards against.
+
+- **Chronological splits, never random.** Evaluation splits on `sold_date`. A random row
+  split leaks future prices into training and flatters the metric, so area and time
+  aggregates avoid future rows too.
+- **Inference matches training.** Area normalization and the LightGBM categorical contract
+  are shared between the trainer and `api_server.py`, not reimplemented on each side, which
+  is where train/serve skew usually creeps in.
+- **Models are verified, not trusted.** Serving checks `.sha256` sidecars and refuses to boot
+  on a failed or partial download, so a bad sync fails loud instead of serving garbage.
+- **Models live in GCS, not the image.** Training output is git-ignored and synced at boot, so
+  the image stays generic and models version independently of deploys.
+- **BigQuery SQL is parameterized or operator-only.** Dynamic SQL goes through
+  `utils/bigquery_safety.py` with bound parameters; ad hoc strings are trusted operator input,
+  never user data.
+- **Least-privilege runtime.** Cloud Run reads its model bucket and nothing else: no BigQuery,
+  no project Editor.
 
 ## Repository map
 
