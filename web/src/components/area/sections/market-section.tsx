@@ -1,72 +1,117 @@
 "use client";
 
+import { useState } from "react";
 import type { AreaMarketDynamics, AreaOverviewStats } from "@/lib/area-types";
 import { formatNumber, formatNumberOrDash, formatSek } from "@/lib/format";
-import { PriceTrendChart } from "@/components/area/price-trend-chart";
+import { buildMonthlySeries, computeTrailingChange, type PriceUnit } from "@/lib/price-trend";
+import { FigureFrame } from "@/components/ui/figure-frame";
+import { PriceTrendChart } from "@/components/area/charts/price-trend-chart";
+import { Segmented } from "@/components/area/charts/segmented";
 import { useRoomFilter } from "@/components/area/room-filter-provider";
+import { figureMeta, roomScopeNote } from "@/lib/area-report";
 
 interface MarketSectionProps {
   /** All-rooms overview — the monthly price series only exists at this level. */
   overview: AreaOverviewStats;
   marketDynamics: AreaMarketDynamics;
   avgLivingArea: number | null;
+  updatedAt: string;
+  stale: boolean;
 }
 
-export function MarketSection({ overview, marketDynamics, avgLivingArea }: MarketSectionProps) {
-  const { stats } = useRoomFilter();
+export function MarketSection({
+  overview,
+  marketDynamics,
+  avgLivingArea,
+  updatedAt,
+  stale,
+}: MarketSectionProps) {
+  const { filter, stats } = useRoomFilter();
   const dynamics = stats?.market_dynamics ?? marketDynamics;
 
-  return (
-    <div id="market" className="ledger-card mb-6 p-5 sm:p-6">
-      <h2 className="mb-4 text-lg font-semibold tracking-tight text-ledger-text">
-        Market dynamics
-      </h2>
+  const canPerSqm = Boolean(avgLivingArea && avgLivingArea > 0);
+  const [unit, setUnit] = useState<PriceUnit>(canPerSqm ? "per_sqm" : "total");
+  const series = buildMonthlySeries(overview, { unit, avgLivingArea });
+  const change = computeTrailingChange(series.points);
 
-      <div className="mb-5">
-        <PriceTrendChart
-          median_price_3m={overview.median_price_3m}
-          median_price_6m={overview.median_price_6m}
-          median_price_12m={overview.median_price_12m}
-          monthly_prices={overview.monthly_prices}
-          avgLivingArea={avgLivingArea}
-        />
+  const note = roomScopeNote(filter, stats?.property_count);
+
+  return (
+    <FigureFrame
+      kind="figure"
+      index={1}
+      id="market"
+      title="Market dynamics"
+      meta={figureMeta(updatedAt, note)}
+      stale={stale}
+      actions={
+        canPerSqm ? (
+          <Segmented
+            ariaLabel="Price unit"
+            value={unit}
+            onChange={setUnit}
+            options={[
+              { value: "per_sqm", label: "Price/m²" },
+              { value: "total", label: "Total" },
+            ]}
+          />
+        ) : undefined
+      }
+    >
+      <div className="mb-4 flex items-baseline justify-between gap-3">
+        <p className="text-caption text-ledger-dimmed">
+          Median {unit === "per_sqm" ? "price / m²" : "sold price"} over the last 12 months
+        </p>
+        {change !== null && (
+          <p className="text-right">
+            <span className="eyebrow text-ledger-dimmed">12-mo change</span>{" "}
+            <span
+              className={`num text-body-sm font-semibold ${change >= 0 ? "text-val-exc" : "text-val-high"}`}
+            >
+              {change >= 0 ? "+" : ""}
+              {change.toFixed(1)}%
+            </span>
+          </p>
+        )}
       </div>
 
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      <PriceTrendChart series={series} unit={series.unit} />
+
+      <dl className="mt-6 grid gap-5 border-t border-ledger-border pt-5 sm:grid-cols-2 lg:grid-cols-4">
         <div>
-          <p className="eyebrow">Price change (mean)</p>
-          <p
-            className={`num mt-2 text-2xl font-semibold ${
+          <dt className="eyebrow">Price change (mean)</dt>
+          <dd
+            className={`num mt-1.5 text-title font-semibold ${
               dynamics.price_change_mean > 0 ? "text-val-exc" : "text-val-high"
             }`}
           >
             {dynamics.price_change_mean > 0 ? "+" : ""}
             {formatSek(dynamics.price_change_mean)}
-          </p>
+          </dd>
         </div>
         <div>
-          <p className="eyebrow">Volatility</p>
-          <p className="num mt-2 text-2xl font-semibold text-ledger-text">
+          <dt className="eyebrow">Volatility</dt>
+          <dd className="num mt-1.5 text-title font-semibold text-ledger-text">
             {formatSek(dynamics.volatility)}
-          </p>
+          </dd>
         </div>
         <div>
-          <p className="eyebrow">Sales volume (3M)</p>
-          <p className="num mt-2 text-2xl font-semibold text-ledger-text">
+          <dt className="eyebrow">Sales volume (3M)</dt>
+          <dd className="num mt-1.5 text-title font-semibold text-ledger-text">
             {formatNumber(marketDynamics.sales_volume_3m)}
-          </p>
-          <p className="num mt-1 text-[12px] text-ledger-muted">
+          </dd>
+          <p className="num mt-1 text-caption text-ledger-muted">
             6M: {formatNumber(marketDynamics.sales_volume_6m)} · 12M:{" "}
             {formatNumber(marketDynamics.sales_volume_12m)}
           </p>
         </div>
         <div>
-          <p className="eyebrow">Liquidity score</p>
-          <p className="num mt-2 text-2xl font-semibold text-ledger-text">
+          <dt className="eyebrow">Liquidity score</dt>
+          <dd className="num mt-1.5 text-title font-semibold text-ledger-text">
             {formatNumberOrDash(dynamics.liquidity, 2)}
-          </p>
+          </dd>
         </div>
-      </div>
-    </div>
+      </dl>
+    </FigureFrame>
   );
 }

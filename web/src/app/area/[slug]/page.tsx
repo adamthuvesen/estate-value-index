@@ -8,17 +8,19 @@ import { selectSimilarAreas, type ScoredArea } from "@/lib/similar-areas";
 import { isMissingDataError } from "@/lib/api-errors";
 import { PRICE_TIER_LABEL } from "@/lib/tiers";
 import { formatDateSv, formatNumber, getStaleInfo } from "@/lib/format";
-import { SectionNavigation } from "@/components/area/section-navigation";
-import { RoomFilterProvider } from "@/components/area/room-filter-provider";
 import { parseRoomFilter } from "@/lib/room-filter";
+import { AREA_SECTIONS } from "@/components/area/section-registry";
+import { RoomFilterProvider } from "@/components/area/room-filter-provider";
 import { RoomFilterComponent } from "@/components/area/room-filter";
-import { OverviewSection } from "@/components/area/sections/overview-section";
+import { RailNav } from "@/components/area/rail-nav";
+import { AreaHero } from "@/components/area/area-hero";
 import { MarketSection } from "@/components/area/sections/market-section";
 import { ValueSection } from "@/components/area/sections/value-section";
 import { SizeSection } from "@/components/area/sections/size-section";
 import { BuildingStockSection } from "@/components/area/sections/building-stock-section";
-import { RecentSalesSection } from "@/components/area/recent-sales-section";
+import { RecentSalesTable } from "@/components/area/recent-sales-table";
 import { SimilarAreas } from "@/components/area/similar-areas";
+import { ButtonLink } from "@/components/ui/button";
 
 // Area statistics load from a request-time cache (GCS-synced file); a static
 // build would bake in whatever existed at build time.
@@ -68,18 +70,73 @@ export async function generateMetadata({ params }: AreaPageProps): Promise<Metad
 function MissingDataPanel() {
   return (
     <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
-      <div className="mx-auto mt-4 max-w-xl rounded-2xl border border-ledger-border bg-ledger-surface px-6 py-12 text-center shadow-elev-1">
+      <div className="mx-auto mt-4 max-w-xl rounded-sm border border-ledger-border bg-ledger-surface px-6 py-12 text-center shadow-elev-1">
         <p className="eyebrow text-val-over">Data unavailable</p>
         <h1 className="mt-3 font-display text-title text-ledger-text">
           Area statistics are not available yet
         </h1>
-        <p className="mt-3 text-[14px] text-ledger-muted">
+        <p className="mt-3 text-body-sm text-ledger-muted">
           Run the enrichment pipeline or enable GCS downloads, then reload this page.
         </p>
-        <Link href="/areas" className="ledger-btn focus-ring mt-6 inline-flex text-[13px]">
+        <ButtonLink href="/areas" variant="secondary" size="sm" className="mt-6">
           Back to all areas
-        </Link>
+        </ButtonLink>
       </div>
+    </div>
+  );
+}
+
+/** Static contents anchors shown under the hero on mobile (the rail is hidden). */
+function MobileContents() {
+  return (
+    <nav aria-label="Report contents" className="mt-8 lg:hidden">
+      <p className="eyebrow text-ledger-dimmed">In this report</p>
+      <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5 text-body-sm">
+        {AREA_SECTIONS.map((section) => (
+          <li key={section.id}>
+            <a
+              href={`#${section.id}`}
+              className="focus-ring text-ledger-muted underline-offset-4 hover:text-ledger-text hover:underline"
+            >
+              {section.title}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  );
+}
+
+function KeyFacts({
+  area,
+  updatedAt,
+  stale,
+}: {
+  area: AreaStatistics;
+  updatedAt: string;
+  stale: boolean;
+}) {
+  return (
+    <div className="border-t border-ledger-border pt-4">
+      <p className="eyebrow text-ledger-dimmed">Key facts</p>
+      <dl className="mt-3 space-y-2 text-body-sm">
+        <div className="flex items-baseline justify-between gap-3">
+          <dt className="text-ledger-muted">Price tier</dt>
+          <dd className="font-medium text-ledger-text">
+            {PRICE_TIER_LABEL[area.price_tier] ?? area.price_tier}
+          </dd>
+        </div>
+        <div className="flex items-baseline justify-between gap-3">
+          <dt className="text-ledger-muted">Sample size</dt>
+          <dd className="num font-medium text-ledger-text">{formatNumber(area.sample_size)}</dd>
+        </div>
+        <div className="flex items-baseline justify-between gap-3">
+          <dt className="text-ledger-muted">Updated</dt>
+          <dd className={`num font-medium ${stale ? "text-val-over" : "text-ledger-text"}`}>
+            {formatDateSv(updatedAt)}
+          </dd>
+        </div>
+      </dl>
     </div>
   );
 }
@@ -119,97 +176,94 @@ export default async function AreaDetailPage({ params, searchParams }: AreaPageP
     notFound();
   }
 
-  const staleInfo = getStaleInfo(metadata.generated_at);
+  const updatedAt = metadata.generated_at;
+  const stale = getStaleInfo(updatedAt)?.isStale ?? false;
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
-      <div className="relative">
-        <nav className="mb-8 text-[13px] text-ledger-muted">
-          <Link href="/" className="focus-ring transition-colors hover:text-ledger-text">
-            Home
-          </Link>
-          {" / "}
-          <Link href="/areas" className="focus-ring transition-colors hover:text-ledger-text">
-            Areas
-          </Link>
-          {" / "}
-          <span className="font-medium text-ledger-text">{area.display_name}</span>
-        </nav>
+    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
+      <nav className="mb-6 text-caption text-ledger-muted">
+        <Link href="/areas" className="focus-ring transition-colors hover:text-ledger-text">
+          Areas
+        </Link>
+        {" / "}
+        <span className="text-ledger-text">{area.display_name}</span>
+      </nav>
 
-        <div className="mb-8 text-center animate-fade-in-up">
-          <p className="eyebrow text-ledger-accent">Area report</p>
-          <div className="mt-2 mb-3 flex flex-wrap items-center justify-center gap-3">
-            <h1 className="font-display text-headline text-ledger-text">{area.display_name}</h1>
-            <span className="inline-flex rounded-pill border border-ledger-border bg-ledger-elevated px-3 py-1 text-[13px] font-medium text-ledger-muted">
-              {PRICE_TIER_LABEL[area.price_tier] ?? area.price_tier}
-            </span>
-          </div>
-          {area.has_limited_data && (
-            <p className="text-[13px] text-val-over">
-              Limited data available ({area.sample_size} properties) — estimates may vary.
-            </p>
-          )}
-        </div>
+      <AreaHero area={area} updatedAt={updatedAt} stale={stale} />
+      <MobileContents />
 
-        {staleInfo?.isStale && (
-          <div className="mx-auto mb-8 max-w-2xl rounded-xl border border-val-over-line bg-val-over-tint px-4 py-3 text-center">
-            <p className="text-[13px] text-val-over">
-              Data is {Math.floor(staleInfo.ageDays)} days old — last updated{" "}
-              {formatDateSv(staleInfo.generatedAt)}.
-            </p>
-          </div>
-        )}
-
-        <SectionNavigation areaName={area.display_name} />
-
-        <RoomFilterProvider initialFilter={initialFilter} roomData={area.by_room_count}>
-          <RoomFilterComponent />
-
-          <OverviewSection overview={area.overview} marketDynamics={area.market_dynamics} />
-
-          <MarketSection
-            overview={area.overview}
-            marketDynamics={area.market_dynamics}
-            avgLivingArea={area.size_analysis.size_distribution.living_area.mean}
-          />
-
-          <ValueSection valueInsights={area.value_insights} />
-
-          <SizeSection sizeAnalysis={area.size_analysis} />
-
-          <BuildingStockSection
-            characteristics={area.property_characteristics}
-            constructionEra={area.construction_era}
-          />
-
-          {similarAreas.length > 0 && (
-            <div id="similar" className="ledger-card mb-6 p-5 sm:p-6">
-              <SimilarAreas areas={similarAreas} />
+      <RoomFilterProvider initialFilter={initialFilter} roomData={area.by_room_count}>
+        <div className="mt-10 grid grid-cols-1 gap-x-10 lg:grid-cols-12">
+          <aside className="hidden lg:col-span-3 lg:block">
+            <div className="sticky top-20 space-y-6">
+              <RailNav />
+              <KeyFacts area={area} updatedAt={updatedAt} stale={stale} />
+              <p className="border-t border-ledger-border pt-4 text-caption text-ledger-dimmed">
+                Figures are model estimates from Booli sold listings, not appraisals.
+              </p>
             </div>
-          )}
+          </aside>
 
-          <RecentSalesSection
-            recentProperties={area.recent_properties}
-            areaName={area.area_name}
-          />
-        </RoomFilterProvider>
+          <div className="min-w-0 lg:col-span-9">
+            <div className="sticky top-14 z-30 -mx-4 mb-8 border-b border-ledger-border bg-ledger-bg/90 px-4 py-3 backdrop-blur-md sm:-mx-6 sm:px-6 lg:static lg:mx-0 lg:border-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none">
+              <RoomFilterComponent />
+            </div>
 
-        <div className="ledger-card p-6 text-center">
-          <h3 className="text-lg font-semibold tracking-tight text-ledger-text">
-            Find properties in {area.display_name}
-          </h3>
-          <p className="mt-2 text-[14px] text-ledger-muted">
-            Browse all <span className="num">{formatNumber(area.overview.listing_count)}</span>{" "}
-            properties and discover undervalued opportunities.
-          </p>
-          <Link
-            href={`/value-finder?area=${area.area_name}`}
-            className="ledger-btn-primary focus-ring mt-4 inline-flex text-[13px]"
-          >
-            Explore {area.display_name} properties
-          </Link>
+            <div className="space-y-12">
+              <MarketSection
+                overview={area.overview}
+                marketDynamics={area.market_dynamics}
+                avgLivingArea={area.size_analysis.size_distribution.living_area.mean}
+                updatedAt={updatedAt}
+                stale={stale}
+              />
+              <ValueSection
+                valueInsights={area.value_insights}
+                updatedAt={updatedAt}
+                stale={stale}
+              />
+              <SizeSection sizeAnalysis={area.size_analysis} updatedAt={updatedAt} stale={stale} />
+              <BuildingStockSection
+                characteristics={area.property_characteristics}
+                constructionEra={area.construction_era}
+                updatedAt={updatedAt}
+                stale={stale}
+              />
+              {similarAreas.length > 0 && <SimilarAreas areas={similarAreas} />}
+              <RecentSalesTable
+                recentProperties={area.recent_properties}
+                areaName={area.area_name}
+                updatedAt={updatedAt}
+                stale={stale}
+              />
+
+              <aside className="border-t-2 border-ledger-text pt-6">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                  <div className="max-w-md">
+                    <p className="eyebrow text-ledger-accent">Explore</p>
+                    <h2 className="mt-1 font-display text-title text-ledger-text">
+                      Find properties in {area.display_name}
+                    </h2>
+                    <p className="mt-2 text-body-sm text-ledger-muted">
+                      Browse all{" "}
+                      <span className="num">{formatNumber(area.overview.listing_count)}</span>{" "}
+                      properties and surface undervalued opportunities.
+                    </p>
+                  </div>
+                  <ButtonLink
+                    href={`/value-finder?area=${area.area_name}`}
+                    variant="primary"
+                    size="md"
+                    className="shrink-0"
+                  >
+                    Open in Value Finder
+                  </ButtonLink>
+                </div>
+              </aside>
+            </div>
+          </div>
         </div>
-      </div>
+      </RoomFilterProvider>
     </div>
   );
 }
