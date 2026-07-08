@@ -25,6 +25,7 @@ from estate_value_index.ml import (
     get_feature_lists,
     handle_missing_values,
 )
+from estate_value_index.ml.ask_price import mask_ask_price_signals
 from estate_value_index.ml.training import LGBMTrainer
 from estate_value_index.ml.training_workflow.data import (
     load_feature_subset,
@@ -234,6 +235,12 @@ def _prepare_model_data(
     test_raw: pd.DataFrame,
     feature_set: str,
 ) -> PreparedModelData:
+    # Mask ask-price signals before feature engineering, exactly as production
+    # training does — otherwise engineered features leak listing-price signal into
+    # the no-list experiment metrics.
+    if not _feature_set_requires_listing_price(feature_set):
+        train_raw = mask_ask_price_signals(train_raw)
+        test_raw = mask_ask_price_signals(test_raw)
     train_engineered = create_optimized_features(train_raw)
     feature_context = build_feature_context(train_engineered)
     test_engineered = create_optimized_features(test_raw, context=feature_context)
