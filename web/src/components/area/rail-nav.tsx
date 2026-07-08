@@ -61,13 +61,16 @@ export function RailNav() {
                 onClick={(e) => handleClick(e, section.id)}
                 aria-current={isActive ? "true" : undefined}
                 className={cn(
-                  "focus-ring group flex items-baseline gap-2.5 rounded-sm py-1 pl-2.5 text-body-sm transition-colors",
+                  "group flex items-baseline gap-2.5 rounded-sm px-2.5 py-1.5 text-body-sm transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ledger-accent/35 focus-visible:ring-offset-2 focus-visible:ring-offset-ledger-bg",
                   isActive
-                    ? "border-l-2 border-ledger-text font-medium text-ledger-text"
-                    : "border-l-2 border-transparent text-ledger-muted hover:text-ledger-text",
+                    ? "bg-ledger-accent-tint font-medium text-ledger-text"
+                    : "text-ledger-muted hover:bg-ledger-elevated/70 hover:text-ledger-text",
                 )}
               >
-                <span className="num text-caption text-ledger-dimmed">{section.chapter}</span>
+                <span className={cn("num text-caption", isActive ? "text-ledger-accent" : "text-ledger-dimmed")}>
+                  {section.chapter}
+                </span>
+                {isActive && <span className="h-1.5 w-1.5 rounded-full bg-ledger-accent" aria-hidden />}
                 <span className="flex-1">{section.title}</span>
                 {FIGURE_REF[section.id] && (
                   <span className="eyebrow shrink-0 text-ledger-dimmed">

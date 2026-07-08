@@ -48,7 +48,7 @@ export function SiteHeader() {
             </span>
           </Link>
           {hasNav && (
-            <nav className="hidden h-full items-stretch gap-7 md:flex">
+            <nav className="hidden h-full items-center gap-2 md:flex">
               {siteConfig.navItems.map((item, order) => {
                 const active = isActive(pathname, item.href);
                 return (
@@ -56,10 +56,10 @@ export function SiteHeader() {
                     key={item.href}
                     href={item.href}
                     aria-current={active ? "page" : undefined}
-                    className={`focus-ring -mb-px inline-flex h-full items-center gap-1.5 border-b-2 text-body-sm font-medium transition-colors duration-ledger ${
+                    className={`inline-flex h-9 items-center gap-1.5 rounded-sm px-2.5 text-body-sm font-medium transition-colors duration-ledger focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ledger-accent/35 focus-visible:ring-offset-2 focus-visible:ring-offset-ledger-bg ${
                       active
-                        ? "border-ledger-text text-ledger-text"
-                        : "border-transparent text-ledger-muted hover:text-ledger-text"
+                        ? "bg-ledger-accent-tint text-ledger-text"
+                        : "text-ledger-muted hover:bg-ledger-elevated/70 hover:text-ledger-text"
                     }`}
                   >
                     <span
@@ -68,6 +68,7 @@ export function SiteHeader() {
                     >
                       {chapterIndex(order)}
                     </span>
+                    {active && <span className="h-1.5 w-1.5 rounded-full bg-ledger-accent" aria-hidden />}
                     {item.label}
                   </Link>
                 );
@@ -122,10 +123,10 @@ export function SiteHeader() {
                   <Link
                     href={item.href}
                     aria-current={active ? "page" : undefined}
-                    className={`focus-ring flex items-center gap-2.5 rounded-sm px-2 py-3 text-body font-medium transition-colors duration-ledger ${
+                    className={`flex items-center gap-2.5 rounded-sm px-2 py-3 text-body font-medium transition-colors duration-ledger focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ledger-accent/35 focus-visible:ring-offset-2 focus-visible:ring-offset-ledger-bg ${
                       active
-                        ? "text-ledger-text"
-                        : "text-ledger-muted hover:text-ledger-text"
+                        ? "bg-ledger-accent-tint text-ledger-text"
+                        : "text-ledger-muted hover:bg-ledger-elevated/70 hover:text-ledger-text"
                     }`}
                   >
                     <span
@@ -134,6 +135,7 @@ export function SiteHeader() {
                     >
                       {chapterIndex(order)}
                     </span>
+                    {active && <span className="h-1.5 w-1.5 rounded-full bg-ledger-accent" aria-hidden />}
                     {item.label}
                   </Link>
                 </li>
