@@ -63,7 +63,18 @@ export function PriceTrendChart({ series, unit }: PriceTrendChartProps) {
     <ResponsiveContainer width="100%" height={HEIGHT}>
       <LineChart data={series.points} margin={{ top: 16, right: 44, bottom: 4, left: 4 }}>
         <XAxis dataKey="month" {...axisDefaults} interval={1} minTickGap={8} />
-        <YAxis {...axisDefaults} width={52} tickFormatter={axisFormat} />
+        <YAxis
+          {...axisDefaults}
+          width={52}
+          tickFormatter={axisFormat}
+          // Hug the data — a zero baseline flattens a 105–120k series into a
+          // sliver at the top of the plot.
+          domain={[
+            (dataMin: number) => Math.floor((dataMin * 0.94) / 1000) * 1000,
+            (dataMax: number) => Math.ceil((dataMax * 1.04) / 1000) * 1000,
+          ]}
+          tickCount={4}
+        />
         {median12 !== null && (
           <ReferenceLine
             y={median12}
