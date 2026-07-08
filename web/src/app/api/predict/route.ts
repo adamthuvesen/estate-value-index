@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { coerceBool } from '@/lib/booli-listing-parser';
+import { estimateRange } from '@/lib/estimate-range';
 
 type PredictionRequestBody = {
   listing_id?: unknown;
@@ -150,13 +151,15 @@ function parseOptionalBoolean(value: unknown): boolean | null {
   return parsed;
 }
 
-function predictionRange(predictedPrice: number, modelId: string) {
-  const roundToStep = modelId === 'no_list_price' ? Math.ceil : Math.round;
-  const roundedPrediction = roundToStep(predictedPrice / PRICE_RANGE_STEP) * PRICE_RANGE_STEP;
+function predictionRange(predictedPrice: number) {
+  // estimateRange is the single source of truth for the displayed window (nearest
+  // 100k, ±100k <6M / ±200k ≥6M / ±300k >12M). The UI recomputes from
+  // rounded_predicted_price, so the API must round the same way to agree.
+  const range = estimateRange(predictedPrice);
   return {
-    rounded_predicted_price: roundedPrediction,
-    price_range_min: Math.max(0, roundedPrediction - PRICE_RANGE_STEP),
-    price_range_max: roundedPrediction + PRICE_RANGE_STEP,
+    rounded_predicted_price: range.center,
+    price_range_min: Math.max(0, range.min),
+    price_range_max: range.max,
     price_range_step: PRICE_RANGE_STEP,
   };
 }
@@ -263,7 +266,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         listing_id: parsedPayload.listingId,
         predicted_price: predictedPrice,
-        ...predictionRange(predictedPrice, prediction.model_id),
+        ...predictionRange(predictedPrice),
         model_used: prediction.model_used,
         model_id: prediction.model_id,
         model_type: prediction.model_type,

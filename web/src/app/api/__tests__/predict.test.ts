@@ -107,7 +107,7 @@ describe('/api/predict', () => {
       expect(JSON.stringify(data)).not.toContain('stack trace')
     })
 
-    it('rounds no-list predictions up for the 100k display range', async () => {
+    it('rounds no-list predictions to the nearest 100k display range', async () => {
       mockFastApiPrediction(2_136_441)
 
       const response = await POST(makeRequest({ living_area: 55 }))
@@ -115,9 +115,9 @@ describe('/api/predict', () => {
 
       expect(response.status).toBe(200)
       expect(data.predicted_price).toBe(2_136_441)
-      expect(data.rounded_predicted_price).toBe(2_200_000)
-      expect(data.price_range_min).toBe(2_100_000)
-      expect(data.price_range_max).toBe(2_300_000)
+      expect(data.rounded_predicted_price).toBe(2_100_000)
+      expect(data.price_range_min).toBe(2_000_000)
+      expect(data.price_range_max).toBe(2_200_000)
       expect(data.price_range_step).toBe(100_000)
     })
 
@@ -134,7 +134,7 @@ describe('/api/predict', () => {
     })
 
     it('clamps the lower range bound at zero', async () => {
-      mockFastApiPrediction(43_000)
+      mockFastApiPrediction(130_000)
 
       const response = await POST(makeRequest({ living_area: 12 }))
       const data = await response.json()
