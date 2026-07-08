@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ButtonLink } from "@/components/ui/button";
 import { getAreaOverviewList } from "@/lib/area-overview";
 import type { AreaOverview } from "@/lib/area-types";
 
@@ -40,9 +41,9 @@ export default async function AreaNotFound() {
           </div>
         )}
 
-        <Link href="/areas" className="ledger-btn focus-ring mt-8 inline-flex text-[13px]">
+        <ButtonLink href="/areas" variant="secondary" size="sm" className="mt-8">
           Browse the area register
-        </Link>
+        </ButtonLink>
       </div>
     </div>
   );

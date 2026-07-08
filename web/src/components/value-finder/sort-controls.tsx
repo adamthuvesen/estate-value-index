@@ -1,3 +1,4 @@
+import { buttonClasses } from "@/components/ui/button";
 import type { SortField, SortOrder } from "@/lib/value-finder-types";
 
 interface SortControlsProps {
@@ -65,7 +66,7 @@ export function SortControls({
         <button
           onClick={() => onSortChange(sortField, sortOrder === "asc" ? "desc" : "asc")}
           disabled={isLoading}
-          className="ledger-btn focus-ring px-2.5 py-1.5"
+          className={buttonClasses("secondary", "sm", "px-2.5 py-1.5")}
           title={sortOrder === "asc" ? "Ascending" : "Descending"}
           aria-label={`Sort ${sortOrder === "asc" ? "ascending" : "descending"}`}
         >

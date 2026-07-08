@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Badge } from "@/components/ui/badge";
 import { DualRangeSlider } from "@/components/ui/dual-range-slider";
 import { formatSek } from "@/lib/format";
 import { VALUE_TIER_STYLES } from "@/lib/tiers";
@@ -78,7 +79,7 @@ export function FiltersPanel({
         >
           <h2 className="eyebrow text-ledger-text">Filters</h2>
           {activeFilterCount > 0 && (
-            <span className="ledger-badge-active num">{activeFilterCount}</span>
+            <Badge variant="accent" className="num">{activeFilterCount}</Badge>
           )}
           <svg
             className={`h-4 w-4 text-ledger-dimmed transition-transform lg:hidden ${mobileOpen ? "rotate-180" : ""}`}

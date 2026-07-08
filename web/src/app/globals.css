@@ -159,56 +159,12 @@
   @apply hover:-translate-y-0.5 hover:shadow-elev-2 hover:border-ledger-border-emphasis;
 }
 
-/* ---------- Buttons (legacy recipes; retired once pages adopt <Button/>) ---------- */
-@utility ledger-btn {
-  @apply inline-flex items-center justify-center gap-2 bg-ledger-surface border border-ledger-border text-ledger-text;
-  @apply px-4 py-2.5 rounded-sm text-sm font-medium;
-  @apply transition-all duration-ledger ease-ledger;
-  @apply hover:bg-ledger-elevated hover:border-ledger-border-emphasis;
-  @apply active:scale-[0.98];
-  @apply disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100;
-}
-
-@utility ledger-btn-primary {
-  /* Primary = ink black, Apple/Vercel style */
-  @apply inline-flex items-center justify-center gap-2 bg-ledger-text text-white border border-ledger-text;
-  @apply px-4 py-2.5 rounded-sm text-sm font-medium;
-  @apply transition-all duration-ledger ease-ledger;
-  @apply hover:bg-[#2B2C31] hover:border-[#2B2C31];
-  @apply active:scale-[0.98];
-  @apply disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100;
-}
-
-@utility ledger-btn-neutral {
-  @apply ledger-btn text-ledger-muted;
-  @apply hover:text-ledger-text;
-}
-
 /* ---------- Input ---------- */
 @utility ledger-input {
   @apply bg-ledger-surface border border-ledger-border rounded-sm;
   @apply px-3 py-2 text-sm text-ledger-text placeholder:text-ledger-dimmed;
   @apply transition-all duration-ledger ease-ledger;
   @apply focus:border-ledger-accent focus:shadow-focus focus:outline-hidden;
-}
-
-/* ---------- Badges (legacy recipes; retired once pages adopt <Badge/>) ---------- */
-@utility ledger-badge {
-  @apply inline-flex items-center justify-center gap-1;
-  @apply px-2.5 py-0.5 rounded-pill border;
-  @apply text-[11px] font-semibold tracking-eyebrow;
-}
-
-@utility ledger-badge-active {
-  @apply ledger-badge border-transparent bg-ledger-accent text-white;
-}
-
-@utility ledger-badge-inactive {
-  @apply ledger-badge border-ledger-border text-ledger-muted bg-ledger-surface;
-}
-
-@utility ledger-badge-alert {
-  @apply ledger-badge border-val-high-line bg-val-high-tint text-val-high;
 }
 
 /* ---------- Eyebrow (mono kicker label) ---------- */

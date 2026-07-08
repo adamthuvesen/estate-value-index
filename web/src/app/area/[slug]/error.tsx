@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { Button, ButtonLink } from "@/components/ui/button";
 
 /** Unexpected-error boundary for the area report. Known states (missing data,
  *  unknown slug) are handled in the page itself; this is the genuine-crash path. */
@@ -23,12 +23,12 @@ export default function AreaError({
           {error.digest && <span className="num"> (ref {error.digest})</span>}
         </p>
         <div className="mt-6 flex items-center justify-center gap-3">
-          <button onClick={reset} className="ledger-btn-primary focus-ring text-[13px]">
+          <Button onClick={reset} size="sm">
             Try again
-          </button>
-          <Link href="/areas" className="ledger-btn focus-ring text-[13px]">
+          </Button>
+          <ButtonLink href="/areas" variant="secondary" size="sm">
             Back to all areas
-          </Link>
+          </ButtonLink>
         </div>
       </div>
     </div>
