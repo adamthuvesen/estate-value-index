@@ -20,7 +20,7 @@ type PredictionFormProps = {
 
 const fieldLabel = "text-[12px] font-medium text-tactical-muted";
 const fieldControl =
-  "rounded-sm border border-tactical-border bg-tactical-surface px-3 py-2 text-[14px] text-tactical-text transition-colors placeholder:text-tactical-dimmed hover:border-tactical-border-emphasis focus:border-tactical-accent focus:shadow-focus focus:outline-none";
+  "rounded-sm border border-tactical-border bg-tactical-surface px-3 py-2 text-[14px] text-tactical-text transition-colors placeholder:text-tactical-dimmed hover:border-tactical-border-emphasis focus:border-tactical-accent focus:shadow-focus focus:outline-hidden";
 
 export function PredictionForm({
   formData,

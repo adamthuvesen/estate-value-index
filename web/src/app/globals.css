@@ -1,50 +1,344 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
 
-/* ============================================================
+@theme {
+  --color-tactical-bg: #fbfbfa;
+  --color-tactical-surface: #ffffff;
+  --color-tactical-elevated: #f4f4f2;
+  --color-tactical-border: #e9e9e4;
+  --color-tactical-border-emphasis: #d7d7d1;
+  --color-tactical-text: #16171a;
+  --color-tactical-muted: #63666e;
+  --color-tactical-dimmed: #767980;
+  --color-tactical-accent: #0b62ff;
+  --color-tactical-accent-hover: #0a54db;
+  --color-tactical-accent-soft: #4c8cff;
+  --color-tactical-success: #157f4b;
+  --color-tactical-success-dim: #2e9d63;
+  --color-tactical-neutral: #8a8d95;
+  --color-tactical-neutral-hover: #63666e;
+
+  --color-val-exc: #157f4b;
+  --color-val-exc-tint: #e7f4ec;
+  --color-val-exc-line: #bfe3cd;
+  --color-val-great: #2e8b57;
+  --color-val-good: #4f8a6b;
+  --color-val-fair: #6b7280;
+  --color-val-fair-tint: #f1f2f1;
+  --color-val-over: #c2681c;
+  --color-val-over-tint: #fbf0e4;
+  --color-val-over-line: #f0d9be;
+  --color-val-high: #c0392b;
+  --color-val-high-tint: #fbebe9;
+  --color-val-high-line: #f1cfc9;
+
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+
+  --color-chart-1: hsl(var(--chart-1));
+  --color-chart-2: hsl(var(--chart-2));
+  --color-chart-3: hsl(var(--chart-3));
+  --color-chart-4: hsl(var(--chart-4));
+  --color-chart-5: hsl(var(--chart-5));
+
+  --font-sans:
+    var(--font-inter), system-ui, -apple-system, Segoe UI, sans-serif;
+  --font-mono:
+    var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo, Monaco,
+    Consolas, Liberation Mono, Courier New, monospace;
+
+  --radius-lg: 12px;
+  --radius-md: 10px;
+  --radius-sm: 8px;
+  --radius-tactical: 9px;
+  --radius-pill: 999px;
+
+  --tracking-tactical: 0em;
+  --tracking-tactical-wide: 0.08em;
+
+  --ease-tactical: cubic-bezier(0.22, 0.61, 0.36, 1);
+
+  --transition-duration-tactical: 180ms;
+
+  --shadow-elev-1:
+    0 1px 2px rgba(16, 17, 20, 0.04), 0 1px 3px rgba(16, 17, 20, 0.05);
+  --shadow-elev-2:
+    0 4px 14px rgba(16, 17, 20, 0.07), 0 2px 5px rgba(16, 17, 20, 0.05);
+  --shadow-elev-3:
+    0 12px 32px rgba(16, 17, 20, 0.1), 0 4px 10px rgba(16, 17, 20, 0.06);
+  --shadow-focus: 0 0 0 3px rgba(11, 98, 255, 0.18);
+
+  --animate-fade-in-up: fade-in-up 0.5s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  --animate-fade-in: fade-in 0.4s ease-out both;
+  --animate-gauge-grow: gauge-grow 0.7s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+
+  @keyframes fade-in-up {
+    0% {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes fade-in {
+    0% {
+      opacity: 0;
+    }
+    100% {
+      opacity: 1;
+    }
+  }
+  @keyframes gauge-grow {
+    0% {
+      transform: scaleX(0);
+    }
+    100% {
+      transform: scaleX(1);
+    }
+  }
+}
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+}
+
+@utility tactical-card {
+  /* ---------- Card ---------- */
+  @apply bg-tactical-surface border border-tactical-border rounded-tactical relative;
+  @apply shadow-elev-1 transition-all duration-tactical ease-tactical;
+}
+
+@utility tactical-card-hover {
+  @apply transition-all duration-tactical ease-tactical;
+  @apply hover:-translate-y-0.5 hover:shadow-elev-2 hover:border-tactical-border-emphasis;
+}
+
+@utility tactical-corners {
+  /* Corner accents are a tactical relic — neutralized to no-ops so any
+     remaining usages don't paint crosshairs on the calm layout. */
+  @apply relative;
+}
+
+@utility tactical-card-corner-tl {
+  @apply relative;
+}
+
+@utility tactical-card-corner-tr {
+  @apply relative;
+}
+
+@utility tactical-card-corner-bl {
+  @apply relative;
+}
+
+@utility tactical-card-corner-br {
+  @apply relative;
+}
+
+@utility tactical-btn {
+  /* ---------- Buttons ---------- */
+  @apply inline-flex items-center justify-center gap-2 bg-tactical-surface border border-tactical-border text-tactical-text;
+  @apply px-4 py-2.5 rounded-sm text-sm font-medium;
+  @apply transition-all duration-tactical ease-tactical;
+  @apply hover:bg-tactical-elevated hover:border-tactical-border-emphasis;
+  @apply active:scale-[0.98];
+  @apply disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100;
+}
+
+@utility tactical-btn-primary {
+  /* Primary = ink black, Apple/Vercel style */
+  @apply inline-flex items-center justify-center gap-2 bg-tactical-text text-white border border-tactical-text;
+  @apply px-4 py-2.5 rounded-sm text-sm font-medium;
+  @apply transition-all duration-tactical ease-tactical;
+  @apply hover:bg-[#2B2C31] hover:border-[#2B2C31];
+  @apply active:scale-[0.98];
+  @apply disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100;
+}
+
+@utility tactical-btn-neutral {
+  @apply tactical-btn text-tactical-muted;
+  @apply hover:text-tactical-text;
+}
+
+@utility tactical-input {
+  /* ---------- Input ---------- */
+  @apply bg-tactical-surface border border-tactical-border rounded-sm;
+  @apply px-3 py-2 text-sm text-tactical-text placeholder:text-tactical-dimmed;
+  @apply transition-all duration-tactical ease-tactical;
+  @apply focus:border-tactical-accent focus:shadow-focus focus:outline-hidden;
+}
+
+@utility tactical-badge {
+  /* ---------- Badges ---------- */
+  @apply inline-flex items-center justify-center gap-1;
+  @apply px-2.5 py-0.5 rounded-pill border;
+  @apply text-[11px] font-semibold tracking-tactical-wide;
+}
+
+@utility tactical-badge-active {
+  @apply tactical-badge border-transparent bg-tactical-accent text-white;
+}
+
+@utility tactical-badge-inactive {
+  @apply tactical-badge border-tactical-border text-tactical-muted bg-tactical-surface;
+}
+
+@utility tactical-badge-alert {
+  @apply tactical-badge border-val-high-line bg-val-high-tint text-val-high;
+}
+
+@utility tactical-label {
+  /* ---------- Label / eyebrow ---------- */
+  @apply text-[11px] font-semibold uppercase tracking-tactical-wide text-tactical-dimmed font-mono;
+}
+
+@utility tactical-focus-ring {
+  /* ---------- Focus ring ---------- */
+  @apply focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-tactical-accent/50 focus-visible:ring-offset-2 focus-visible:ring-offset-tactical-bg rounded-sm;
+}
+
+@utility tactical-section-separator {
+  /* ---------- Section separator ---------- */
+  @apply border-t border-tactical-border my-12;
+}
+
+@utility tactical-header-xl {
+  /* ---------- Headers ---------- */
+  @apply text-4xl md:text-5xl font-semibold tracking-tactical text-tactical-text;
+}
+
+@utility tactical-header-lg {
+  @apply text-2xl md:text-3xl font-semibold tracking-tactical text-tactical-text;
+}
+
+@utility tactical-header-md {
+  @apply text-xl md:text-2xl font-semibold tracking-tactical text-tactical-text;
+}
+
+@utility tactical-header-sm {
+  @apply text-lg md:text-xl font-semibold tracking-tactical text-tactical-text;
+}
+
+@utility num {
+  /* ---------- Data typography ---------- */
+  @apply font-mono tabular-nums;
+}
+
+@utility value-gauge {
+  /* ---------- Fair-value gauge (signature element) ---------- */
+  @apply relative h-1.5 w-full rounded-pill bg-tactical-elevated overflow-hidden;
+}
+
+@utility value-gauge-fill {
+  @apply absolute inset-y-0 left-0 rounded-pill origin-left;
+  animation: gauge-grow 0.7s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+@utility text-balance {
+  text-wrap: balance;
+}
+
+@utility prose-muted {
+  color: var(--muted-foreground);
+}
+
+@utility animate-fade-in {
+  animation: fade-in 0.4s ease-out both;
+}
+
+@utility terminal-text {
+  @apply font-mono text-sm leading-relaxed;
+}
+
+@utility tactical-section-gap {
+  @apply space-y-6;
+}
+
+@layer utilities {
+  /* ============================================================
    Nordic Ledger — light, Scandinavian-calm design system
    Color is rationed: neutrals for chrome, the diverging
    value scale is the only place saturated hues carry meaning.
    ============================================================ */
 
-:root {
-  --radius: 9px;
+  :root {
+    --radius: 9px;
 
-  --background: #FBFBFA;
-  --foreground: #16171A;
-  --card: #FFFFFF;
-  --card-foreground: #16171A;
-  --popover: #FFFFFF;
-  --popover-foreground: #16171A;
-  --primary: #16171A;
-  --primary-foreground: #FFFFFF;
-  --secondary: #F4F4F2;
-  --secondary-foreground: #16171A;
-  --muted: #F1F2F1;
-  --muted-foreground: #63666E;
-  --accent: #0B62FF;
-  --accent-foreground: #FFFFFF;
-  --destructive: #C0392B;
-  --border: #E9E9E4;
-  --input: #FFFFFF;
-  --ring: #0B62FF;
+    --background: #fbfbfa;
+    --foreground: #16171a;
+    --card: #ffffff;
+    --card-foreground: #16171a;
+    --popover: #ffffff;
+    --popover-foreground: #16171a;
+    --primary: #16171a;
+    --primary-foreground: #ffffff;
+    --secondary: #f4f4f2;
+    --secondary-foreground: #16171a;
+    --muted: #f1f2f1;
+    --muted-foreground: #63666e;
+    --accent: #0b62ff;
+    --accent-foreground: #ffffff;
+    --destructive: #c0392b;
+    --border: #e9e9e4;
+    --input: #ffffff;
+    --ring: #0b62ff;
 
-  /* Chart palette — legible on white */
-  --chart-1: #0B62FF; /* brand blue */
-  --chart-2: #157F4B; /* value green */
-  --chart-3: #C2681C; /* amber */
-  --chart-4: #C0392B; /* clay red */
-  --chart-5: #8A8D95; /* neutral */
+    /* Chart palette — legible on white */
+    --chart-1: #0b62ff; /* brand blue */
+    --chart-2: #157f4b; /* value green */
+    --chart-3: #c2681c; /* amber */
+    --chart-4: #c0392b; /* clay red */
+    --chart-5: #8a8d95; /* neutral */
 
-  --sidebar: #FFFFFF;
-  --sidebar-foreground: #16171A;
-  --sidebar-primary: #16171A;
-  --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #F4F4F2;
-  --sidebar-accent-foreground: #16171A;
-  --sidebar-border: #E9E9E4;
-  --sidebar-ring: #0B62FF;
+    --sidebar: #ffffff;
+    --sidebar-foreground: #16171a;
+    --sidebar-primary: #16171a;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #f4f4f2;
+    --sidebar-accent-foreground: #16171a;
+    --sidebar-border: #e9e9e4;
+    --sidebar-ring: #0b62ff;
+  }
 }
 
 @layer base {
@@ -84,142 +378,6 @@
   }
 }
 
-@layer components {
-  /* ---------- Card ---------- */
-  .tactical-card {
-    @apply bg-tactical-surface border border-tactical-border rounded-tactical relative;
-    @apply shadow-elev-1 transition-all duration-tactical ease-tactical;
-  }
-
-  .tactical-card-hover {
-    @apply transition-all duration-tactical ease-tactical;
-    @apply hover:-translate-y-0.5 hover:shadow-elev-2 hover:border-tactical-border-emphasis;
-  }
-
-  /* Corner accents are a tactical relic — neutralized to no-ops so any
-     remaining usages don't paint crosshairs on the calm layout. */
-  .tactical-corners,
-  .tactical-card-corner-tl,
-  .tactical-card-corner-tr,
-  .tactical-card-corner-bl,
-  .tactical-card-corner-br {
-    @apply relative;
-  }
-
-  /* ---------- Buttons ---------- */
-  .tactical-btn {
-    @apply inline-flex items-center justify-center gap-2 bg-tactical-surface border border-tactical-border text-tactical-text;
-    @apply px-4 py-2.5 rounded-sm text-sm font-medium;
-    @apply transition-all duration-tactical ease-tactical;
-    @apply hover:bg-tactical-elevated hover:border-tactical-border-emphasis;
-    @apply active:scale-[0.98];
-    @apply disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100;
-  }
-
-  /* Primary = ink black, Apple/Vercel style */
-  .tactical-btn-primary {
-    @apply inline-flex items-center justify-center gap-2 bg-tactical-text text-white border border-tactical-text;
-    @apply px-4 py-2.5 rounded-sm text-sm font-medium;
-    @apply transition-all duration-tactical ease-tactical;
-    @apply hover:bg-[#2B2C31] hover:border-[#2B2C31];
-    @apply active:scale-[0.98];
-    @apply disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100;
-  }
-
-  .tactical-btn-neutral {
-    @apply tactical-btn text-tactical-muted;
-    @apply hover:text-tactical-text;
-  }
-
-  /* ---------- Input ---------- */
-  .tactical-input {
-    @apply bg-tactical-surface border border-tactical-border rounded-sm;
-    @apply px-3 py-2 text-sm text-tactical-text placeholder:text-tactical-dimmed;
-    @apply transition-all duration-tactical ease-tactical;
-    @apply focus:border-tactical-accent focus:shadow-focus focus:outline-none;
-  }
-
-  /* ---------- Badges ---------- */
-  .tactical-badge {
-    @apply inline-flex items-center justify-center gap-1;
-    @apply px-2.5 py-0.5 rounded-pill border;
-    @apply text-[11px] font-semibold tracking-tactical-wide;
-  }
-
-  .tactical-badge-active {
-    @apply tactical-badge border-transparent bg-tactical-accent text-white;
-  }
-
-  .tactical-badge-inactive {
-    @apply tactical-badge border-tactical-border text-tactical-muted bg-tactical-surface;
-  }
-
-  .tactical-badge-alert {
-    @apply tactical-badge border-val-high-line bg-val-high-tint text-val-high;
-  }
-
-  /* ---------- Label / eyebrow ---------- */
-  .tactical-label {
-    @apply text-[11px] font-semibold uppercase tracking-tactical-wide text-tactical-dimmed font-mono;
-  }
-
-  /* ---------- Focus ring ---------- */
-  .tactical-focus-ring {
-    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tactical-accent/50 focus-visible:ring-offset-2 focus-visible:ring-offset-tactical-bg rounded-sm;
-  }
-
-  /* ---------- Section separator ---------- */
-  .tactical-section-separator {
-    @apply border-t border-tactical-border my-12;
-  }
-
-  /* ---------- Headers ---------- */
-  .tactical-header-xl {
-    @apply text-4xl md:text-5xl font-semibold tracking-tactical text-tactical-text;
-  }
-  .tactical-header-lg {
-    @apply text-2xl md:text-3xl font-semibold tracking-tactical text-tactical-text;
-  }
-  .tactical-header-md {
-    @apply text-xl md:text-2xl font-semibold tracking-tactical text-tactical-text;
-  }
-  .tactical-header-sm {
-    @apply text-lg md:text-xl font-semibold tracking-tactical text-tactical-text;
-  }
-
-  /* ---------- Data typography ---------- */
-  .num {
-    @apply font-mono tabular-nums;
-  }
-
-  /* ---------- Fair-value gauge (signature element) ---------- */
-  .value-gauge {
-    @apply relative h-1.5 w-full rounded-pill bg-tactical-elevated overflow-hidden;
-  }
-  .value-gauge-fill {
-    @apply absolute inset-y-0 left-0 rounded-pill origin-left;
-    animation: gauge-grow 0.7s cubic-bezier(0.22, 0.61, 0.36, 1) both;
-  }
-}
-
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
-  .prose-muted {
-    color: var(--muted-foreground);
-  }
-  .animate-fade-in {
-    animation: fade-in 0.4s ease-out both;
-  }
-  .terminal-text {
-    @apply font-mono text-sm leading-relaxed;
-  }
-  .tactical-section-gap {
-    @apply space-y-6;
-  }
-}
-
 /* ---------- Checkbox ---------- */
 input[type="checkbox"] {
   @apply appearance-none w-[18px] h-[18px] border border-tactical-border-emphasis bg-tactical-surface rounded-[5px];
@@ -234,7 +392,7 @@ input[type="checkbox"]:checked {
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 16 16' fill='%23ffffff' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M12.207 4.793a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-2-2a1 1 0 011.414-1.414L6.5 9.086l4.293-4.293a1 1 0 011.414 0z'/%3E%3C/svg%3E");
 }
 input[type="checkbox"]:focus-visible {
-  @apply outline-none ring-2 ring-tactical-accent/40 ring-offset-1;
+  @apply outline-hidden ring-2 ring-tactical-accent/40 ring-offset-1;
 }
 
 /* ---------- Range slider ---------- */

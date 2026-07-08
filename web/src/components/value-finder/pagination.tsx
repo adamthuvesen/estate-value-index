@@ -91,7 +91,7 @@ export function Pagination({
                 key={pageNum}
                 onClick={() => handlePageClick(pageNum)}
                 disabled={isLoading}
-                className={`tactical-focus-ring num h-9 min-w-[2.25rem] rounded-sm px-2.5 text-[13px] font-medium transition-colors duration-tactical ${
+                className={`tactical-focus-ring num h-9 min-w-9 rounded-sm px-2.5 text-[13px] font-medium transition-colors duration-tactical ${
                   isCurrent
                     ? "bg-tactical-text text-white"
                     : "border border-tactical-border bg-tactical-surface text-tactical-text hover:bg-tactical-elevated disabled:opacity-40"

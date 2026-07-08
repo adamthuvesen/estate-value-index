@@ -22,7 +22,7 @@ const sortOptions: { value: SortField; label: string }[] = [
 const pageSizeOptions = [20, 50, 100];
 
 const selectClass =
-  "tactical-focus-ring appearance-none rounded-sm border border-tactical-border bg-tactical-surface bg-[length:16px] bg-[right_0.6rem_center] bg-no-repeat py-1.5 pl-3 pr-8 text-[13px] font-medium text-tactical-text transition-colors hover:border-tactical-border-emphasis focus:border-tactical-accent focus:outline-none disabled:opacity-40";
+  "tactical-focus-ring appearance-none rounded-sm border border-tactical-border bg-tactical-surface bg-size-[16px] bg-position-[right_0.6rem_center] bg-no-repeat py-1.5 pl-3 pr-8 text-[13px] font-medium text-tactical-text transition-colors hover:border-tactical-border-emphasis focus:border-tactical-accent focus:outline-hidden disabled:opacity-40";
 
 // inline chevron so selects match the light system without a global appearance reset
 const chevron =
