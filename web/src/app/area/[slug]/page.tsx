@@ -237,7 +237,7 @@ export default async function AreaDetailPage({ params, searchParams }: AreaPageP
                 stale={stale}
               />
 
-              <aside className="border-t-2 border-ledger-text pt-6">
+              <aside className="border-t border-ledger-border pt-6">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                   <div className="max-w-md">
                     <p className="eyebrow text-ledger-accent">Explore</p>

@@ -18,7 +18,7 @@ export function SimilarAreas({ areas }: SimilarAreasProps) {
   const section = getSection("similar");
 
   return (
-    <section id="similar" className="scroll-mt-24 border-t-2 border-ledger-text pt-4">
+    <section id="similar" className="scroll-mt-24 border-t border-ledger-border pt-4">
       <span className="eyebrow block text-ledger-accent">Chapter {section.chapter}</span>
       <h2 className="mt-1 font-display text-title text-ledger-text">Similar areas</h2>
       <p className="mt-1 text-caption text-ledger-dimmed">

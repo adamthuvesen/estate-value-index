@@ -25,7 +25,7 @@ export function AreaHero({ area, updatedAt, stale }: AreaHeroProps) {
   const undervalued = area.value_insights.undervalued_pct;
 
   return (
-    <header className="border-t-2 border-ledger-text pt-5">
+    <header className="border-t border-ledger-border pt-5">
       <p className="eyebrow text-ledger-accent">
         Area report · <span className="text-ledger-muted">{tierLabel}</span>
       </p>

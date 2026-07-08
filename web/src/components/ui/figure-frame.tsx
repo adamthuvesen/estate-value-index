@@ -41,7 +41,7 @@ export function FigureFrame({
     kind !== "panel" && index !== undefined ? `${KIND_LABEL[kind]} ${index}` : null;
 
   return (
-    <section id={id} className={cn("scroll-mt-24 border-t-2 border-ledger-text pt-4", className)}>
+    <section id={id} className={cn("scroll-mt-24 border-t border-ledger-border pt-4", className)}>
       <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
         <div className="min-w-0">
           {label && (
@@ -64,7 +64,7 @@ export function FigureFrame({
         )}
       </div>
 
-      <div className="ledger-card mt-4 rounded-t-none border-t-0 p-4 shadow-none sm:p-5">
+      <div className="ledger-card mt-4 p-4 shadow-none sm:p-5">
         {children}
       </div>
 

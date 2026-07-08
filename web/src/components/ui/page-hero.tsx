@@ -12,7 +12,7 @@ interface PageHeroProps {
 
 export function PageHero({ chapter, eyebrow, title, lead, children }: PageHeroProps) {
   return (
-    <header className="border-t-2 border-ledger-text pt-5">
+    <header className="border-t border-ledger-border pt-5">
       <p className="eyebrow flex items-center gap-2 text-ledger-muted">
         <span className="num text-ledger-text">{chapter}</span>
         <span aria-hidden className="text-ledger-border-emphasis">
