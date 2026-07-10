@@ -12,8 +12,7 @@ import {
 } from "recharts";
 import {
   axisDefaults,
-  ChartTooltip,
-  usePrefersReducedMotion,
+  ChartTooltip
 } from "@/components/charts/chart-theme";
 
 export interface SimpleBar {
@@ -54,7 +53,6 @@ export function SimpleBarChart({
   categoryWidth = 96,
   maxLabels,
 }: SimpleBarChartProps) {
-  const reduce = usePrefersReducedMotion();
   const xInterval = maxLabels ? Math.max(0, Math.ceil(data.length / maxLabels) - 1) : 0;
 
   const tooltip = (
@@ -82,7 +80,7 @@ export function SimpleBarChart({
             axisLine={false}
           />
           {tooltip}
-          <Bar dataKey="value" radius={[0, 3, 3, 0]} barSize={16} isAnimationActive={!reduce}>
+          <Bar dataKey="value" radius={[0, 3, 3, 0]} barSize={16} isAnimationActive={false}>
             {data.map((d, i) => (
               <Cell key={i} fill={LOW} fillOpacity={d.muted ? 0.4 : 1} />
             ))}
@@ -107,7 +105,7 @@ export function SimpleBarChart({
         />
         <YAxis hide />
         {tooltip}
-        <Bar dataKey="value" radius={[3, 3, 0, 0]} isAnimationActive={!reduce}>
+        <Bar dataKey="value" radius={[3, 3, 0, 0]} isAnimationActive={false}>
           {data.map((d, i) => (
             <Cell key={i} fill={LOW} fillOpacity={d.muted ? 0.4 : 1} />
           ))}

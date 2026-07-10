@@ -2,7 +2,7 @@
 
 import { BarChart, Bar, XAxis, YAxis, LabelList, ResponsiveContainer } from "recharts";
 import type { ConstructionEraDistribution } from "@/lib/area-types";
-import { ChartEmpty, usePrefersReducedMotion } from "@/components/charts/chart-theme";
+import { ChartEmpty } from "@/components/charts/chart-theme";
 
 interface ConstructionEraChartProps {
   construction_era: ConstructionEraDistribution;
@@ -13,7 +13,6 @@ const ERA_ORDER = ["Pre-1900", "1900-1950", "1950-1980", "1980-2000", "2000+"];
 /** Fig. 4 — construction era, chronological, single hue. Rhymes with Fig. 2.
  *  The old tiles + legend duplication folds into the frame's footnote. */
 export function ConstructionEraChart({ construction_era }: ConstructionEraChartProps) {
-  const reduce = usePrefersReducedMotion();
 
   if (
     !construction_era.median_year ||
@@ -74,7 +73,7 @@ export function ConstructionEraChart({ construction_era }: ConstructionEraChartP
           fill="var(--color-ledger-accent)"
           radius={[0, 3, 3, 0]}
           barSize={16}
-          isAnimationActive={!reduce}
+          isAnimationActive={false}
         >
           <LabelList dataKey="count" content={renderLabel} />
         </Bar>

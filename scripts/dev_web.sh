@@ -2,7 +2,8 @@
 # Run the estate-value-index web app locally.
 #
 # Starts the FastAPI model server (:8000) and the Next.js dev server (:3000),
-# and regenerates the web app's derived data (value analysis + area statistics)
+# and regenerates the web app's derived data (value analysis, area statistics,
+# overall statistics)
 # from the model in web/models/ and the local dataset.
 #
 #   ./scripts/dev_web.sh                 start; regenerate derived data if missing
@@ -23,6 +24,7 @@ WEB_PORT="${WEB_PORT:-3000}"
 MODEL="web/models/price_prediction_model_no_list_price.joblib"
 VALUE_JSON="data/derived/value_analysis.json"
 AREA_JSON="data/derived/area_statistics.json"
+OVERALL_JSON="data/derived/overall_statistics.json"
 
 refresh=false
 skip_data=false
@@ -51,7 +53,7 @@ if [[ ! -f "$DATA_FILE" ]]; then
   exit 1
 fi
 
-if ! $skip_data && { $refresh || [[ ! -f "$VALUE_JSON" ]] || [[ ! -f "$AREA_JSON" ]]; }; then
+if ! $skip_data && { $refresh || [[ ! -f "$VALUE_JSON" ]] || [[ ! -f "$AREA_JSON" ]] || [[ ! -f "$OVERALL_JSON" ]]; }; then
   echo ">> regenerating derived data from $DATA_FILE + web/models ..."
   uv run python -m estate_value_index.cli value-analysis \
     --data-file "$DATA_FILE" --models-dir web/models --model-type no_list_price \
@@ -59,6 +61,9 @@ if ! $skip_data && { $refresh || [[ ! -f "$VALUE_JSON" ]] || [[ ! -f "$AREA_JSON
   uv run python -m estate_value_index.cli areas \
     --data-source json --raw-listings "$DATA_FILE" \
     --value-analysis "$VALUE_JSON" --output "$AREA_JSON"
+  uv run python -m estate_value_index.cli overall-stats \
+    --data-source json --raw-listings "$DATA_FILE" \
+    --value-analysis "$VALUE_JSON" --output "$OVERALL_JSON"
 else
   echo ">> using existing derived data (pass --refresh-data to regenerate)"
 fi

@@ -28,7 +28,7 @@ export function StatsHero({
       <PageHero
         chapter="04"
         eyebrow="Statistics"
-        title="The Full Ledger"
+        title="Stockholm in Numbers"
         lead={
           <>
             Every recorded apartment sale in the register, read as one document:{" "}

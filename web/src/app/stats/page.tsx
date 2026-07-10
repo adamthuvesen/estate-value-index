@@ -20,7 +20,7 @@ import { RecordsSection } from "@/components/stats/sections/records-section";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Statistics — The Full Ledger",
+  title: "Statistics — Stockholm in Numbers",
   description:
     "A city-wide statistical report over every recorded Stockholm apartment sale — prices, bidding, geography, building stock, and the record book.",
 };
@@ -81,7 +81,7 @@ export default async function StatsPage() {
         <PageHero
           chapter="04"
           eyebrow="Statistics"
-          title="The Full Ledger"
+          title="Stockholm in Numbers"
           lead="A city-wide statistical report over every recorded Stockholm apartment sale."
         />
         <div className="mt-10 rounded-sm border border-val-over-line bg-val-over-tint px-6 py-10 text-center">
