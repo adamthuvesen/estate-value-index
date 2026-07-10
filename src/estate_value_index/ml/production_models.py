@@ -29,6 +29,7 @@ from estate_value_index.ml import (
     filter_valid_listings,
 )
 from estate_value_index.ml.ask_price import mask_ask_price_signals
+from estate_value_index.ml.estimate_range_factors import compute_estimate_range_factors
 from estate_value_index.ml.features.context import FeatureEngineeringContext
 from estate_value_index.ml.market_normalized_target import (
     _market_index,
@@ -286,6 +287,7 @@ def train_and_persist_production_models(
         predictions = evaluation_model.predict(eval_test)
         heldout_metrics = _prediction_metrics(y_test, predictions)
         calibration = _calibration_report(evaluation_model, eval_test, y_test, served=predictions)
+        estimate_range_factors = compute_estimate_range_factors(eval_test, predictions)
 
         production_model = fit_tiered_production_model(
             filtered,
@@ -297,6 +299,7 @@ def train_and_persist_production_models(
             production_model,
             heldout_metrics=heldout_metrics,
             calibration=calibration,
+            estimate_range_factors=estimate_range_factors,
             train_rows=len(train_raw),
             test_rows=len(test_raw),
             production_rows=len(filtered),
@@ -679,6 +682,7 @@ def _metrics_payload(
     *,
     heldout_metrics: dict[str, float],
     calibration: dict[str, object],
+    estimate_range_factors: dict[str, object],
     train_rows: int,
     test_rows: int,
     production_rows: int,
@@ -702,6 +706,7 @@ def _metrics_payload(
         "categorical_features": model.categorical_features,
         "heldout": heldout_metrics,
         "calibration": calibration,
+        "estimate_range_factors": estimate_range_factors,
         "n_train": train_rows,
         "n_test": test_rows,
         "production_n_train": production_rows,

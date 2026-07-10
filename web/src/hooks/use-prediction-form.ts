@@ -293,9 +293,14 @@ export function usePredictionForm({
   const modelLabel = modelLabels[resolvedModelKey] ?? modelLabels[formData.model] ?? "Auto";
 
   const listingPriceValue = Number(formData.listing_price || 0);
-  const rawEstimate = prediction?.rounded_predicted_price ?? prediction?.predicted_price ?? null;
-  // The UI shows a value window, never the raw point estimate.
-  const displayedEstimateRange = rawEstimate !== null ? estimateRange(rawEstimate) : null;
+  const rawEstimate = prediction?.predicted_price ?? prediction?.rounded_predicted_price ?? null;
+  // The UI shows a value window, never the raw point estimate. Recompute from the
+  // same predicted price and factors the API used so the window matches exactly;
+  // estimateRange falls back to baked factors when the artifact carries none.
+  const displayedEstimateRange =
+    rawEstimate !== null
+      ? estimateRange(rawEstimate, prediction?.estimate_range_factors ?? undefined)
+      : null;
   const anchorPrice = prediction?.input_data.listing_price ?? listingPriceValue;
   const priceDifference = displayedEstimateRange !== null && anchorPrice > 0
     ? displayedEstimateRange.center - anchorPrice

@@ -48,9 +48,7 @@ export function PredictionResults({
                   <span className="text-title text-ledger-muted">kr</span>
                 </span>
               </p>
-              <p className="mt-2 text-caption text-ledger-dimmed">
-                ±{formatNumber(estimateRange.halfWidth)} kr window around the model estimate
-              </p>
+              <p className="mt-2 text-caption text-ledger-dimmed">Estimated range</p>
             </div>
 
             {priceDifference !== null && (

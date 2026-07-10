@@ -8,6 +8,7 @@ Usage:
 import asyncio
 import hashlib
 import hmac
+import json
 import logging
 import os
 import sys
@@ -32,6 +33,7 @@ from estate_value_index.model_artifacts import (
     DEFAULT_MODEL_PREFIX,
     LISTING_MODEL_ID,
     NO_LIST_MODEL_ID,
+    production_artifact_names,
     production_model_files,
     required_production_artifact_files,
 )
@@ -247,6 +249,9 @@ class PredictionResponse(BaseModel):
     model_id: str
     requires_listing_price: bool
     status: str = "success"
+    # Per-bucket q35/q65 factors driving the displayed value window; null when
+    # the model artifact predates the estimate_range_factors block.
+    estimate_range_factors: dict | None = None
 
 
 class HealthResponse(BaseModel):
@@ -342,6 +347,24 @@ def _verify_model_integrity(model_path: Path) -> str:
     return observed
 
 
+def _load_estimate_range_factors(models_dir: Path, model_id: str) -> dict | None:
+    """Read the estimate_range_factors block from a model's metrics sidecar.
+
+    Returns None when the metrics file is absent or predates the block, so the
+    web app falls back to its baked factors.
+    """
+    metrics_path = models_dir / production_artifact_names(model_id, DEFAULT_MODEL_PREFIX).metrics
+    if not metrics_path.exists():
+        return None
+    try:
+        metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as exc:
+        logger.warning("Could not read metrics for %s: %s", model_id, exc)
+        return None
+    factors = metrics.get("estimate_range_factors")
+    return factors if isinstance(factors, dict) else None
+
+
 def load_all_models(models_dir: Path) -> dict[str, dict]:
     """Load all available models into memory on startup.
 
@@ -382,6 +405,7 @@ def load_all_models(models_dir: Path) -> dict[str, dict]:
             "sha256": digest,
             "requires_listing_price": bool(getattr(model, "requires_listing_price", False)),
             "model_type": getattr(model, "model_type", model_type),
+            "estimate_range_factors": _load_estimate_range_factors(models_dir, model_type),
         }
         logger.info(
             "Loaded %s model: %s (sha256=%s..., %.1fs)",
@@ -445,6 +469,7 @@ async def predict(request: PredictionRequest):
             model_id=model_type,
             requires_listing_price=bool(cached.get("requires_listing_price", False)),
             status="success",
+            estimate_range_factors=cached.get("estimate_range_factors"),
         )
 
     except HTTPException:
