@@ -2,6 +2,8 @@
 
 ![License](https://img.shields.io/github/license/adamthuvesen/estate-value-index) ![Python](https://img.shields.io/badge/python-3.11%2B-blue)
 
+![Value Finder — every recent sale scored against the model's estimate](docs/assets/value-finder.png)
+
 This repo predicts sale prices for Swedish residential listings, end to end: ingest authorized
 listing data, land it in BigQuery, engineer features, train LightGBM, and serve
 predictions from a FastAPI + Next.js container on Cloud Run.
