@@ -13,8 +13,6 @@ name: ML Pipeline
 #   GCS_BUCKET
 
 on:
-  schedule:
-    - cron: "10 3 * * 0"
   workflow_dispatch:
     inputs:
       environment:
