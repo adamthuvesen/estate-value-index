@@ -50,7 +50,6 @@ tests/
 *.spec.ts
 
 # Notebooks (not needed for production)
-notebooks/
 *.ipynb
 
 # Reports (not needed for production)

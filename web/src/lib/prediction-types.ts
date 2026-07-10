@@ -1,3 +1,5 @@
+import type { EstimateRangeFactors } from "./estimate-range";
+
 export interface PredictionInput {
   listing_id: string;
   listing_price: string;
@@ -41,6 +43,8 @@ export interface PredictionResult {
   price_range_min: number;
   price_range_max: number;
   price_range_step: number;
+  /** Per-bucket window factors for this prediction; null when the model artifact predates them. */
+  estimate_range_factors: EstimateRangeFactors | null;
   input_data: PredictionPayload;
   confidence: string;
   timestamp: string;

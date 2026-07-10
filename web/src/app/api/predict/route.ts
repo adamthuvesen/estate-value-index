@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { coerceBool } from '@/lib/booli-listing-parser';
-import { estimateRange } from '@/lib/estimate-range';
+import {
+  estimateRange,
+  estimateRangeFactorsFromArtifact,
+  type EstimateRangeFactors,
+} from '@/lib/estimate-range';
 
 type PredictionRequestBody = {
   listing_id?: unknown;
@@ -46,6 +50,7 @@ type FastAPIResponse = {
   model_id: string;
   requires_listing_price: boolean;
   status: string;
+  estimate_range_factors?: unknown;
 };
 
 const API_BASE_URL = process.env.PREDICTION_API_URL || 'http://localhost:8000';
@@ -151,11 +156,11 @@ function parseOptionalBoolean(value: unknown): boolean | null {
   return parsed;
 }
 
-function predictionRange(predictedPrice: number) {
-  // estimateRange is the single source of truth for the displayed window (nearest
-  // 100k, ±100k <6M / ±200k ≥6M / ±300k >12M). The UI recomputes from
-  // rounded_predicted_price, so the API must round the same way to agree.
-  const range = estimateRange(predictedPrice);
+function predictionRange(predictedPrice: number, factors?: EstimateRangeFactors) {
+  // estimateRange is the single source of truth for the displayed window: an
+  // empirical per-bucket q35/q65 interval. The client recomputes from
+  // predicted_price with the same factors, so both agree.
+  const range = estimateRange(predictedPrice, factors);
   return {
     rounded_predicted_price: range.center,
     price_range_min: Math.max(0, range.min),
@@ -262,11 +267,14 @@ export async function POST(request: NextRequest) {
 
       const prediction = (await response.json()) as FastAPIResponse;
       const predictedPrice = Math.round(prediction.predicted_price);
+      const factors =
+        estimateRangeFactorsFromArtifact(prediction.estimate_range_factors) ?? undefined;
 
       return NextResponse.json({
         listing_id: parsedPayload.listingId,
         predicted_price: predictedPrice,
-        ...predictionRange(predictedPrice),
+        ...predictionRange(predictedPrice, factors),
+        estimate_range_factors: factors ?? null,
         model_used: prediction.model_used,
         model_id: prediction.model_id,
         model_type: prediction.model_type,

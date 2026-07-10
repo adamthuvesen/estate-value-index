@@ -513,7 +513,7 @@ if __name__ == "__main__":
         "--config-file",
         type=str,
         default=None,
-        help="Path to config file (e.g., ingestion/config/booli_solna_sundbyberg.json)",
+        help="Path to config file (e.g., ingestion/config/booli_all_locations.json)",
     )
     parser.add_argument("--tune", action="store_true", help="Enable hyperparameter tuning")
     parser.add_argument(

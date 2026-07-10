@@ -15,8 +15,7 @@ import { binIndexForValue, histogramBars } from "@/lib/histogram";
 import {
   axisDefaults,
   chartColors,
-  ChartTooltip,
-  usePrefersReducedMotion,
+  ChartTooltip
 } from "@/components/charts/chart-theme";
 import { formatNumber } from "@/lib/format";
 
@@ -46,7 +45,6 @@ export function HistogramBarChart({
   reference = null,
   diverging = null,
 }: HistogramBarChartProps) {
-  const reduce = usePrefersReducedMotion();
   const bars = histogramBars(hist);
   const tickInterval = Math.max(0, Math.ceil(bars.length / 6) - 1);
 
@@ -94,7 +92,7 @@ export function HistogramBarChart({
             return bar ? `${xFormat(bar.start)} – ${xFormat(bar.end)}` : "";
           }}
         />
-        <Bar dataKey="count" isAnimationActive={!reduce}>
+        <Bar dataKey="count" isAnimationActive={false}>
           {bars.map((bar) => {
             const above = diverging ? bar.start >= diverging.threshold : false;
             return (

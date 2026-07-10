@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from estate_value_index.analytics.model_suite import (
+from estate_value_index.experiments.model_suite import (
     DEFAULT_DATA_FILE,
     DEFAULT_LISTING_FEATURE_SET,
     DEFAULT_NO_LIST_FEATURE_SET,

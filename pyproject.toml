@@ -216,7 +216,6 @@ exclude = [
     "build",
     "dist",
     "node_modules",
-    "notebooks",
     "web",
 ]
 

@@ -53,7 +53,7 @@ def run_scrapy_spider(
         max_pages: Maximum number of pages to scrape
         concurrent_requests: Number of concurrent requests
         delay: Download delay in seconds
-        config_file: Optional path to config file (e.g., ingestion/config/booli_solna_sundbyberg.json)
+        config_file: Optional path to config file (e.g., ingestion/config/booli_all_locations.json)
         start_page: Optional start page for the spider (defaults to spider's default)
         output_file: Optional path to output JSONL file
 
@@ -489,7 +489,7 @@ def complete_scrape_flow(
         materialize_features: Materialize features in BigQuery
         upload_to_cloud: Upload to GCS
         sync_after_upload: Sync local file from BigQuery after upload
-        config_file: Optional path to config file (e.g., ingestion/config/booli_solna_sundbyberg.json)
+        config_file: Optional path to config file (e.g., ingestion/config/booli_all_locations.json)
 
     Returns:
         Complete flow results dict

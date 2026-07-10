@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from estate_value_index.analytics.ppsqm_blend import (
+from estate_value_index.experiments.ppsqm_blend import (
     DEFAULT_DATA_FILE,
     DEFAULT_OUTPUT_DIR,
     run_ppsqm_blend_experiment,

@@ -45,10 +45,10 @@ ingestion, feature materialization, training, and deployment. The four flows und
 | ---- | ----- |
 | Ingestion | `src/estate_value_index/ingestion/`, `scrapy.cfg`, `uv run python -m estate_value_index.cli process` |
 | Pipeline orchestration | `src/estate_value_index/pipelines/core/` (flows), `pipelines/tasks/` (Prefect tasks), `prefect.yaml` |
-| Feature engineering and training | `src/estate_value_index/ml/` (incl. `ml/features/`, `ml/training_workflow/`, `ml/production_models.py`) |
-| Analytics generation | `src/estate_value_index/analytics/` (area statistics, value analysis) |
-| Monitoring | `src/estate_value_index/monitoring/` (drift detection) |
-| Cost/ops | `src/estate_value_index/ops/` |
+| Feature engineering and training | `src/estate_value_index/ml/` (incl. `ml/features/`, `ml/training_workflow/`, `ml/production_models.py` and its model stack: `market_normalized_target`, `residual_calibration`, `production_residual_calibration`, `specialist_model`, `premium_specialist`, `tiered_ensemble`) |
+| Analytics generation | `src/estate_value_index/analytics/` (web-JSON generators: area statistics, value analysis, overall statistics) |
+| Model experiments | `src/estate_value_index/experiments/` (one-off experiments run via `cli/*_experiment.py`; artifacts in `reports/`, writeups in `docs/internal/experiments/`) |
+| Monitoring and cost | `src/estate_value_index/monitoring/` (drift detection, cost monitoring) |
 | Shared utilities | `src/estate_value_index/utils/` (settings, GCP client factory, GCS, BigQuery safety) |
 | Prediction API | `api_server.py` |
 | Web app and Next API routes | `web/src/app/`, `web/src/app/api/` |
@@ -61,7 +61,7 @@ Imports flow one way, top to bottom. Keep it that way:
 
 ```text
 cli / pipelines        (entry points, orchestration)
-   -> analytics / ml / ingestion / monitoring / ops   (domain logic)
+   -> analytics / ml / experiments / ingestion / monitoring   (domain logic)
       -> utils         (settings, clients, gcs, bigquery_safety; no domain imports)
 ```
 
@@ -88,7 +88,7 @@ cli / pipelines        (entry points, orchestration)
 
 - FastAPI rate limiting is in-process, so effective limits are per worker unless a shared backend is added.
 - Routes that scan `value_analysis` or area statistics JSON are acceptable at current sizes; index or pre-aggregate them if the files grow substantially.
-- `estate_value_index.ops.cost_monitoring` and the `costs` CLI report usage estimates, not invoiced billing.
+- `estate_value_index.monitoring.cost_monitoring` and the `costs` CLI report usage estimates, not invoiced billing.
 
 ## Generated artifacts
 

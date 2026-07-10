@@ -12,8 +12,7 @@ import {
 import {
   axisDefaults,
   chartColors,
-  ChartTooltip,
-  usePrefersReducedMotion,
+  ChartTooltip
 } from "@/components/charts/chart-theme";
 
 export interface TrendPoint {
@@ -49,7 +48,6 @@ export function TrendLineChart({
   reference = null,
   maxTicks = 7,
 }: TrendLineChartProps) {
-  const reduce = usePrefersReducedMotion();
   const axisFmt = axisFormat ?? valueFormat;
 
   const lastPartialIndex = data.findIndex((p) => p.partial);
@@ -108,7 +106,7 @@ export function TrendLineChart({
           stroke={chartColors.accent}
           strokeWidth={1.5}
           connectNulls={false}
-          isAnimationActive={!reduce}
+          isAnimationActive={false}
           dot={false}
           activeDot={{ r: 4 }}
         />
@@ -119,7 +117,7 @@ export function TrendLineChart({
           strokeWidth={1.5}
           strokeDasharray="4 4"
           connectNulls
-          isAnimationActive={!reduce}
+          isAnimationActive={false}
           dot={(props: { cx?: number; cy?: number; index?: number; payload?: TrendPoint }) => {
             const { cx, cy, index, payload } = props;
             if (cx == null || cy == null || !payload?.partial) return <g key={index} />;

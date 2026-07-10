@@ -2,7 +2,7 @@
 
 import { BarChart, Bar, XAxis, YAxis, Cell, LabelList, ResponsiveContainer } from "recharts";
 import type { PriceBySizeBucket } from "@/lib/area-types";
-import { ChartEmpty, usePrefersReducedMotion } from "@/components/charts/chart-theme";
+import { ChartEmpty } from "@/components/charts/chart-theme";
 import { formatRawNumber, formatSek, formatShortThousands } from "@/lib/format";
 
 interface SizePriceChartProps {
@@ -16,7 +16,6 @@ const LOW_COUNT = 3;
 /** Fig. 3 — median sold price across living-area bands. One hue; buckets with
  *  fewer than 3 sales are muted (thin evidence). Chart ⇄ Table via the frame. */
 export function SizePriceChart({ price_by_size, view }: SizePriceChartProps) {
-  const reduce = usePrefersReducedMotion();
   const data = price_by_size ?? [];
 
   if (data.length === 0) {
@@ -91,7 +90,7 @@ export function SizePriceChart({ price_by_size, view }: SizePriceChartProps) {
           interval={0}
         />
         <YAxis hide />
-        <Bar dataKey="median_price" radius={[3, 3, 0, 0]} isAnimationActive={!reduce}>
+        <Bar dataKey="median_price" radius={[3, 3, 0, 0]} isAnimationActive={false}>
           {data.map((entry) => (
             <Cell
               key={entry.bucket}

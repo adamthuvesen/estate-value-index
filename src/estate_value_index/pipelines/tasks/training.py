@@ -202,7 +202,7 @@ def rebuild_container_task(
     logger = get_task_logger(__name__)
     logger.info(f"Rebuilding container: {image_name}:{image_tag}")
 
-    cmd = ["./scripts/vertex_ai/build_and_push.sh", "--image", image_name, "--tag", image_tag]
+    cmd = ["./vertex_ai/build_and_push.sh", "--image", image_name, "--tag", image_tag]
     if dry_run:
         cmd.append("--dry-run")
 
@@ -251,7 +251,7 @@ def submit_vertex_training_job_task(
     logger = get_task_logger(__name__)
     logger.info("Submitting Vertex AI production training job (machine=%s)", machine_type)
 
-    cmd = ["./scripts/vertex_ai/submit_custom_job.sh", "--machine-type", machine_type]
+    cmd = ["./vertex_ai/submit_custom_job.sh", "--machine-type", machine_type]
     if image_uri:
         cmd.extend(["--image-uri", image_uri])
     if display_name:

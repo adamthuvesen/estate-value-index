@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from estate_value_index.analytics.high_end_weighting import (
+from estate_value_index.experiments.high_end_weighting import (
     DEFAULT_CURVE_POWER,
     DEFAULT_DATA_FILE,
     DEFAULT_MAX_WEIGHT,

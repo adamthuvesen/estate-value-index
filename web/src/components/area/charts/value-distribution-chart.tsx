@@ -10,7 +10,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { VALUE_TIERS, type ValueTier } from "@/lib/value-finder-types";
-import { chartPalette, ChartEmpty, usePrefersReducedMotion } from "@/components/charts/chart-theme";
+import { chartPalette, ChartEmpty } from "@/components/charts/chart-theme";
 
 interface ValueDistributionChartProps {
   value_tier_distribution: Record<string, number>;
@@ -19,7 +19,6 @@ interface ValueDistributionChartProps {
 /** Fig. 2 — value-tier counts as horizontal bars, coloured strictly by the
  *  val.* tier scale, with direct end labels `count · share`. */
 export function ValueDistributionChart({ value_tier_distribution }: ValueDistributionChartProps) {
-  const reduce = usePrefersReducedMotion();
   const data = VALUE_TIERS.filter((tier) => value_tier_distribution[tier] > 0).map((tier) => ({
     name: tier as ValueTier,
     value: value_tier_distribution[tier],
@@ -73,7 +72,7 @@ export function ValueDistributionChart({ value_tier_distribution }: ValueDistrib
           tickLine={false}
           axisLine={false}
         />
-        <Bar dataKey="value" radius={[0, 3, 3, 0]} isAnimationActive={!reduce} barSize={16}>
+        <Bar dataKey="value" radius={[0, 3, 3, 0]} isAnimationActive={false} barSize={16}>
           {data.map((entry) => (
             <Cell key={entry.name} fill={entry.color} />
           ))}

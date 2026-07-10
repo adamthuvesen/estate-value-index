@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from estate_value_index.analytics.specialist_model import (
+from estate_value_index.ml.specialist_model import (
     DEFAULT_DATA_FILE,
     DEFAULT_GATE_COMP_VALUE_MIN,
     DEFAULT_GATE_LUXURY_SCORE_MIN,

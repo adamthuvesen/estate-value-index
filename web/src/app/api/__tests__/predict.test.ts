@@ -134,7 +134,7 @@ describe('/api/predict', () => {
     })
 
     it('clamps the lower range bound at zero', async () => {
-      mockFastApiPrediction(130_000)
+      mockFastApiPrediction(50_000)
 
       const response = await POST(makeRequest({ living_area: 12 }))
       const data = await response.json()
@@ -142,7 +142,7 @@ describe('/api/predict', () => {
       expect(response.status).toBe(200)
       expect(data.rounded_predicted_price).toBe(100_000)
       expect(data.price_range_min).toBe(0)
-      expect(data.price_range_max).toBe(200_000)
+      expect(data.price_range_max).toBe(100_000)
     })
   })
 })

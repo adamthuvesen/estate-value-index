@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from argparse import Namespace
 
-from estate_value_index.ops.cost_monitoring import (
+from estate_value_index.monitoring.cost_monitoring import (
     monitor_bigquery_costs,
     monitor_gcs_costs,
     monitor_vertex_ai_costs,

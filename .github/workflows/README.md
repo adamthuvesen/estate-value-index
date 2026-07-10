@@ -122,33 +122,6 @@ gh workflow run ml-pipeline.yml -f environment=staging -f mode=local -f tune=fal
 | `tune` | true, false | true | Enable hyperparameter tuning |
 | `deploy` | true, false | false | Deploy to Cloud Run after training |
 
----
-
-## 🧯 Local Catch-up Backfill
-
-Backfill is local/private only, not a public GitHub Actions workflow.
-
-### What it does:
-
-1. Runs the primary catch-up window from `2025-12-22` through today with weekly windows
-2. Uses conservative source-access defaults: `max_pages=20`, `concurrent=1`, `delay=1.0`
-3. Retries each ingestion window twice and fails if validation drops below 50%
-4. Falls back to `2026-04-27` through today with `max_pages=10`, `delay=2.0`
-5. Processes `all_dedup.jsonl`, uploads through the BigQuery MERGE path, materializes features with truncate, syncs back to local/GCS, then retrains and deploys
-
-The script defaults to `DRY_RUN=true`, which prints the planned windows and makes no cloud changes.
-Run it only with data access you are allowed to use; the public repo does not ship or
-redistribute scraped listing data.
-
-Local GCP scripts guard against the wrong human account. They expect
-`a.thuvesen@gmail.com` and refuse `adam.thuvesen@mentimeter.com`.
-
-```bash
-DRY_RUN=true bash scripts/run_catchup_backfill.sh
-DRY_RUN=false bash scripts/run_catchup_backfill.sh
-bash scripts/plan_cloud_cleanup.sh --dry-run
-```
-
 ### Costs:
 
 | Configuration | Duration | Estimated Cost |

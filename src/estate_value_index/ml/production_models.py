@@ -6,8 +6,8 @@ The public serving contract has two model ids:
 - ``with_list_price``: uses the listing price when it is available.
 
 ``TieredProductionModel`` wraps the tier-spec, gating, and blend-selection
-helpers from ``analytics.tiered_ensemble`` — the experiment track that won
-over ``analytics.specialist_model`` and ``analytics.premium_specialist``.
+helpers from ``ml.tiered_ensemble`` — the experiment track that won
+over ``ml.specialist_model`` and ``ml.premium_specialist``.
 """
 
 from __future__ import annotations
@@ -22,7 +22,16 @@ import joblib
 import numpy as np
 import pandas as pd
 
-from estate_value_index.analytics.market_normalized_target import (
+from estate_value_index.ml import (
+    build_feature_context,
+    create_optimized_features,
+    create_temporal_holdout_split,
+    filter_valid_listings,
+)
+from estate_value_index.ml.ask_price import mask_ask_price_signals
+from estate_value_index.ml.estimate_range_factors import compute_estimate_range_factors
+from estate_value_index.ml.features.context import FeatureEngineeringContext
+from estate_value_index.ml.market_normalized_target import (
     _market_index,
     blend_market_predictions,
     denormalize_market_predictions,
@@ -30,7 +39,7 @@ from estate_value_index.analytics.market_normalized_target import (
     normalize_prices_to_market_index,
     select_best_market_blend_weight,
 )
-from estate_value_index.analytics.residual_calibration import (
+from estate_value_index.ml.residual_calibration import (
     CENTRAL_AREAS,
     _feature_set_requires_listing_price,
     _fit_residual_calibrator,
@@ -40,7 +49,7 @@ from estate_value_index.analytics.residual_calibration import (
     apply_calibration_correction,
     build_calibration_features,
 )
-from estate_value_index.analytics.tiered_ensemble import (
+from estate_value_index.ml.tiered_ensemble import (
     DEFAULT_INFERENCE_GATE_HIGH_MIN,
     DEFAULT_INFERENCE_GATE_LOW_MAX,
     DEFAULT_MIN_SEGMENT_ROWS,
@@ -61,14 +70,6 @@ from estate_value_index.analytics.tiered_ensemble import (
     select_best_expert_weights,
     select_gated_expert_weights,
 )
-from estate_value_index.ml import (
-    build_feature_context,
-    create_optimized_features,
-    create_temporal_holdout_split,
-    filter_valid_listings,
-)
-from estate_value_index.ml.ask_price import mask_ask_price_signals
-from estate_value_index.ml.features.context import FeatureEngineeringContext
 from estate_value_index.ml.training_workflow.data import load_training_dataframe
 from estate_value_index.ml.training_workflow.runner import _context_payload
 from estate_value_index.model_artifacts import (
@@ -93,7 +94,7 @@ DEFAULT_LISTING_FEATURE_SET = "with_list_price_v1"
 # predictions where the tiered model still underpredicts. Offline proof showed
 # global calibration worsened aggregate bias by nudging the well-calibrated
 # mid-market down; restricting to the tail improves MAE, bias, and the high-end
-# at once. See analytics/production_residual_calibration.py.
+# at once. See ml/production_residual_calibration.py.
 DEFAULT_CALIBRATION_MAX_ABS = 1_000_000.0
 DEFAULT_CALIBRATION_MAX_FRAC = 0.12
 DEFAULT_CALIBRATION_MIN_PREDICTION = 8_000_000.0
@@ -286,6 +287,7 @@ def train_and_persist_production_models(
         predictions = evaluation_model.predict(eval_test)
         heldout_metrics = _prediction_metrics(y_test, predictions)
         calibration = _calibration_report(evaluation_model, eval_test, y_test, served=predictions)
+        estimate_range_factors = compute_estimate_range_factors(eval_test, predictions)
 
         production_model = fit_tiered_production_model(
             filtered,
@@ -297,6 +299,7 @@ def train_and_persist_production_models(
             production_model,
             heldout_metrics=heldout_metrics,
             calibration=calibration,
+            estimate_range_factors=estimate_range_factors,
             train_rows=len(train_raw),
             test_rows=len(test_raw),
             production_rows=len(filtered),
@@ -679,6 +682,7 @@ def _metrics_payload(
     *,
     heldout_metrics: dict[str, float],
     calibration: dict[str, object],
+    estimate_range_factors: dict[str, object],
     train_rows: int,
     test_rows: int,
     production_rows: int,
@@ -702,6 +706,7 @@ def _metrics_payload(
         "categorical_features": model.categorical_features,
         "heldout": heldout_metrics,
         "calibration": calibration,
+        "estimate_range_factors": estimate_range_factors,
         "n_train": train_rows,
         "n_test": test_rows,
         "production_n_train": production_rows,

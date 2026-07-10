@@ -2,6 +2,8 @@
 
 ![License](https://img.shields.io/github/license/adamthuvesen/estate-value-index) ![Python](https://img.shields.io/badge/python-3.11%2B-blue)
 
+![Value Finder — every recent sale scored against the model's estimate](docs/assets/value-finder.png)
+
 This repo predicts sale prices for Swedish residential listings, end to end: ingest authorized
 listing data, land it in BigQuery, engineer features, train LightGBM, and serve
 predictions from a FastAPI + Next.js container on Cloud Run.
@@ -73,35 +75,6 @@ GCS_BUCKET=your-gcs-bucket
 Config precedence is environment variables -> [config/pipeline_config.yaml](config/pipeline_config.yaml)
 -> code defaults. Inspect resolved settings with
 `uv run python -m estate_value_index.utils.settings`.
-
-## Public demo
-
-You can inspect the no-secret fixture output without cloud access:
-
-```bash
-uv run python -m json.tool tests/fixtures/synthetic_value_analysis.json
-```
-
-Representative output:
-
-```json
-{
-  "statistics": {
-    "total_properties": 2,
-    "undervalued_count": 1,
-    "overvalued_count": 1,
-    "model_performance": {
-      "mae": 250000,
-      "rmse": 310000,
-      "mape": 4.5
-    }
-  }
-}
-```
-
-This is a toy fixture, not a public benchmark. It proves the output shape and UI/API
-contract. It does not reproduce private listings, geocodes, trained models, cloud state,
-or production performance.
 
 ## Run locally
 

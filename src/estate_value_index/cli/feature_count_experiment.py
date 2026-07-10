@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from estate_value_index.analytics.feature_count import (
+from estate_value_index.experiments.feature_count import (
     DEFAULT_DATA_FILE,
     DEFAULT_FEATURE_COUNTS,
     DEFAULT_OUTPUT_DIR,

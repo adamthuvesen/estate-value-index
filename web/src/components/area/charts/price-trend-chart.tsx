@@ -13,8 +13,7 @@ import type { MonthlySeries, PriceUnit } from "@/lib/price-trend";
 import {
   axisDefaults,
   chartColors,
-  ChartTooltip,
-  usePrefersReducedMotion,
+  ChartTooltip
 } from "@/components/charts/chart-theme";
 import {
   formatSek,
@@ -33,7 +32,6 @@ const HEIGHT = 240;
 /** Fig. 1 — honest price trend. Line when ≥3 real months; a direct-labeled
  *  3/6/12-month medians dumbbell otherwise. Never fabricates a filled line. */
 export function PriceTrendChart({ series, unit }: PriceTrendChartProps) {
-  const reduce = usePrefersReducedMotion();
   const perSqm = unit === "per_sqm";
   const axisFormat = (v: number) => (perSqm ? formatShortThousands(v) : formatShortSek(v));
   const fullFormat = (v: number) => (perSqm ? formatSekPerSqm(v) : formatSek(v));
@@ -102,7 +100,7 @@ export function PriceTrendChart({ series, unit }: PriceTrendChartProps) {
           stroke={chartColors.accent}
           strokeWidth={1.5}
           connectNulls={false}
-          isAnimationActive={!reduce}
+          isAnimationActive={false}
           dot={(props: { cx?: number; cy?: number; index?: number; payload?: { isReal?: boolean } }) => {
             const { cx, cy, index, payload } = props;
             if (cx == null || cy == null || !payload?.isReal) {
