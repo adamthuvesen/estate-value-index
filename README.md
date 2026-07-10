@@ -74,35 +74,6 @@ Config precedence is environment variables -> [config/pipeline_config.yaml](conf
 -> code defaults. Inspect resolved settings with
 `uv run python -m estate_value_index.utils.settings`.
 
-## Public demo
-
-You can inspect the no-secret fixture output without cloud access:
-
-```bash
-uv run python -m json.tool tests/fixtures/synthetic_value_analysis.json
-```
-
-Representative output:
-
-```json
-{
-  "statistics": {
-    "total_properties": 2,
-    "undervalued_count": 1,
-    "overvalued_count": 1,
-    "model_performance": {
-      "mae": 250000,
-      "rmse": 310000,
-      "mape": 4.5
-    }
-  }
-}
-```
-
-This is a toy fixture, not a public benchmark. It proves the output shape and UI/API
-contract. It does not reproduce private listings, geocodes, trained models, cloud state,
-or production performance.
-
 ## Run locally
 
 One command starts both servers and regenerates the web app's derived data
