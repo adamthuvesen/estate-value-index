@@ -73,6 +73,64 @@ def generate_area_statistics_task(
 
 
 @task(
+    name="generate-overall-statistics",
+    description="Generate city-wide statistics for web app",
+    retries=2,
+    retry_delay_seconds=30,
+    timeout_seconds=300,
+)
+def generate_overall_statistics_task(
+    output_file: Path | None = None,
+    data_source: str = "bigquery",
+    value_analysis_path: Path | None = None,
+    raw_listings_path: Path | None = None,
+) -> AnalyticsResult:
+    """Generate city-wide statistics for the web Stats page.
+
+    Args:
+        output_file: Path to write statistics
+        data_source: Data source - "bigquery" or "json"
+        value_analysis_path: Path to value_analysis.json
+        raw_listings_path: Path to raw listings JSON
+
+    Returns:
+        AnalyticsResult with generation statistics
+    """
+    logger = get_task_logger(__name__)
+
+    if output_file is None:
+        output_file = Path("data/derived/overall_statistics.json")
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+
+    logger.info(f"Generating overall statistics from {data_source}")
+
+    from estate_value_index.analytics.overall_statistics import generate_overall_statistics
+
+    generate_overall_statistics(
+        data_source=data_source,
+        value_analysis_path=value_analysis_path,
+        raw_listings_path=raw_listings_path,
+        output_path=output_file,
+    )
+
+    if not output_file.exists():
+        raise FileNotFoundError(f"Output file not created: {output_file}")
+
+    with open(output_file, encoding="utf-8") as f:
+        stats = json.load(f)
+        total_properties = stats.get("metadata", {}).get("total_properties", 0)
+
+    logger.info(f"Overall statistics generated: {total_properties} properties")
+
+    return AnalyticsResult(
+        success=True,
+        timestamp=datetime.now().isoformat(),
+        output_file=str(output_file),
+        records_generated=total_properties,
+    )
+
+
+@task(
     name="generate-value-analysis",
     description="Generate property value analysis predictions",
     retries=2,

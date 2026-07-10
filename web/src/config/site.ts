@@ -6,6 +6,7 @@ export const siteConfig = {
     { href: "/", label: "Predictor" },
     { href: "/value-finder", label: "Value Finder" },
     { href: "/areas", label: "Areas" },
+    { href: "/stats", label: "Statistics" },
   ],
   social: {
     github: "https://github.com/adamthuvesen",

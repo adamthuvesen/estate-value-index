@@ -44,6 +44,22 @@ export function formatPercent(value: number | null | undefined, decimals = 1): s
   return `${formatNumberOrDash(value, decimals)}%`;
 }
 
+/** Format a 0..1 fraction as a percentage string (multiplies by 100 first). */
+export function formatSharePct(
+  fraction: number | null | undefined,
+  decimals = 0,
+): string {
+  if (fraction === null || fraction === undefined) return "—";
+  return `${(fraction * 100).toFixed(decimals)}%`;
+}
+
+/** Signed percent with an explicit leading `+`/`−`, e.g. `+4.4%`. */
+export function formatSignedPct(value: number | null | undefined, decimals = 1): string {
+  if (value === null || value === undefined) return "—";
+  const sign = value > 0 ? "+" : value < 0 ? "−" : "";
+  return `${sign}${Math.abs(value).toFixed(decimals)}%`;
+}
+
 export function formatShortThousands(value: number): string {
   if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
   if (value >= 1_000) return `${Math.round(value / 1_000)}k`;
@@ -68,6 +84,24 @@ export function titleCaseArea(value: string): string {
     .filter(Boolean)
     .map((part) => part[0].toUpperCase() + part.slice(1))
     .join(" ");
+}
+
+const MONTH_ABBR = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+/** "2024-03" → "Mar ’24". Falls back to the input if it isn't `YYYY-MM`. */
+export function formatMonthShort(yearMonth: string): string {
+  const match = /^(\d{4})-(\d{2})$/.exec(yearMonth);
+  if (!match) return yearMonth;
+  const month = MONTH_ABBR[Number(match[2]) - 1] ?? match[2];
+  return `${month} ’${match[1].slice(2)}`;
+}
+
+/** Calendar-month index 1..12 → "Jan". */
+export function formatMonthOfYear(month: number): string {
+  return MONTH_ABBR[month - 1] ?? String(month);
 }
 
 export function formatDateSv(date: Date | string): string {

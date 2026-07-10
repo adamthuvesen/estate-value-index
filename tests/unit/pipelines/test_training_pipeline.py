@@ -372,7 +372,8 @@ class TestGenerateEnrichmentStage:
     @pytest.mark.unit
     def test_runs_when_validation_passed(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Value analysis must run before area statistics: area statistics reads
-        the value_analysis.json file that value analysis writes. Upload runs last."""
+        the value_analysis.json file that value analysis writes. Overall statistics
+        uses the same file, and upload runs last."""
         called: list[str] = []
         kwargs_by_task: dict[str, dict] = {}
 
@@ -396,6 +397,11 @@ class TestGenerateEnrichmentStage:
         )
         monkeypatch.setattr(
             pipeline_tasks,
+            "generate_overall_statistics_task",
+            _record("overall_stats", {"records_generated": 1}),
+        )
+        monkeypatch.setattr(
+            pipeline_tasks,
             "upload_enrichment_to_gcs_task",
             _record("upload", {"uploaded_files": 1}),
         )
@@ -404,10 +410,14 @@ class TestGenerateEnrichmentStage:
 
         _generate_enrichment_stage(TrainingFlowConfig(), results, MagicMock())
 
-        assert called == ["value_analysis", "area_stats", "upload"]
+        assert called == ["value_analysis", "area_stats", "overall_stats", "upload"]
         # Area statistics must read the exact file value analysis just wrote.
         assert (
             kwargs_by_task["area_stats"]["value_analysis_path"]
+            == kwargs_by_task["value_analysis"]["output_file"]
+        )
+        assert (
+            kwargs_by_task["overall_stats"]["value_analysis_path"]
             == kwargs_by_task["value_analysis"]["output_file"]
         )
         assert "enrichment" not in results["steps"]

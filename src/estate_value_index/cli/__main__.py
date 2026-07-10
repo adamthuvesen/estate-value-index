@@ -41,6 +41,10 @@ _COMMANDS: dict[str, Command] = {
         "Generate area statistics JSON for the web UI",
         "estate_value_index.cli.generate_area_statistics",
     ),
+    "overall-stats": Command(
+        "Generate city-wide statistics JSON for the web Stats page",
+        "estate_value_index.cli.generate_overall_statistics",
+    ),
     "value-analysis": Command(
         "Generate value analysis enrichment JSON",
         "estate_value_index.cli.generate_value_analysis",
