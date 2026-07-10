@@ -146,6 +146,14 @@
       transform: scaleX(1);
     }
   }
+  @keyframes barcode-grow {
+    0% {
+      transform: scaleY(0);
+    }
+    100% {
+      transform: scaleY(1);
+    }
+  }
 }
 
 /* ---------- Card ---------- */

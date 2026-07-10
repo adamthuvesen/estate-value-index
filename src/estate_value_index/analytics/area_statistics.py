@@ -265,6 +265,29 @@ def calculate_value_tier_distribution(value_properties: list[dict]) -> dict[str,
     return dict(tier_counts)
 
 
+# Construction eras in chronological order; shared by area and overall statistics.
+CONSTRUCTION_ERAS: tuple[str, ...] = (
+    "Pre-1900",
+    "1900-1950",
+    "1950-1980",
+    "1980-2000",
+    "2000+",
+)
+
+
+def construction_era_bucket(year: int) -> str:
+    """Map a construction year to its era label (see ``CONSTRUCTION_ERAS``)."""
+    if year < 1900:
+        return "Pre-1900"
+    if year < 1950:
+        return "1900-1950"
+    if year < 1980:
+        return "1950-1980"
+    if year < 2000:
+        return "1980-2000"
+    return "2000+"
+
+
 def calculate_construction_era_distribution(properties: list[dict]) -> dict[str, Any]:
     """Bucket construction years into eras: Pre-1900, 1900-1950, 1950-1980, 1980-2000, 2000+."""
     construction_years = [
@@ -284,16 +307,7 @@ def calculate_construction_era_distribution(properties: list[dict]) -> dict[str,
 
     era_counts = defaultdict(int)
     for year in construction_years:
-        if year < 1900:
-            era_counts["Pre-1900"] += 1
-        elif year < 1950:
-            era_counts["1900-1950"] += 1
-        elif year < 1980:
-            era_counts["1950-1980"] += 1
-        elif year < 2000:
-            era_counts["1980-2000"] += 1
-        else:
-            era_counts["2000+"] += 1
+        era_counts[construction_era_bucket(year)] += 1
 
     ages = [current_year - year for year in construction_years]
 

@@ -21,6 +21,9 @@ Permissioned listing source -> JSONL + upload path -> process_listings -> booli_
 - Pipeline tasks: `src/estate_value_index/pipelines/tasks/`
 - BigQuery schemas: `schemas/bq_raw_listings.json`, `schemas/bq_features_engineered.json`
 - Pipeline config: `config/pipeline_config.yaml`
+- Web enrichment JSON (`data/derived/`, synced to GCS): `area_statistics.json`,
+  `value_analysis.json`, and `overall_statistics.json` (city-wide stats for `/stats`;
+  regenerate with `uv run python -m estate_value_index.cli overall-stats`)
 
 ## Environment
 

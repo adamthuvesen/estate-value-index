@@ -482,6 +482,7 @@ def _generate_enrichment_stage(config: TrainingFlowConfig, results: dict, logger
     try:
         from estate_value_index.pipelines.tasks import (
             generate_area_statistics_task,
+            generate_overall_statistics_task,
             generate_value_analysis_task,
             upload_enrichment_to_gcs_task,
         )
@@ -512,6 +513,19 @@ def _generate_enrichment_stage(config: TrainingFlowConfig, results: dict, logger
         results["steps"]["area_statistics"] = area_stats_result
         logger.info(
             f"Generated statistics for {area_stats_result.get('records_generated', 0)} areas"
+        )
+
+        # Generate city-wide statistics for the web Stats page
+        overall_stats_result = generate_overall_statistics_task(
+            output_file=Path("data/derived/overall_statistics.json"),
+            data_source="bigquery",
+            value_analysis_path=value_analysis_path,
+            raw_listings_path=Path("data/raw/booli/booli_listings_prod.json"),
+        )
+        results["steps"]["overall_statistics"] = overall_stats_result
+        logger.info(
+            f"Generated overall statistics for "
+            f"{overall_stats_result.get('records_generated', 0)} properties"
         )
 
         # Upload enrichment data to GCS (for Cloud Run to access)

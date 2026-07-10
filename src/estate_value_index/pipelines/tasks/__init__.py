@@ -14,6 +14,7 @@ This module provides a unified interface to all pipeline tasks, organized by dom
 # Analytics tasks
 from .analytics import (
     generate_area_statistics_task,
+    generate_overall_statistics_task,
     generate_value_analysis_task,
     upload_enrichment_to_gcs_task,
 )
@@ -73,6 +74,7 @@ __all__ = [
     "verify_sync_task",
     # Analytics
     "generate_area_statistics_task",
+    "generate_overall_statistics_task",
     "generate_value_analysis_task",
     "upload_enrichment_to_gcs_task",
     # Training
