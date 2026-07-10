@@ -37,10 +37,11 @@ class BooliSpider(BooliExtractionMixins, scrapy.Spider):
         self.start_time = datetime.now()
         self.last_processed_page = None
         self.build_id = None
-        # parents[3] lands on the package root (estate_value_index/) — matches
-        # the previous dirname^4 chain that this replaced.
-        self.project_root = str(Path(__file__).resolve().parents[3])
-        self.build_id_cache_path = str(Path(self.project_root) / "cache" / "booli_build_id.txt")
+        # parents[5] lands on the repo root; keep the runtime cache out of the
+        # source package, under the repo data/ dir. The parent dir is created
+        # lazily when the build ID is first persisted.
+        repo_root = Path(__file__).resolve().parents[5]
+        self.build_id_cache_path = str(repo_root / "data" / "cache" / "booli_build_id.txt")
         # Enable debug logging for testing
         self.debug_extraction = kwargs.get("debug_extraction", False)
 

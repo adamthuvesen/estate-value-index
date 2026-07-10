@@ -71,8 +71,6 @@ docs/internal/
 # Jupyter
 .ipynb_checkpoints/
 *.ipynb_checkpoints
-notebooks/*.csv
-notebooks/*.ipynb
 
 # Test artifacts
 .pytest_cache/

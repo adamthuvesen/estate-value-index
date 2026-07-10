@@ -50,7 +50,7 @@ REVIEWED_DYNAMIC_SQL: dict[str, str] = {
     "estate_value_index.ingestion.bigquery_upload:_verify_row_count": (
         "`full_table_id` is the validated bq_table() result."
     ),
-    "estate_value_index.ops.cost_monitoring:monitor_bigquery_costs": (
+    "estate_value_index.monitoring.cost_monitoring:monitor_bigquery_costs": (
         "`project_id` is validated via _validate_bq_project_id() above; the region "
         "+ INFORMATION_SCHEMA.JOBS path components are static literals; `days` is a "
         "ScalarQueryParameter."

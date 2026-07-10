@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from estate_value_index.analytics.tiered_ensemble import (
+from estate_value_index.ml.tiered_ensemble import (
     DEFAULT_DATA_FILE,
     DEFAULT_INFERENCE_GATE_HIGH_MIN,
     DEFAULT_INFERENCE_GATE_LOW_MAX,

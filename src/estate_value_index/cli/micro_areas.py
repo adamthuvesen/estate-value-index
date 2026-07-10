@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from estate_value_index.analytics.micro_areas import (
+from estate_value_index.experiments.micro_areas import (
     DEFAULT_OUTPUT_DIR,
     MICRO_AREA_MIN_PRIOR_COUNT,
     generate_micro_area_report,

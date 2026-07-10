@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from estate_value_index.analytics.market_normalized_target import (
+from estate_value_index.ml.market_normalized_target import (
     DEFAULT_DATA_FILE,
     DEFAULT_OUTPUT_DIR,
     run_market_normalized_experiment,

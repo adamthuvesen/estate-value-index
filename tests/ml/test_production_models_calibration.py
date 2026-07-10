@@ -5,13 +5,13 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from estate_value_index.analytics.tiered_ensemble import TierSpec
 from estate_value_index.ml.production_models import (
     LISTING_MODEL_ID,
     NO_LIST_MODEL_ID,
     TieredProductionModel,
     _select_blend,
 )
+from estate_value_index.ml.tiered_ensemble import TierSpec
 
 
 class _StubCalibrator:

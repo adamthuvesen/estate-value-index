@@ -9,7 +9,7 @@ variables. They must not fall back to a real project name when config is missing
 ./scripts/setup_bigquery.sh --project your-gcp-project-id
 ./scripts/create_predictions_table.sh --project your-gcp-project-id
 ./scripts/cloud_run_disable.sh --project your-gcp-project-id
-./scripts/vertex_ai/build_and_push.sh --project your-gcp-project-id --dry-run
+./vertex_ai/build_and_push.sh --project your-gcp-project-id --dry-run
 ```
 
 ## Manual / exploratory
@@ -22,4 +22,4 @@ These are not imported by the pipeline; run from the repo root with `uv run` or 
 | `fetch_economic_data.py` | Pull external economic series (if configured) |
 
 GCP cost monitoring is a CLI command, not a script here:
-`uv run python -m estate_value_index.cli costs` (thin wrapper for `estate_value_index.ops.cost_monitoring`).
+`uv run python -m estate_value_index.cli costs` (thin wrapper for `estate_value_index.monitoring.cost_monitoring`).
