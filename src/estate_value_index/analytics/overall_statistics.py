@@ -478,9 +478,7 @@ def _amenity_effect(properties: list[dict], flag: str) -> dict[str, Any]:
         "median_ppsqm_with": median_with,
         "median_ppsqm_without": median_without,
         "naive_diff_pct": naive_diff_pct,
-        "within_area_diff_pct": (
-            statistics.median(within_diffs) if within_diffs else None
-        ),
+        "within_area_diff_pct": (statistics.median(within_diffs) if within_diffs else None),
         "within_area_sample_areas": len(within_diffs),
     }
 
@@ -503,9 +501,7 @@ def _within_area_amenity_diffs(properties: list[dict], flag: str) -> list[float]
             continue
         median_without = statistics.median(without_rows)
         if median_without:
-            diffs.append(
-                (statistics.median(with_rows) - median_without) / median_without * 100
-            )
+            diffs.append((statistics.median(with_rows) - median_without) / median_without * 100)
     return diffs
 
 
@@ -646,9 +642,7 @@ def build_top_streets(properties: list[dict]) -> list[dict]:
 
 def _best_value_record(value_properties: list[dict]) -> dict[str, Any] | None:
     rankable = [
-        p
-        for p in value_properties
-        if p.get("is_rankable") and p.get("value_score") is not None
+        p for p in value_properties if p.get("is_rankable") and p.get("value_score") is not None
     ]
     if not rankable:
         return None
@@ -670,9 +664,7 @@ def build_records(properties: list[dict], value_properties: list[dict]) -> dict[
     highest_ppsqm_prop, highest_ppsqm = max(ppsqm_rows, key=lambda pv: pv[1])
 
     fast_rows = [
-        p
-        for p in priced
-        if p.get("days_on_market") is not None and p["days_on_market"] >= 1
+        p for p in priced if p.get("days_on_market") is not None and p["days_on_market"] >= 1
     ]
     fastest = min(fast_rows, key=lambda p: p["days_on_market"])
 

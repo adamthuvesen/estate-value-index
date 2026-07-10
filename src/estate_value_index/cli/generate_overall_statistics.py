@@ -14,9 +14,7 @@ from estate_value_index.analytics.overall_statistics import generate_overall_sta
 
 def main(argv: list[str] | None = None, *, args=None) -> int:
     if args is None:
-        parser = argparse.ArgumentParser(
-            description="Generate city-wide statistics for the web UI"
-        )
+        parser = argparse.ArgumentParser(description="Generate city-wide statistics for the web UI")
         parser.add_argument(
             "--data-source",
             choices=["bigquery", "json"],
