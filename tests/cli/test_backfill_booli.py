@@ -239,7 +239,7 @@ def test_run_backfill_fails_after_low_validation_retry(tmp_path: Path) -> None:
         )
 
 
-def test_run_backfill_fails_on_zero_scraped_rows(tmp_path: Path) -> None:
+def test_run_backfill_fails_on_zero_fetched_rows(tmp_path: Path) -> None:
     base_config = tmp_path / "base.json"
     base_config.write_text(json.dumps({"search_parameters": {}}), encoding="utf-8")
 
@@ -248,7 +248,7 @@ def test_run_backfill_fails_on_zero_scraped_rows(tmp_path: Path) -> None:
         output_file.write_text("", encoding="utf-8")
         return output_file
 
-    with pytest.raises(RuntimeError, match="zero scraped rows"):
+    with pytest.raises(RuntimeError, match="zero fetched rows"):
         run_backfill(
             base_config_file=base_config,
             output_dir=tmp_path / "backfill",
