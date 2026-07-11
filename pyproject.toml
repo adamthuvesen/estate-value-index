@@ -73,7 +73,6 @@ dev = [
     "pytest>=7.4.0",
     "pytest-cov>=4.1.0",
     "pytest-mock>=3.11.0",
-    "mypy>=1.5.0",
     "ruff>=0.1.0",
     "pre-commit>=4.0.0",
     "estate-value-index[ml,pipeline,viz,geo,monitoring,vertex]",
@@ -161,37 +160,6 @@ filterwarnings = [
     "ignore::UserWarning",
     "ignore::DeprecationWarning",
 ]
-
-# =============================================================================
-# MyPy Configuration
-# =============================================================================
-
-[tool.mypy]
-python_version = "3.11"
-warn_return_any = true
-warn_unused_configs = true
-disallow_untyped_defs = false  # Gradual adoption
-disallow_incomplete_defs = false  # Gradual adoption
-check_untyped_defs = true
-disallow_untyped_decorators = false
-no_implicit_optional = true
-warn_redundant_casts = true
-warn_unused_ignores = true
-warn_no_return = true
-warn_unreachable = true
-strict_equality = true
-show_error_codes = true
-show_error_context = true
-pretty = true
-
-[[tool.mypy.overrides]]
-module = [
-    "lightgbm.*",
-    "optuna.*",
-    "prefect.*",
-    "google.cloud.*",
-]
-ignore_missing_imports = true
 
 # =============================================================================
 # Ruff Configuration
