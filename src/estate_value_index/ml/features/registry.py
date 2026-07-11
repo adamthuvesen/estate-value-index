@@ -4,8 +4,6 @@ from collections.abc import Sequence
 
 import pandas as pd
 
-from estate_value_index.ml.features.utils import _coerce_nullable_bool
-
 """Feature name registry and missing-value handling."""
 
 NUMERIC_FEATURE_NAMES: tuple[str, ...] = (
@@ -191,18 +189,12 @@ def handle_missing_values(
 ) -> tuple[pd.DataFrame, pd.DataFrame, dict[str, float], dict[str, str]]:
     """Handle missing values consistently across train and test sets.
 
-    Uses conservative imputation strategies:
+    Uses consistent imputation strategies:
     - Numeric: median (or 0 if all null)
-    - Boolean (elevator, balcony): False (conservative assumption)
     - Categorical: mode (or 'unknown')
     """
     X_train = X_train.copy()
     X_test = X_test.copy()
-
-    # Conservative defaults for boolean features (assume absence if unknown)
-    BOOLEAN_FEATURES = {"elevator", "balcony"}
-    BOOLEAN_DEFAULT = False
-    BOOLEAN_DTYPE = pd.CategoricalDtype(categories=[False, True])
 
     numeric_fill_values = {}
     for col in numeric_features:
@@ -224,26 +216,11 @@ def handle_missing_values(
     categorical_fill_values = {}
     for col in categorical_features:
         if col in X_train.columns:
-            # Use conservative False for boolean amenity features
-            if col in BOOLEAN_FEATURES:
-                fill_val = BOOLEAN_DEFAULT
-                categorical_fill_values[col] = fill_val
-
-                train_series = _coerce_nullable_bool(X_train[col]).fillna(fill_val)
-                X_train.loc[:, col] = train_series.astype(BOOLEAN_DTYPE)
-
-                if col in X_test.columns:
-                    test_series = _coerce_nullable_bool(X_test[col]).fillna(fill_val)
-                    X_test.loc[:, col] = test_series.astype(BOOLEAN_DTYPE)
-
-                continue
-            else:
-                # Use mode for other categorical features
-                mode_val = X_train[col].mode()[0] if not X_train[col].mode().empty else "unknown"
-                if pd.isna(mode_val):
-                    mode_val = "unknown"
-                fill_val = mode_val
-                categorical_fill_values[col] = str(fill_val)
+            mode_val = X_train[col].mode()[0] if not X_train[col].mode().empty else "unknown"
+            if pd.isna(mode_val):
+                mode_val = "unknown"
+            fill_val = mode_val
+            categorical_fill_values[col] = str(fill_val)
 
             filled_train = X_train[col].astype("object").fillna(fill_val)
             X_train[col] = filled_train.infer_objects(copy=False).astype("category")

@@ -28,9 +28,6 @@ logs/
 *.log
 *.err
 
-# Scrapy
-.scrapy/
-
 # Data files — organized by lifecycle role:
 #   raw/       ingested source data (never committed)
 #   reference/ curated inputs (COMMITTED — intentionally not ignored)

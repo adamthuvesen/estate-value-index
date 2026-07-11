@@ -32,27 +32,3 @@ export function SkeletonCard({ className }: { className?: string }) {
     </div>
   );
 }
-
-/** Placeholder rows for a register/table body. */
-export function SkeletonTableRows({
-  rows = 8,
-  columns = 5,
-}: {
-  rows?: number;
-  columns?: number;
-}) {
-  return (
-    <div className="space-y-2" aria-hidden>
-      {Array.from({ length: rows }).map((_, r) => (
-        <div key={r} className="flex items-center gap-4 py-1">
-          {Array.from({ length: columns }).map((_, c) => (
-            <Skeleton
-              key={c}
-              className={cn("h-4", c === 0 ? "flex-[2]" : "flex-1")}
-            />
-          ))}
-        </div>
-      ))}
-    </div>
-  );
-}

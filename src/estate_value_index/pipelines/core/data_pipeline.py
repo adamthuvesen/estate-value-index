@@ -1,166 +1,65 @@
 #!/usr/bin/env python3
-"""Prefect flow for automated Booli scraping and data upload to GCS."""
+"""Prefect flow for authorized Booli API ingestion and data loading."""
 
 import json
-import os
-import subprocess
-import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from prefect import flow, get_run_logger, task
 
+from estate_value_index.ingestion.booli.api import scrape_booli_api_window
 from estate_value_index.pipelines.utils import get_task_logger
 from estate_value_index.utils.gcs import GCSClient, is_gcs_enabled
-from estate_value_index.utils.settings import get_min_scrape_validation_rate
+from estate_value_index.utils.settings import get_min_ingestion_validation_rate
+
+DEFAULT_BOOLI_CONFIG = Path("src/estate_value_index/ingestion/config/booli_all_locations.json")
 
 
-def _blocked_status_from_scrapy_output(output: str) -> str | None:
-    block_markers = {
-        "403": ("403 Forbidden", "<403"),
-        "429": ("429 Too Many Requests", "<429", "429 retries exhausted"),
-    }
-    for status, markers in block_markers.items():
-        if any(marker in output for marker in markers):
-            return status
-    return None
-
-
-def _read_new_scrapy_log(log_file: Path, start_offset: int) -> str:
-    if not log_file.exists():
-        return ""
-    try:
-        with log_file.open("rb") as file:
-            file.seek(start_offset)
-            return file.read().decode("utf-8", errors="replace")
-    except OSError:
-        return ""
-
-
-@task(name="run-scrapy-spider", retries=1, retry_delay_seconds=60)
-def run_scrapy_spider(
+@task(name="fetch-booli-api", retries=1, retry_delay_seconds=60)
+def fetch_booli_api(
     max_pages: int = 10,
-    concurrent_requests: int = 4,
-    delay: float = 0.1,
     config_file: str | None = None,
-    start_page: int | None = None,
     output_file: Path | None = None,
 ) -> Path:
-    """Run Scrapy spider to collect listings.
-
-    Args:
-        max_pages: Maximum number of pages to scrape
-        concurrent_requests: Number of concurrent requests
-        delay: Download delay in seconds
-        config_file: Optional path to config file (e.g., ingestion/config/booli_all_locations.json)
-        start_page: Optional start page for the spider (defaults to spider's default)
-        output_file: Optional path to output JSONL file
-
-    Returns:
-        Path to output JSONL file
-    """
-    logger = get_task_logger("estate_value_index.scraper")
-    logger.info(
-        "Starting Scrapy spider (max_pages=%s, start_page=%s, concurrent=%s, config=%s)",
-        max_pages,
-        start_page,
-        concurrent_requests,
-        config_file,
-    )
-
-    Path("logs/ingestion").mkdir(parents=True, exist_ok=True)
-    scrapy_log_file = Path(os.getenv("BOOLI_LOG_FILE", "logs/ingestion/booli.log"))
-    scrapy_log_start = scrapy_log_file.stat().st_size if scrapy_log_file.exists() else 0
-
+    """Fetch signed Booli API records into the raw-listing JSONL schema."""
+    logger = get_task_logger("estate_value_index.ingestion")
     if output_file is None:
         output_dir = Path("data/raw/booli")
         output_dir.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        # .jsonl: one JSON object per line, no enclosing array.
         output_file = output_dir / f"booli_listings_{timestamp}.jsonl"
     else:
         output_file.parent.mkdir(parents=True, exist_ok=True)
-    output_target = f"{output_file}:jsonlines"
-
-    cmd = [
-        sys.executable,
-        "-m",
-        "scrapy",
-        "crawl",
-        "-s",
-        f"DOWNLOAD_DELAY={delay}",
-        "-s",
-        f"CONCURRENT_REQUESTS={concurrent_requests}",
-        "-o",
-        output_target,
-        "-a",
-        f"max_pages={max_pages}",
-    ]
-    if start_page is not None:
-        cmd.extend(["-a", f"start_page={start_page}"])
-    if config_file:
-        cmd.extend(["-a", f"config_file={config_file}"])
-    # Spider name last to avoid CLI parsing issues
-    cmd.append("booli")
-
-    logger.info(f"Running command: {' '.join(cmd)}")
-    result = subprocess.run(
-        cmd,
-        cwd=Path.cwd(),
-        capture_output=True,
-        text=True,
-        timeout=3600,
+    resolved_config = Path(config_file) if config_file else DEFAULT_BOOLI_CONFIG
+    logger.info("Fetching Booli API records (max_pages=%s, config=%s)", max_pages, resolved_config)
+    result = scrape_booli_api_window(
+        config_file=resolved_config,
+        output_file=output_file,
+        max_pages=max_pages,
     )
-
-    if result.returncode != 0:
-        logger.error(f"Scrapy failed: {result.stderr}")
-        raise RuntimeError(f"Scrapy spider failed with code {result.returncode}")
-
-    blocked_status = _blocked_status_from_scrapy_output(
-        "\n".join(
-            part
-            for part in (
-                result.stdout,
-                result.stderr,
-                _read_new_scrapy_log(scrapy_log_file, scrapy_log_start),
-            )
-            if part
-        )
-    )
-    if blocked_status is not None:
-        logger.error("Booli scrape blocked with HTTP %s", blocked_status)
-        raise RuntimeError(f"Booli scrape blocked with HTTP {blocked_status}")
-
-    if not output_file.exists():
-        raise FileNotFoundError(f"Output file not created: {output_file}")
-
-    with open(output_file) as f:
-        listing_count = sum(1 for line in f if line.strip())
-
-    if listing_count == 0:
-        raise RuntimeError(f"Scrapy spider produced zero listings: {output_file}")
-
-    logger.info(f"Scraped {listing_count} listings to {output_file}")
-    return output_file
+    logger.info("Fetched Booli API records to %s", result)
+    return result
 
 
-def _parse_listing_line(line: str, logger) -> dict | None:
+def _parse_listing_line(line: str, logger) -> dict[str, Any] | None:
     line = line.strip()
-    if not line or line in ["[", "]"]:
+    if not line:
         return None
-    if line.endswith(","):
-        line = line[:-1]
 
     try:
-        return json.loads(line)
+        record = json.loads(line)
     except json.JSONDecodeError as e:
         logger.warning(f"Failed to parse line: {line[:100]}... Error: {e}")
         return None
+    if not isinstance(record, dict):
+        logger.warning("Skipping non-object JSONL record: %s", line[:100])
+        return None
+    return record
 
 
-def _load_listing_records(file_path: Path, logger) -> list[dict]:
-    data = []
+def _load_listing_records(file_path: Path, logger) -> list[dict[str, Any]]:
+    data: list[dict[str, Any]] = []
     with open(file_path) as f:
         for line in f:
             item = _parse_listing_line(line, logger)
@@ -202,7 +101,7 @@ def _validation_summary(data: list[dict], required_fields: list[str]) -> dict:
 
 @task(name="validate-listings-data")
 def validate_listings(file_path: Path, min_validation_rate: float | None = None) -> dict:
-    """Validate scraped listings data.
+    """Validate ingested listing records.
 
     Args:
         file_path: Path to JSONL file
@@ -216,7 +115,7 @@ def validate_listings(file_path: Path, min_validation_rate: float | None = None)
     data = _load_listing_records(file_path, logger)
     required_fields = ["listing_id", "sold_price", "living_area", "area"]
     min_validation_rate = (
-        get_min_scrape_validation_rate() if min_validation_rate is None else min_validation_rate
+        get_min_ingestion_validation_rate() if min_validation_rate is None else min_validation_rate
     )
     validation_result = _validation_summary(data, required_fields)
 
@@ -228,11 +127,11 @@ def validate_listings(file_path: Path, min_validation_rate: float | None = None)
     )
 
     if validation_result["total_listings"] == 0:
-        raise RuntimeError(f"Scrape produced zero listings: {file_path}")
+        raise RuntimeError(f"Ingestion produced zero listings: {file_path}")
 
     if validation_result["validation_rate"] < min_validation_rate:
         raise RuntimeError(
-            "Scrape validation rate "
+            "Ingestion validation rate "
             f"{validation_result['validation_rate']:.1%} is below "
             f"{min_validation_rate:.1%}"
         )
@@ -261,19 +160,17 @@ def upload_to_gcs(file_path: Path, gcs_path: str = "raw/booli_listings_prod.json
     return gcs_uri
 
 
-@flow(name="Estate Value Index Scraper", log_prints=True)
-def scrape_booli_flow(
+@flow(name="Estate Value Index Booli API Ingestion", log_prints=True)
+def ingest_booli_flow(
     max_pages: int = 10,
-    concurrent_requests: int = 4,
-    delay: float = 0.1,
     upload_to_cloud: bool = True,
     config_file: str | None = None,
 ) -> dict:
-    """Scrape Booli listings, validate, and optionally upload to GCS."""
+    """Fetch Booli API listings, validate, and optionally upload to GCS."""
     logger = get_run_logger()
-    logger.info("Starting Booli scraping flow")
+    logger.info("Starting Booli API ingestion flow")
 
-    output_file = run_scrapy_spider(max_pages, concurrent_requests, delay, config_file)
+    output_file = fetch_booli_api(max_pages, config_file)
     validation_results = validate_listings(output_file)
 
     gcs_uri = None
@@ -287,7 +184,7 @@ def scrape_booli_flow(
         "timestamp": datetime.now().isoformat(),
     }
 
-    logger.info(f"Flow completed: {validation_results['valid_listings']} valid listings scraped")
+    logger.info(f"Flow completed: {validation_results['valid_listings']} valid listings fetched")
     return results
 
 
@@ -311,16 +208,14 @@ def _pipeline_tasks() -> dict[str, Any]:
     }
 
 
-def _run_scrape_stage(
+def _run_ingestion_stage(
     logger,
     *,
     max_pages: int,
-    concurrent_requests: int,
-    delay: float,
     config_file: str | None,
 ) -> tuple[Path, dict]:
-    logger.info("Stage 1: Scraping listings")
-    output_file = run_scrapy_spider(max_pages, concurrent_requests, delay, config_file)
+    logger.info("Stage 1: Fetching listings from Booli API")
+    output_file = fetch_booli_api(max_pages, config_file)
     validation_results = validate_listings(output_file)
     return output_file, validation_results
 
@@ -413,7 +308,7 @@ def _run_gcs_backup_stage(logger, process_result: dict, *, upload_to_cloud: bool
     return upload_to_gcs(Path(process_result["output_file"]))
 
 
-def _complete_scrape_results(
+def _complete_ingestion_results(
     *,
     output_file: Path,
     validation_results: dict,
@@ -425,7 +320,7 @@ def _complete_scrape_results(
     gcs_uri: str | None,
 ) -> dict:
     return {
-        "scraping": {"output_file": str(output_file), "validation": validation_results},
+        "ingestion": {"output_file": str(output_file), "validation": validation_results},
         "processing": process_result,
         "bigquery": bq_result,
         "geocoding": geocode_result,
@@ -436,7 +331,7 @@ def _complete_scrape_results(
     }
 
 
-def _log_complete_scrape_summary(
+def _log_complete_ingestion_summary(
     logger,
     *,
     validation_results: dict,
@@ -446,8 +341,8 @@ def _log_complete_scrape_summary(
     feature_result: dict | None,
     sync_result: dict | None,
 ) -> None:
-    logger.info("Complete scraping pipeline finished")
-    logger.info(f"   Scraped: {validation_results['valid_listings']} valid listings")
+    logger.info("Complete ingestion pipeline finished")
+    logger.info(f"   Fetched: {validation_results['valid_listings']} valid listings")
     logger.info(f"   Processed: {process_result.get('total_listings', 0)} total listings")
     if bq_result:
         logger.info(f"   BigQuery: {bq_result.get('rows_uploaded', 0)} rows uploaded")
@@ -461,20 +356,18 @@ def _log_complete_scrape_summary(
             logger.info(f"   Verified: {sync_result['verification'].get('in_sync', False)}")
 
 
-@flow(name="Estate Value Index Complete Scraping Pipeline", log_prints=True)
-def complete_scrape_flow(
+@flow(name="Estate Value Index Complete Ingestion Pipeline", log_prints=True)
+def complete_ingestion_flow(
     max_pages: int = 10,
-    concurrent_requests: int = 4,
-    delay: float = 0.1,
     upload_to_bq: bool = True,
     materialize_features: bool = True,
     upload_to_cloud: bool = True,
     sync_after_upload: bool = True,
     config_file: str | None = None,
 ) -> dict:
-    """Complete scraping pipeline: Scrape → Process → BigQuery → Features → Sync.
+    """Complete ingestion pipeline: Booli API → Process → BigQuery → Features → Sync.
 
-    This flow extends the basic scraping flow with:
+    This flow extends the basic API ingestion flow with:
     - Processing (merge, clean, impute)
     - BigQuery upload
     - Feature materialization
@@ -482,9 +375,7 @@ def complete_scrape_flow(
     - GCS backup
 
     Args:
-        max_pages: Maximum pages to scrape
-        concurrent_requests: Concurrent request limit
-        delay: Download delay
+        max_pages: Maximum API result pages to fetch
         upload_to_bq: Upload to BigQuery after processing
         materialize_features: Materialize features in BigQuery
         upload_to_cloud: Upload to GCS
@@ -495,14 +386,12 @@ def complete_scrape_flow(
         Complete flow results dict
     """
     logger = get_run_logger()
-    logger.info("Starting complete scraping pipeline")
+    logger.info("Starting complete Booli API ingestion pipeline")
     tasks = _pipeline_tasks()
 
-    output_file, validation_results = _run_scrape_stage(
+    output_file, validation_results = _run_ingestion_stage(
         logger,
         max_pages=max_pages,
-        concurrent_requests=concurrent_requests,
-        delay=delay,
         config_file=config_file,
     )
     process_result = _run_process_stage(logger, tasks["process_listings"], output_file)
@@ -532,7 +421,7 @@ def complete_scrape_flow(
     )
     gcs_uri = _run_gcs_backup_stage(logger, process_result, upload_to_cloud=upload_to_cloud)
 
-    results = _complete_scrape_results(
+    results = _complete_ingestion_results(
         output_file=output_file,
         validation_results=validation_results,
         process_result=process_result,
@@ -542,7 +431,7 @@ def complete_scrape_flow(
         sync_result=sync_result,
         gcs_uri=gcs_uri,
     )
-    _log_complete_scrape_summary(
+    _log_complete_ingestion_summary(
         logger,
         validation_results=validation_results,
         process_result=process_result,
@@ -557,5 +446,5 @@ def complete_scrape_flow(
 
 if __name__ == "__main__":
     # Run flow locally for testing
-    result = scrape_booli_flow(max_pages=5, upload_to_cloud=False)
+    result = ingest_booli_flow(max_pages=5, upload_to_cloud=False)
     print(json.dumps(result, indent=2))

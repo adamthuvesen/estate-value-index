@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 import pandas as pd
 
-from estate_value_index.exceptions import BigQueryError, DataLoadError, exception_context
+from estate_value_index.exceptions import DataLoadError, exception_context
 from estate_value_index.utils.bigquery_safety import safe_table_ref
 
 if TYPE_CHECKING:
@@ -374,42 +374,3 @@ def sync_cache_to_bigquery(
         return len(df)
     finally:
         client.delete_table(staging_ref, not_found_ok=True)
-
-
-def load_geocode_cache_from_bigquery(
-    project_id: str | None = None,
-) -> dict[str, tuple[float, float]]:
-    """Load geocode cache from BigQuery table.
-
-    Args:
-        project_id: GCP project ID (defaults to env var)
-
-    Returns:
-        Dictionary mapping address strings to (lat, lon) tuples
-    """
-    from estate_value_index.utils.clients import get_bq_client
-
-    client = get_bq_client(project_id)
-    project = project_id or client.project
-    dataset, table = BQ_GEOCODE_TABLE.split(".", 1)
-    table_ref = safe_table_ref(project, dataset, table)
-
-    query = f"SELECT address, lat, lon FROM {safe_table_ref(project, dataset, table, quote=True)}"
-
-    try:
-        df = client.query(query).to_dataframe()
-        cache = {}
-        for _, row in df.iterrows():
-            if pd.notna(row["lat"]) and pd.notna(row["lon"]):
-                cache[row["address"]] = (float(row["lat"]), float(row["lon"]))
-
-        logger.info(f"Loaded {len(cache)} geocodes from BigQuery")
-        return cache
-    except Exception as e:
-        # Returning {} here would silently train/geocode with no cache hits.
-        # Surface the BigQuery failure instead of masking it as an empty cache.
-        logger.warning(f"Failed to load geocodes from BigQuery: {e}")
-        raise BigQueryError(
-            f"Failed to load geocodes from BigQuery table {table_ref}: {e}",
-            context=exception_context("load_geocode_cache_from_bigquery", table=table_ref),
-        ) from e

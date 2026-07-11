@@ -11,7 +11,7 @@ intentionally git-ignored.
 ## Where to work
 
 - Production training entrypoint: `uv run python -m estate_value_index.cli train-production-models`
-- Experiment/evaluation workflow modules: `src/estate_value_index/ml/training_workflow/`
+- Shared training data and metrics: `src/estate_value_index/ml/training_workflow/`
 - Feature engineering: `src/estate_value_index/ml/features/`
 - Data loading and preprocessing: `src/estate_value_index/ml/data_loader.py`, `src/estate_value_index/ml/preprocessing.py`
 - Model serving: `api_server.py`
@@ -77,9 +77,7 @@ intentionally git-ignored.
 
 ```bash
 uv run python -m estate_value_index.cli train-production-models --data-source bigquery
-uv run python -m estate_value_index.cli model-suite-experiment
-uv run python -m estate_value_index.cli feature-count-experiment --help
 ```
 
-Tuned experiment invocations (feature sets, weights, counts) live in
-`docs/internal/ml-feature-selection.md`.
+Past experiment results and feature-selection rationale live in
+`docs/internal/` and are intentionally not part of the public repository.

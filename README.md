@@ -13,8 +13,8 @@ than a model in a notebook. The brittle parts are the ones real systems trip ove
 temporal leakage in training, train/serve skew at inference, and untrusted input reaching
 SQL or the file system.
 
-The public repo ships code and synthetic fixtures only, not scraped listings or a
-redistributable Booli dataset. Real listings, geocodes, trained models, private datasets,
+The public repo ships code and synthetic fixtures only. Authorized listing records,
+geocodes, trained models, private datasets,
 and production metrics are left out. Bring your own lawful data access,
 BigQuery, GCS, and `.env` for production-like runs.
 
@@ -22,11 +22,11 @@ BigQuery, GCS, and `.env` for production-like runs.
 
 | Layer | Tech |
 | ----- | ---- |
-| Ingestion | Authorized API/export inputs, Scrapy adapter for parser development |
+| Ingestion | Signed API and authorized export inputs |
 | Warehouse | BigQuery |
 | ML | pandas, scikit-learn, LightGBM, optional Optuna |
 | API | FastAPI |
-| Web | Next.js 15, React 18 |
+| Web | Next.js 16, React 19 |
 | Orchestration | Prefect 3 |
 | Deploy | Docker, Cloud Run, GCS |
 | Tooling | Python 3.11+, Node 20+, uv, pytest, Jest |
@@ -125,8 +125,8 @@ uv run python -m estate_value_index.pipelines.core.complete_pipeline --dry-run  
 uv run python -m estate_value_index.pipelines.core.complete_pipeline --retrain    # retrain existing data
 uv run python -m estate_value_index.pipelines.core.complete_pipeline --retrain --deploy
 
-# Ingest authorized listings
-uv run python -m estate_value_index.cli crawl --max-pages 10
+# Backfill authorized listings through the signed API
+uv run python -m estate_value_index.cli backfill --start-date 2026-01-01 --end-date 2026-01-31
 
 # Deploy to Cloud Run
 ./scripts/deploy_cloud_run.sh
@@ -159,11 +159,11 @@ Why the system is built the way it is, and the failure mode each choice guards a
 | `src/estate_value_index/ingestion/` | Listing ingestion, parsing, BigQuery load |
 | `src/estate_value_index/pipelines/` | Prefect flows and tasks |
 | `src/estate_value_index/ml/` | Feature engineering, data loading, training |
-| `src/estate_value_index/monitoring/` | Evidently drift checks |
+| `src/estate_value_index/monitoring/` | Model and data drift checks |
 | `src/estate_value_index/utils/` | Settings, GCP clients, GCS, BigQuery safety |
 | `web/src/app/` | Next.js pages and API routes |
 | `config/`, `schemas/` | Pipeline/feature config and BigQuery schemas |
-| `scripts/` | Deploy, startup, materialization, ops helpers |
+| `scripts/` | Deploy, startup, cloud setup, and research helpers |
 | `tests/` | Python test suite |
 
 Deeper docs: [data-pipeline.md](docs/data-pipeline.md),

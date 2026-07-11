@@ -47,22 +47,3 @@ export function extractListingId(parsed: URL): string | null {
   }
   return null;
 }
-
-export type ParsedBooliListing = {
-  listing_id: string;
-  listing_price: number | null;
-  living_area: number | null;
-  rooms: number | null;
-  monthly_fee: number | null;
-  construction_year: number | null;
-  days_on_market: number | null;
-  property_type: string;
-  municipality: string;
-  area: string | null;
-  floor: number | null;
-  elevator: boolean | null;
-  balcony: boolean | null;
-  latitude?: number | null;
-  longitude?: number | null;
-  source_url: string;
-};

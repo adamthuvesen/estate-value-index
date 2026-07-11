@@ -13,7 +13,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from estate_value_index.ingestion.booli.api import scrape_booli_api_window
-from estate_value_index.pipelines.core.data_pipeline import run_scrapy_spider
 
 if TYPE_CHECKING:
     from argparse import Namespace
@@ -160,10 +159,7 @@ def run_backfill(
     end_date: date,
     window_days: int,
     max_pages: int,
-    concurrent_requests: int,
-    delay: float,
     dry_run: bool,
-    source: str = "spider",
     max_window_retries: int = 2,
     min_validation_rate: float = 0.5,
     scrape: Callable[..., Path] | None = None,
@@ -179,17 +175,11 @@ def run_backfill(
                 {"start": window.start.isoformat(), "end": window.end.isoformat()}
                 for window in windows
             ],
-            "source": source,
             "max_window_retries": max_window_retries,
             "min_validation_rate": min_validation_rate,
         }
 
-    if source == "spider":
-        scrape_fn = scrape or getattr(run_scrapy_spider, "fn", run_scrapy_spider)
-    elif source == "api":
-        scrape_fn = scrape or scrape_booli_api_window
-    else:
-        raise ValueError(f"unsupported backfill source: {source}")
+    scrape_fn = scrape or scrape_booli_api_window
 
     listing_files: list[Path] = []
     window_counts: dict[str, int] = {}
@@ -208,8 +198,6 @@ def run_backfill(
                 scraped_file = Path(
                     scrape_fn(
                         max_pages=max_pages,
-                        concurrent_requests=concurrent_requests,
-                        delay=delay,
                         config_file=str(config_file),
                         output_file=output_file,
                     )
@@ -217,7 +205,7 @@ def run_backfill(
                 validation = validate_jsonl_file(scraped_file)
                 window_validation[window.label] = validation
                 if validation["total_listings"] == 0:
-                    raise RuntimeError(f"zero scraped rows for window {window.label}")
+                    raise RuntimeError(f"zero fetched rows for window {window.label}")
                 if validation["validation_rate"] < min_validation_rate:
                     raise RuntimeError(
                         "validation rate "
@@ -244,7 +232,6 @@ def run_backfill(
 
     return {
         "dry_run": False,
-        "source": source,
         "output_dir": str(output_dir),
         "window_counts": window_counts,
         "window_validation": window_validation,
@@ -275,9 +262,6 @@ def add_arguments(parser: argparse.ArgumentParser, *, include_json: bool = True)
     parser.add_argument("--end-date", default=None)
     parser.add_argument("--window-days", type=int, default=7)
     parser.add_argument("--max-pages", type=int, default=20)
-    parser.add_argument("--concurrent", type=int, default=2)
-    parser.add_argument("--delay", type=float, default=0.5)
-    parser.add_argument("--source", choices=("spider", "api"), default="spider")
     parser.add_argument("--max-window-retries", type=int, default=2)
     parser.add_argument("--min-validation-rate", type=float, default=0.5)
     parser.add_argument("--dry-run", action="store_true")
@@ -298,10 +282,6 @@ def main(argv: list[str] | None = None, *, args: Namespace | None = None) -> int
 
     if args.max_pages < 1:
         parser.error("--max-pages must be >= 1")
-    if args.concurrent < 1:
-        parser.error("--concurrent must be >= 1")
-    if args.delay < 0:
-        parser.error("--delay must be >= 0")
     if args.max_window_retries < 0:
         parser.error("--max-window-retries must be >= 0")
     if not 0 <= args.min_validation_rate <= 1:
@@ -323,10 +303,7 @@ def main(argv: list[str] | None = None, *, args: Namespace | None = None) -> int
             end_date=end_date,
             window_days=args.window_days,
             max_pages=args.max_pages,
-            concurrent_requests=args.concurrent,
-            delay=args.delay,
             dry_run=args.dry_run,
-            source=args.source,
             max_window_retries=args.max_window_retries,
             min_validation_rate=args.min_validation_rate,
         )

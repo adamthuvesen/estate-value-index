@@ -276,15 +276,15 @@ def _add_context_micro_area_features(
     df: pd.DataFrame,
     context: FeatureEngineeringContext,
 ) -> pd.DataFrame:
-    res10 = _context_stats_frame(df["h3_res10"], getattr(context, "micro_area_stats_res10", None))
-    res9 = _context_stats_frame(df["h3_res9"], getattr(context, "micro_area_stats_res9", None))
-    area = _context_stats_frame(df["area"], getattr(context, "area_ppsqm_stats", None))
+    res10 = _context_stats_frame(df["h3_res10"], context.micro_area_stats_res10)
+    res9 = _context_stats_frame(df["h3_res9"], context.micro_area_stats_res9)
+    area = _context_stats_frame(df["area"], context.area_ppsqm_stats)
 
     base_ok = res10["count"] >= MICRO_AREA_MIN_PRIOR_COUNT
     fallback_ok = res9["count"] >= MICRO_AREA_MIN_PRIOR_COUNT
     area_ok = area["count"] > 0
 
-    global_median = getattr(context, "global_ppsqm_median", None)
+    global_median = context.global_ppsqm_median
     if global_median is None or pd.isna(global_median):
         global_median = 0.0
 
@@ -426,7 +426,7 @@ def _add_context_neighbor_features(
     context: FeatureEngineeringContext,
 ) -> pd.DataFrame:
     _init_neighbor_features(df)
-    cell_stats = getattr(context, "micro_area_stats_res10", None) or {}
+    cell_stats = context.micro_area_stats_res10
     for idx, cell in df["h3_res10"].items():
         median, p75, p90, count = _neighbor_stats_from_context(cell, cell_stats)
         df.loc[idx, "h3_neighbor_ppsqm"] = median
@@ -557,15 +557,15 @@ def _add_context_same_size_features(
     _init_same_size_features(df)
     h3_size = _context_multi_stats_frame(
         _stats_keys(df, ["h3_res9", SIZE_BAND_COLUMN]),
-        getattr(context, "same_size_stats_h3_res9", None),
+        context.same_size_stats_h3_res9,
     )
     area_size = _context_multi_stats_frame(
         _stats_keys(df, ["area", SIZE_BAND_COLUMN]),
-        getattr(context, "same_size_stats_area", None),
+        context.same_size_stats_area,
     )
     global_size = _context_multi_stats_frame(
         _stats_keys(df, [SIZE_BAND_COLUMN]),
-        getattr(context, "same_size_stats_global", None),
+        context.same_size_stats_global,
     )
     _choose_same_size_stats(df, h3_size, area_size, global_size)
     return df

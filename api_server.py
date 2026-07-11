@@ -10,8 +10,6 @@ import hashlib
 import hmac
 import json
 import logging
-import os
-import sys
 import time
 import warnings
 from contextlib import asynccontextmanager
@@ -22,10 +20,7 @@ from uuid import uuid4
 import joblib
 import pandas as pd
 import uvicorn
-from cachetools import TTLCache
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from estate_value_index.ml.preprocessing import normalize_area_for_model
@@ -35,14 +30,6 @@ from estate_value_index.model_artifacts import (
     NO_LIST_MODEL_ID,
     production_artifact_names,
     production_model_files,
-    required_production_artifact_files,
-)
-from estate_value_index.utils.settings import (
-    get_rate_limit_max_ips,
-    get_rate_limit_requests,
-    get_rate_limit_window_seconds,
-    get_web_concurrency,
-    is_trust_proxy_headers,
 )
 
 logger = logging.getLogger(__name__)
@@ -55,14 +42,6 @@ if not logger.handlers and not logging.getLogger().handlers:
 warnings.filterwarnings("ignore", category=RuntimeWarning, message="Mean of empty slice")
 warnings.filterwarnings("ignore", category=RuntimeWarning, module="numpy")
 
-try:
-    from estate_value_index.utils.gcs import GCSClient, is_gcs_enabled
-
-    GCS_AVAILABLE = True
-except ImportError:
-    GCS_AVAILABLE = False
-    logger.warning("GCS utilities not available, running in local mode")
-
 MODELS_DIR = Path("web/models")
 AUTO_MODEL = "auto"
 NO_LIST_MODEL = NO_LIST_MODEL_ID
@@ -71,30 +50,6 @@ PRODUCTION_MODEL_FILES = production_model_files(DEFAULT_MODEL_PREFIX)
 REQUIRED_MODEL_IDS = frozenset(PRODUCTION_MODEL_FILES)
 
 MODEL_CACHE: dict[str, dict] = {}
-
-# IP-based rate limiting via a bounded TTL cache (per-process; not cross-worker).
-RATE_LIMIT_MAX_IPS = get_rate_limit_max_ips()
-RATE_LIMIT_REQUESTS = get_rate_limit_requests()
-RATE_LIMIT_WINDOW = get_rate_limit_window_seconds()
-RATE_LIMIT_STORE: TTLCache[str, list[float]] = TTLCache(
-    maxsize=RATE_LIMIT_MAX_IPS,
-    ttl=float(RATE_LIMIT_WINDOW),
-)
-
-
-def _resolve_client_ip(request: Request) -> str:
-    """Resolve client IP for rate limiting (proxy-aware when explicitly enabled)."""
-    forwarded = request.headers.get("x-forwarded-for") or request.headers.get("X-Forwarded-For")
-
-    # Read each request: tests rely on env-var-only behavior, and the cost is
-    # a single dict lookup so caching at startup buys nothing meaningful.
-    if is_trust_proxy_headers() and forwarded:
-        return forwarded.split(",")[0].strip() or "unknown"
-
-    if request.client is not None and request.client.host:
-        return request.client.host
-
-    return "unknown"
 
 
 def _raise_internal_error(context: str, exc: BaseException) -> None:
@@ -111,18 +66,6 @@ def _raise_internal_error(context: str, exc: BaseException) -> None:
 async def lifespan(app: FastAPI):
     """Load models on startup, cleanup on shutdown."""
     global MODEL_CACHE
-    logger.info("Startup: TRUST_PROXY_HEADERS=%s", is_trust_proxy_headers())
-    web_workers = get_web_concurrency()
-    if web_workers > 1 and not os.getenv("RATE_LIMIT_BACKEND"):
-        # stderr print mirrors the logger.warning so ops dashboards that grep
-        # the boot output (and the corresponding regression test) keep working.
-        message = (
-            "Multi-worker mode without distributed rate-limit backend; "
-            "rate limits will be per-worker."
-        )
-        logger.warning(message)
-        print(f"[WARNING] {message}", file=sys.stderr)
-
     logger.info("Loading models from %s", MODELS_DIR.absolute())
     MODEL_CACHE = load_all_models(MODELS_DIR)
 
@@ -144,53 +87,6 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
-@app.middleware("http")
-async def rate_limit_middleware(request: Request, call_next):
-    """Per-IP rate limiting; ``/health`` is exempt so liveness probes never block."""
-    if request.url.path == "/health":
-        return await call_next(request)
-
-    client_ip = _resolve_client_ip(request)
-    current_time = time.time()
-
-    # No async lock around the gate: TTLCache get/set is atomic enough for an
-    # advisory rate limit, and per-IP races at most leak a handful of extra
-    # requests. A global lock here would serialize every prediction request
-    # behind the gate and defeat the point of running async.
-    req_list = RATE_LIMIT_STORE.get(client_ip) or []
-    req_list = [ts for ts in req_list if current_time - ts < RATE_LIMIT_WINDOW]
-
-    if len(req_list) >= RATE_LIMIT_REQUESTS:
-        return JSONResponse(
-            status_code=429,
-            content={
-                "detail": (
-                    f"Rate limit exceeded. Max {RATE_LIMIT_REQUESTS} requests per "
-                    f"{RATE_LIMIT_WINDOW} seconds."
-                )
-            },
-        )
-
-    req_list.append(current_time)
-    RATE_LIMIT_STORE[client_ip] = req_list
-    remaining = RATE_LIMIT_REQUESTS - len(req_list)
-
-    response = await call_next(request)
-    response.headers["X-RateLimit-Limit"] = str(RATE_LIMIT_REQUESTS)
-    response.headers["X-RateLimit-Remaining"] = str(remaining)
-    response.headers["X-RateLimit-Reset"] = str(int(current_time + RATE_LIMIT_WINDOW))
-
-    return response
 
 
 class PredictionRequest(BaseModel):
@@ -276,41 +172,6 @@ def _missing_required_models(cache: dict[str, dict]) -> list[str]:
     return sorted(REQUIRED_MODEL_IDS.difference(cache))
 
 
-def _download_models_from_gcs(models_dir: Path) -> None:
-    """Download required model files from GCS into ``models_dir`` (no-op when disabled)."""
-    if not GCS_AVAILABLE or not is_gcs_enabled():
-        return
-
-    try:
-        gcs_client = GCSClient()
-        models_dir.mkdir(parents=True, exist_ok=True)
-
-        required_models = [
-            f"models/{filename}"
-            for filename in required_production_artifact_files(DEFAULT_MODEL_PREFIX)
-        ]
-
-        logger.info("Downloading %d required model files from GCS", len(required_models))
-        download_start = time.time()
-
-        for gcs_path in required_models:
-            filename = Path(gcs_path).name
-            local_path = models_dir / filename
-
-            if local_path.exists():
-                logger.info("Using cached %s", filename)
-                continue
-
-            file_start = time.time()
-            gcs_client.download_file(gcs_path, local_path)
-            logger.info("Downloaded %s (%.1fs)", filename, time.time() - file_start)
-
-        logger.info("Model download completed in %.1fs", time.time() - download_start)
-
-    except Exception as e:
-        logger.error("Failed to download models from GCS: %s", e)
-
-
 def _verify_model_integrity(model_path: Path) -> str:
     """Verify a model artefact's SHA256 against its `<path>.sha256` sidecar.
 
@@ -374,8 +235,6 @@ def load_all_models(models_dir: Path) -> dict[str, dict]:
     """
     cache: dict[str, dict] = {}
 
-    _download_models_from_gcs(models_dir)
-
     available = _available_models(models_dir)
     if not available:
         logger.warning("No models found in %s", models_dir.absolute())
@@ -399,12 +258,21 @@ def load_all_models(models_dir: Path) -> dict[str, dict]:
             logger.error("Failed to load %s (%s): %s", model_type, model_path.name, exc)
             continue
 
+        try:
+            requires_listing_price = model.requires_listing_price
+            loaded_model_type = model.model_type
+        except AttributeError as exc:
+            logger.error(
+                "Refusing incompatible %s model (%s): %s", model_type, model_path.name, exc
+            )
+            continue
+
         cache[model_type] = {
             "model": model,
             "path": model_path,
             "sha256": digest,
-            "requires_listing_price": bool(getattr(model, "requires_listing_price", False)),
-            "model_type": getattr(model, "model_type", model_type),
+            "requires_listing_price": requires_listing_price,
+            "model_type": loaded_model_type,
             "estimate_range_factors": _load_estimate_range_factors(models_dir, model_type),
         }
         logger.info(
@@ -440,7 +308,7 @@ async def predict(request: PredictionRequest):
         raise HTTPException(status_code=503, detail="No models loaded. Server is not ready.")
 
     try:
-        requested_model = request.model.lower()
+        requested_model = request.model
         model_type = _resolve_prediction_model(requested_model, request.listing_price)
 
         cached = MODEL_CACHE[model_type]
@@ -450,15 +318,13 @@ async def predict(request: PredictionRequest):
         input_data = request.model_dump(exclude={"model"})
 
         # Booli-shaped strings and plain names: same path as training (preprocessing).
-        if input_data.get("area"):
-            area_original = input_data["area"]
-            area_normalized = normalize_area_for_model(area_original)
-            input_data["area"] = area_normalized
-            logger.info("Area normalized for predict: %r -> %r", area_original, area_normalized)
+        area_original = input_data["area"]
+        area_normalized = normalize_area_for_model(area_original)
+        input_data["area"] = area_normalized
+        logger.info("Area normalized for predict: %r -> %r", area_original, area_normalized)
 
         input_df = pd.DataFrame([input_data])
-        if "scraped_at" not in input_df.columns:
-            input_df["scraped_at"] = pd.Timestamp.now()
+        input_df["scraped_at"] = pd.Timestamp.now()
 
         prediction_arr = await asyncio.to_thread(model.predict, input_df)
 
@@ -479,7 +345,7 @@ async def predict(request: PredictionRequest):
 
 
 def _resolve_prediction_model(requested_model: str, listing_price: float | None) -> str:
-    has_listing_price = listing_price is not None and listing_price > 0
+    has_listing_price = listing_price is not None
     if requested_model == AUTO_MODEL:
         model_type = LISTING_MODEL if has_listing_price else NO_LIST_MODEL
     elif requested_model in {NO_LIST_MODEL, LISTING_MODEL}:

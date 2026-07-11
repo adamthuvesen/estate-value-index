@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import hashlib
 from pathlib import Path
+from types import SimpleNamespace
 
 import joblib
 import pytest
@@ -87,7 +88,7 @@ def _build_model_dir_with_two_artifacts(tmp_path: Path) -> tuple[Path, Path, Pat
     valid = _write_artifact(
         models_dir,
         "price_prediction_model_no_list_price.joblib",
-        {"kind": "no_list_price", "value": 1},
+        SimpleNamespace(requires_listing_price=False, model_type="price_tiered_ensemble"),
     )
     _write_sidecar(valid)
 
@@ -102,11 +103,8 @@ def _build_model_dir_with_two_artifacts(tmp_path: Path) -> tuple[Path, Path, Pat
     return models_dir, valid, bad
 
 
-def test_load_all_models_skips_mismatched_artifact(tmp_path: Path, monkeypatch) -> None:
+def test_load_all_models_skips_mismatched_artifact(tmp_path: Path) -> None:
     models_dir, valid, bad = _build_model_dir_with_two_artifacts(tmp_path)
-
-    # Avoid touching real GCS during loading.
-    monkeypatch.setattr(api_server, "_download_models_from_gcs", lambda _dir: None)
 
     cache = api_server.load_all_models(models_dir)
 
@@ -115,7 +113,7 @@ def test_load_all_models_skips_mismatched_artifact(tmp_path: Path, monkeypatch) 
     assert "with_list_price" not in cache, "tampered artefact must not be cached"
 
 
-def test_load_all_models_skips_missing_sidecar(tmp_path: Path, monkeypatch) -> None:
+def test_load_all_models_skips_missing_sidecar(tmp_path: Path) -> None:
     models_dir = tmp_path / "models"
     models_dir.mkdir()
 
@@ -125,8 +123,6 @@ def test_load_all_models_skips_missing_sidecar(tmp_path: Path, monkeypatch) -> N
         {"kind": "no_list_price"},
     )
     # No sidecar at all.
-
-    monkeypatch.setattr(api_server, "_download_models_from_gcs", lambda _dir: None)
 
     cache = api_server.load_all_models(models_dir)
 
@@ -141,8 +137,6 @@ def test_load_all_models_skips_artifacts_that_fail_to_load(tmp_path: Path, monke
     artefact = _write_artifact(models_dir, "price_prediction_model_no_list_price.joblib", {})
     _write_sidecar(artefact)
 
-    monkeypatch.setattr(api_server, "_download_models_from_gcs", lambda _dir: None)
-
     def _raise(*_args, **_kwargs):
         raise ModuleNotFoundError("Can't get attribute 'SomeClass'")
 
@@ -151,3 +145,16 @@ def test_load_all_models_skips_artifacts_that_fail_to_load(tmp_path: Path, monke
     cache = api_server.load_all_models(models_dir)
 
     assert cache == {}, "load must skip artifacts that fail to deserialize"
+
+
+def test_load_all_models_skips_obsolete_model_contract(tmp_path: Path) -> None:
+    models_dir = tmp_path / "models"
+    models_dir.mkdir()
+    artefact = _write_artifact(
+        models_dir,
+        "price_prediction_model_no_list_price.joblib",
+        {"kind": "obsolete"},
+    )
+    _write_sidecar(artefact)
+
+    assert api_server.load_all_models(models_dir) == {}

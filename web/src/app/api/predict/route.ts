@@ -5,6 +5,7 @@ import {
   estimateRangeFactorsFromArtifact,
   type EstimateRangeFactors,
 } from '@/lib/estimate-range';
+import type { PredictionPayload } from '@/lib/prediction-types';
 
 type PredictionRequestBody = {
   listing_id?: unknown;
@@ -23,24 +24,6 @@ type PredictionRequestBody = {
   balcony?: unknown;
   latitude?: unknown;
   longitude?: unknown;
-};
-
-type PredictionPayload = {
-  listing_price: number | null;
-  living_area: number;
-  rooms: number;
-  monthly_fee: number;
-  days_on_market: number;
-  construction_year: number;
-  municipality: string;
-  property_type: string;
-  area: string;
-  model: string;
-  floor?: number | null;
-  elevator?: boolean | null;
-  balcony?: boolean | null;
-  latitude?: number | null;
-  longitude?: number | null;
 };
 
 type FastAPIResponse = {

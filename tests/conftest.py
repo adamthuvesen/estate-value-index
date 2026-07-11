@@ -280,6 +280,17 @@ def mock_feature_context():
             "property_type": "Lägenhet",
             "municipality": "Stockholm",
         },
+        area_market_stats={},
+        micro_area_stats_res10={},
+        micro_area_stats_res9={},
+        area_ppsqm_stats={},
+        same_size_stats_h3_res9={},
+        same_size_stats_area={},
+        same_size_stats_global={},
+        street_area_ppsqm_stats={},
+        street_size_ppsqm_stats={},
+        address_ppsqm_stats={},
+        global_ppsqm_median=None,
     )
 
 

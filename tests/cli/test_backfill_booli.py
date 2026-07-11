@@ -143,8 +143,6 @@ def test_run_backfill_dry_run_does_not_read_config(tmp_path: Path) -> None:
         end_date=date(2026, 1, 3),
         window_days=2,
         max_pages=20,
-        concurrent_requests=2,
-        delay=0.5,
         dry_run=True,
     )
 
@@ -179,8 +177,6 @@ def test_run_backfill_retries_window_scrape_failure(tmp_path: Path) -> None:
         end_date=date(2026, 1, 1),
         window_days=1,
         max_pages=20,
-        concurrent_requests=1,
-        delay=1.0,
         dry_run=False,
         max_window_retries=1,
         scrape=scrape,
@@ -211,15 +207,11 @@ def test_run_backfill_uses_api_source(tmp_path: Path) -> None:
         end_date=date(2026, 1, 1),
         window_days=1,
         max_pages=3,
-        concurrent_requests=1,
-        delay=1.0,
         dry_run=False,
-        source="api",
         scrape=scrape,
     )
 
     assert seen_kwargs["max_pages"] == 3
-    assert summary["source"] == "api"
     assert summary["merge"]["total_unique"] == 1
 
 
@@ -240,8 +232,6 @@ def test_run_backfill_fails_after_low_validation_retry(tmp_path: Path) -> None:
             end_date=date(2026, 1, 1),
             window_days=1,
             max_pages=20,
-            concurrent_requests=1,
-            delay=1.0,
             dry_run=False,
             max_window_retries=1,
             min_validation_rate=0.5,
@@ -249,7 +239,7 @@ def test_run_backfill_fails_after_low_validation_retry(tmp_path: Path) -> None:
         )
 
 
-def test_run_backfill_fails_on_zero_scraped_rows(tmp_path: Path) -> None:
+def test_run_backfill_fails_on_zero_fetched_rows(tmp_path: Path) -> None:
     base_config = tmp_path / "base.json"
     base_config.write_text(json.dumps({"search_parameters": {}}), encoding="utf-8")
 
@@ -258,7 +248,7 @@ def test_run_backfill_fails_on_zero_scraped_rows(tmp_path: Path) -> None:
         output_file.write_text("", encoding="utf-8")
         return output_file
 
-    with pytest.raises(RuntimeError, match="zero scraped rows"):
+    with pytest.raises(RuntimeError, match="zero fetched rows"):
         run_backfill(
             base_config_file=base_config,
             output_dir=tmp_path / "backfill",
@@ -266,8 +256,6 @@ def test_run_backfill_fails_on_zero_scraped_rows(tmp_path: Path) -> None:
             end_date=date(2026, 1, 1),
             window_days=1,
             max_pages=20,
-            concurrent_requests=2,
-            delay=0.5,
             dry_run=False,
             max_window_retries=0,
             scrape=scrape,
@@ -280,8 +268,6 @@ def test_api_source_missing_credentials_returns_clean_error(tmp_path: Path, monk
 
     code = main(
         [
-            "--source",
-            "api",
             "--start-date",
             "2026-04-27",
             "--end-date",

@@ -5,7 +5,6 @@ from estate_value_index.model_artifacts import (
 )
 
 # GCP/Cloud Run defaults
-DEFAULT_REGION = "europe-north1"
 DEFAULT_MACHINE_TYPE = "n1-standard-4"
 
 # Model defaults
@@ -16,6 +15,3 @@ DEFAULT_MODEL_PREFIX = MODEL_ARTIFACT_DEFAULT_MODEL_PREFIX
 # .github/workflows/ml-pipeline.yml repeats this number inline (it cannot import
 # Python), guarded by a test in tests/pipelines/test_training_pipeline.py.
 DEFAULT_MEDIAN_APE_THRESHOLD = 0.08
-
-# Polling defaults
-DEFAULT_POLL_INTERVAL = 30

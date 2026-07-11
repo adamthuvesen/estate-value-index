@@ -3,10 +3,10 @@
 Hierarchy:
     EstateValueIndexError (base)
     ├── ConfigurationError
-    ├── DataError {DataValidationError, DataLoadError, DataQualityError}
-    ├── ModelError {ModelValidationError, ModelTrainingError, ModelLoadError}
-    ├── PipelineError {ScrapingError, ProcessingError, DeploymentError}
-    └── InfrastructureError {BigQueryError, GCSError, VertexAIError}
+    ├── DataError {DataValidationError, DataLoadError}
+    ├── ModelError {ModelValidationError}
+    ├── PipelineError
+    └── InfrastructureError {BigQueryError}
 """
 
 from typing import Any
@@ -49,10 +49,6 @@ class DataLoadError(DataError):
     """Loading data failed (missing file, BigQuery error, malformed input)."""
 
 
-class DataQualityError(DataError):
-    """Data is too sparse or noisy for downstream use."""
-
-
 # Model
 
 
@@ -64,31 +60,11 @@ class ModelValidationError(ModelError):
     """Model failed performance validation (MAE/R²/area sensitivity)."""
 
 
-class ModelTrainingError(ModelError):
-    """Training failed (Optuna error, OOM, numerical instability, timeout)."""
-
-
-class ModelLoadError(ModelError):
-    """Loading or deserializing a model failed."""
-
-
 # Pipeline
 
 
 class PipelineError(EstateValueIndexError):
     """Base class for pipeline orchestration errors."""
-
-
-class ScrapingError(PipelineError):
-    """Web scraping failed (HTML changed, rate limited, timeout, parse error)."""
-
-
-class ProcessingError(PipelineError):
-    """Data processing step failed (area cleaning, imputation, merging, materialization)."""
-
-
-class DeploymentError(PipelineError):
-    """Deployment failed (Cloud Run rollout, health check, artifact upload)."""
 
 
 # Infrastructure
@@ -100,14 +76,6 @@ class InfrastructureError(EstateValueIndexError):
 
 class BigQueryError(InfrastructureError):
     """BigQuery operation failed."""
-
-
-class GCSError(InfrastructureError):
-    """GCS operation failed."""
-
-
-class VertexAIError(InfrastructureError):
-    """Vertex AI operation failed."""
 
 
 def exception_context(operation: str, **kwargs: Any) -> dict[str, Any]:

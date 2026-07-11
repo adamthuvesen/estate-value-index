@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { extractListingId, type ParsedBooliListing } from '@/lib/booli-listing-parser';
+import { extractListingId } from '@/lib/booli-listing-parser';
 import { validateBooliUrl } from '@/lib/booli-url';
 import { titleCaseArea } from '@/lib/format';
+import type { ListingPrefillResponse } from '@/lib/prediction-types';
 import { getValueAnalysisData } from '@/lib/value-analysis-cache';
 import type { ValueProperty } from '@/lib/value-finder-types';
 
@@ -13,7 +14,7 @@ export const runtime = 'nodejs';
 // analyzed dataset when we have the listing, and tell the user to fill in the
 // fields by hand when we don't.
 
-function toPrefill(property: ValueProperty, sourceUrl: string): ParsedBooliListing {
+function toPrefill(property: ValueProperty, sourceUrl: string): ListingPrefillResponse {
   return {
     listing_id: property.listing_id,
     listing_price: property.listing_price,

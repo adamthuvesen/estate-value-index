@@ -9,23 +9,23 @@ from estate_value_index.pipelines.core import complete_pipeline as pipeline
 def test_data_collection_stage_uses_empty_config_and_dry_run_flags(monkeypatch):
     calls = {}
 
-    def fake_complete_scrape_flow(**kwargs):
+    def fake_complete_ingestion_flow(**kwargs):
         calls.update(kwargs)
         return {
-            "scraping": {"validation": {"valid_listings": 12}},
+            "ingestion": {"validation": {"valid_listings": 12}},
             "processing": {"total_listings": 10},
             "bigquery": {},
             "features": {},
         }
 
-    monkeypatch.setattr(pipeline, "complete_scrape_flow", fake_complete_scrape_flow)
+    monkeypatch.setattr(pipeline, "complete_ingestion_flow", fake_complete_ingestion_flow)
     results = {"stages": {}}
 
     pipeline._run_data_collection_stage(
         MagicMock(),
         results,
         max_pages=3,
-        skip_scraping=False,
+        skip_ingestion=False,
         config_file=None,
         dry_run=True,
     )
@@ -35,6 +35,7 @@ def test_data_collection_stage_uses_empty_config_and_dry_run_flags(monkeypatch):
         "upload_to_bq": False,
         "materialize_features": False,
         "upload_to_cloud": False,
+        "sync_after_upload": False,
         "config_file": "",
     }
     assert results["stages"]["data_collection"]["processing"]["total_listings"] == 10
@@ -63,7 +64,7 @@ def test_training_config_matches_vertex_and_local_modes():
         use_vertex=True,
         machine_type="n1-highmem-8",
         rebuild_container=True,
-        skip_scraping=False,
+        skip_ingestion=False,
         dry_run=True,
     )
 
@@ -81,7 +82,7 @@ def test_training_config_matches_vertex_and_local_modes():
         use_vertex=False,
         machine_type="ignored",
         rebuild_container=True,
-        skip_scraping=True,
+        skip_ingestion=True,
         dry_run=True,
     )
 

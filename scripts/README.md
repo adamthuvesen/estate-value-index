@@ -20,6 +20,3 @@ These are not imported by the pipeline; run from the repo root with `uv run` or 
 | ------ | ------- |
 | `analyze_feature_correlation.py` | Ad-hoc feature correlation analysis |
 | `fetch_economic_data.py` | Pull external economic series (if configured) |
-
-GCP cost monitoring is a CLI command, not a script here:
-`uv run python -m estate_value_index.cli costs` (thin wrapper for `estate_value_index.monitoring.cost_monitoring`).

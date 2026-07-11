@@ -1,17 +1,11 @@
 import { NextResponse } from "next/server";
 import { DataFileMissingError } from "@/lib/data-file-errors";
 
-export const AREA_DATA_MISSING_CODE = "AREA_DATA_MISSING";
-export const AREA_DATA_ERROR_CODE = "AREA_DATA_ERROR";
 export const VALUE_ANALYSIS_DATA_MISSING_CODE = "VALUE_ANALYSIS_DATA_MISSING";
 export const VALUE_ANALYSIS_DATA_ERROR_CODE = "VALUE_ANALYSIS_DATA_ERROR";
 
 export function isMissingDataError(error: unknown): boolean {
   return error instanceof DataFileMissingError;
-}
-
-export function isValueAnalysisDataMissingError(error: unknown): boolean {
-  return isMissingDataError(error);
 }
 
 export interface ErrorResponseInit {
@@ -39,29 +33,6 @@ export function errorResponse({
     },
     { status }
   );
-}
-
-/** Standard 404 for "the enrichment job hasn't produced data yet". */
-export function areaDataMissingResponse() {
-  return errorResponse({
-    errorCode: AREA_DATA_MISSING_CODE,
-    errorMessage: "Area statistics are not available yet.",
-    remediation:
-      "Run the enrichment pipeline or enable GCS downloads for enrichment data.",
-    status: 404,
-  });
-}
-
-/** Standard 500 for an unexpected loader failure. */
-export function areaDataErrorResponse(
-  message = "Failed to load area statistics."
-) {
-  return errorResponse({
-    errorCode: AREA_DATA_ERROR_CODE,
-    errorMessage: message,
-    remediation: "Check the data pipeline and server logs.",
-    status: 500,
-  });
 }
 
 /** Standard 404 for "the value-analysis job hasn't produced data yet". */

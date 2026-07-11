@@ -23,15 +23,8 @@ classifiers = [
 
 # Core dependencies (production runtime)
 dependencies = [
-    # Ingestion adapters
-    "scrapy>=2.11.0",
+    # Ingestion adapter
     "requests>=2.31.0",
-    "fake-useragent>=1.4.0",
-    "lxml>=4.9.3",
-    "itemadapter>=0.8.0",
-    "twisted>=22.10.0",
-    "cryptography>=42.0.8",
-    "w3lib>=2.1.2",
 
     # Data processing
     "numpy>=1.24.0",
@@ -55,7 +48,6 @@ dependencies = [
     # Utilities
     "python-dotenv>=1.0.0",
     "pyyaml>=6.0.0",
-    "cachetools>=5.3.0",
 ]
 
 [project.optional-dependencies]
@@ -194,7 +186,6 @@ pretty = true
 
 [[tool.mypy.overrides]]
 module = [
-    "scrapy.*",
     "lightgbm.*",
     "optuna.*",
     "prefect.*",
@@ -242,7 +233,7 @@ ignore = [
 
 [tool.ruff.lint.isort]
 known-first-party = ["estate_value_index"]
-known-third-party = ["scrapy", "pandas", "numpy", "sklearn", "lightgbm", "prefect"]
+known-third-party = ["pandas", "numpy", "sklearn", "lightgbm", "prefect"]
 
 # =============================================================================
 # Coverage Configuration

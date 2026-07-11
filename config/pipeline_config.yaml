@@ -3,7 +3,7 @@
 #
 # Every key below is read by src/estate_value_index/utils/settings.py.
 # Deployment sizing lives in scripts/deploy_cloud_run.sh; drift thresholds live
-# in src/estate_value_index/monitoring/drift_detection.py; scraping filters
+# in src/estate_value_index/monitoring/drift_detection.py; ingestion filters
 # live in the per-run JSON configs under src/estate_value_index/ingestion/config/.
 # If you add a new setting here, wire it up in settings.py in the same change —
 # an unread config key is a silent no-op, not a documented intent.
@@ -17,6 +17,5 @@ training:
 bigquery:
   batch_size: 1000  # Batch size for inserts
 
-scraping:
-  default_max_pages: 10  # Default scraping page limit
-  min_validation_rate: 0.5  # Minimum valid scraped-listing ratio
+ingestion:
+  min_validation_rate: 0.5  # Minimum valid-listing ratio

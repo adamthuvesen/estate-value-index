@@ -86,7 +86,6 @@ class TestCloudRunDeployCommand:
         assert "GCS_BUCKET=estate-value-index-data-production" in env_vars
         assert "NODE_ENV=production" in env_vars
         assert "PREDICTION_API_URL=http://127.0.0.1:8000" in env_vars
-        assert "TRUST_PROXY_HEADERS=true" in env_vars
 
     @pytest.mark.unit
     def test_deploy_uses_dedicated_runtime_sa_and_internal_ingress(
@@ -134,7 +133,6 @@ class TestCloudRunDeployCommand:
         assert "GCS_BUCKET=estate-value-index-data-production" in env_vars
         assert "NODE_ENV=production" in env_vars
         assert "PREDICTION_API_URL=http://127.0.0.1:8000" in env_vars
-        assert "TRUST_PROXY_HEADERS=true" in env_vars
 
 
 class TestGetCurrentRevision:

@@ -35,7 +35,7 @@ class GeocodeResult(TypedDict):
 
 @task(
     name="process-listings",
-    description="Process scraped listings: merge, clean areas, impute missing values",
+    description="Process ingested listings: merge, clean areas, impute missing values",
     retries=2,
     retry_delay_seconds=30,
     timeout_seconds=600,
@@ -48,7 +48,7 @@ def process_listings_task(
     days_threshold: int = 1000,
     dry_run: bool = False,
 ) -> ProcessingResult:
-    """Process scraped listings using unified processing pipeline.
+    """Process ingested listings with the shared processing pipeline.
 
     Performs:
     1. Merge new listings with existing production data (deduplication)
@@ -56,7 +56,7 @@ def process_listings_task(
     3. Impute days_on_market values > threshold using area-based medians
 
     Args:
-        input_file: Path to new scraped listings file
+        input_file: Path to a new ingested listings file
         production_file: Path to existing production data (optional)
         output_file: Path to write processed data (defaults to production_file)
         min_area_count: Minimum listings per area for consolidation

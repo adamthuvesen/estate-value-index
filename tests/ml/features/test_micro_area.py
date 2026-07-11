@@ -126,42 +126,6 @@ def test_context_micro_area_features_do_not_use_holdout_labels() -> None:
         assert holdout_a[column].iloc[0] == holdout_b[column].iloc[0]
 
 
-def test_context_features_tolerate_old_pickled_context_without_new_h3_stats() -> None:
-    train = pd.DataFrame(
-        [_listing(f"TRAIN-{i}", f"2024-01-{i + 1:02d}", 80_000 + i) for i in range(20)]
-    )
-    test = pd.DataFrame([_listing("TEST", "2024-03-01", 100_000)])
-
-    train_engineered = create_optimized_features(train)
-    context = build_feature_context(train_engineered)
-    for attr in (
-        "micro_area_stats_res10",
-        "micro_area_stats_res9",
-        "area_ppsqm_stats",
-        "same_size_stats_h3_res9",
-        "same_size_stats_area",
-        "same_size_stats_global",
-        "street_area_ppsqm_stats",
-        "street_size_ppsqm_stats",
-        "address_ppsqm_stats",
-        "global_ppsqm_median",
-    ):
-        delattr(context, attr)
-
-    engineered = create_optimized_features(test, context=context)
-
-    assert engineered["micro_area_ppsqm_median"].iloc[0] == 0.0
-    assert engineered["micro_area_ppsqm_p90"].iloc[0] == 0.0
-    assert engineered["micro_area_upper_tail_ratio"].iloc[0] == 1.0
-    assert engineered["h3_neighbor_ppsqm_count"].iloc[0] == 0.0
-    assert engineered["h3_neighbor_upper_tail_ratio"].iloc[0] == 1.0
-    assert engineered["same_size_ppsqm_count"].iloc[0] == 0.0
-    assert engineered["same_size_upper_tail_ratio"].iloc[0] == 1.0
-    assert engineered["street_area_scope_used"].iloc[0] == "micro_area"
-    assert engineered["address_comp_scope_used"].iloc[0] == "street_area"
-    assert engineered["street_area_ppsqm_count"].iloc[0] == 0.0
-
-
 def test_same_size_comp_uses_prior_h3_size_history() -> None:
     rows = [
         _listing(

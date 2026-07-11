@@ -38,17 +38,17 @@ class FeatureEngineeringContext:
     global_area_median_price_12m: float
     numeric_fill_values: dict[str, float | None]
     categorical_fill_values: dict[str, str]
-    area_market_stats: dict[str, dict[str, float]] = None
-    micro_area_stats_res10: dict[str, dict[str, float]] = None
-    micro_area_stats_res9: dict[str, dict[str, float]] = None
-    area_ppsqm_stats: dict[str, dict[str, float]] = None
-    same_size_stats_h3_res9: dict[str, dict[str, float]] = None
-    same_size_stats_area: dict[str, dict[str, float]] = None
-    same_size_stats_global: dict[str, dict[str, float]] = None
-    street_area_ppsqm_stats: dict[str, dict[str, float]] = None
-    street_size_ppsqm_stats: dict[str, dict[str, float]] = None
-    address_ppsqm_stats: dict[str, dict[str, float]] = None
-    global_ppsqm_median: float | None = None
+    area_market_stats: dict[str, dict[str, float]]
+    micro_area_stats_res10: dict[str, dict[str, float]]
+    micro_area_stats_res9: dict[str, dict[str, float]]
+    area_ppsqm_stats: dict[str, dict[str, float]]
+    same_size_stats_h3_res9: dict[str, dict[str, float]]
+    same_size_stats_area: dict[str, dict[str, float]]
+    same_size_stats_global: dict[str, dict[str, float]]
+    street_area_ppsqm_stats: dict[str, dict[str, float]]
+    street_size_ppsqm_stats: dict[str, dict[str, float]]
+    address_ppsqm_stats: dict[str, dict[str, float]]
+    global_ppsqm_median: float | None
 
 
 def _to_naive_timestamp(value: pd.Timestamp | None) -> pd.Timestamp:

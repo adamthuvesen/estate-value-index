@@ -172,15 +172,3 @@ export interface ValueFinderFacetsResponse {
   statistics: ValueStatistics;
   last_updated: string;
 }
-
-export interface FilterOption {
-  value: string;
-  label: string;
-  count?: number;
-}
-
-export interface RangeFilter {
-  min: number;
-  max: number;
-  step?: number;
-}

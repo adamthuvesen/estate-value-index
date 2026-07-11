@@ -446,7 +446,7 @@ def process_pipeline(
     """Run the complete data processing pipeline.
 
     Args:
-        input_file: Path to new scraped listings file
+        input_file: Path to a new ingested listings file
         production_file: Path to existing production data
         output_file: Path to write final processed data
         min_area_count: Minimum listings per area (default: 5)

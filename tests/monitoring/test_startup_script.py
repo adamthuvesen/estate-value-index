@@ -65,19 +65,6 @@ def test_startup_rejects_missing_required_model(tmp_path: Path) -> None:
     assert "with_list_price.joblib: model missing" in result.stderr
 
 
-def test_startup_rejects_old_model_names(tmp_path: Path) -> None:
-    model_dir = tmp_path / "models"
-    model_dir.mkdir()
-    _write_artifact(model_dir, "price_prediction_model_no_list.joblib")
-    _write_artifact(model_dir, "price_prediction_model_listing.joblib")
-
-    result = _run_startup(tmp_path, model_dir)
-
-    assert result.returncode == 1
-    assert "no_list_price.joblib: model missing" in result.stderr
-    assert "with_list_price.joblib: model missing" in result.stderr
-
-
 def test_startup_rejects_missing_sidecar(tmp_path: Path) -> None:
     model_dir = tmp_path / "models"
     model_dir.mkdir()

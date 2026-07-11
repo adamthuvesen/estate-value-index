@@ -48,7 +48,6 @@ def _cloud_run_env_vars(gcs_bucket: str) -> str:
             f"GCS_BUCKET={gcs_bucket}",
             "NODE_ENV=production",
             "PREDICTION_API_URL=http://127.0.0.1:8000",
-            "TRUST_PROXY_HEADERS=true",
         ]
     )
 

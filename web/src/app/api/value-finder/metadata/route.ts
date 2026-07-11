@@ -6,7 +6,7 @@ import {
 } from "@/lib/value-finder-types";
 import { getValueAnalysisData } from "@/lib/value-analysis-cache";
 import {
-  isValueAnalysisDataMissingError,
+  isMissingDataError,
   valueAnalysisDataErrorResponse,
   valueAnalysisDataMissingResponse,
 } from "@/lib/api-errors";
@@ -84,7 +84,7 @@ export async function GET() {
   } catch (error) {
     console.error("Error in value-finder/metadata API:", error);
 
-    return isValueAnalysisDataMissingError(error)
+    return isMissingDataError(error)
       ? valueAnalysisDataMissingResponse()
       : valueAnalysisDataErrorResponse();
   }
