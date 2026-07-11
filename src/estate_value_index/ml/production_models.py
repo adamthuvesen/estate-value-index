@@ -105,6 +105,7 @@ def _context_payload(context: FeatureEngineeringContext) -> dict[str, object]:
     payload["reference_date"] = context.reference_date.isoformat()
     return {key: _json_safe(value) for key, value in payload.items()}
 
+
 # Residual calibration is applied only to the no_list_price model, and only to high
 # predictions where the tiered model still underpredicts. Offline proof showed
 # global calibration worsened aggregate bias by nudging the well-calibrated

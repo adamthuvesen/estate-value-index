@@ -45,9 +45,7 @@ class BooliApiCredentials:
             if not value
         ]
         if missing:
-            raise RuntimeError(
-                "Booli API credentials are required: " + ", ".join(missing)
-            )
+            raise RuntimeError("Booli API credentials are required: " + ", ".join(missing))
         return cls(caller_id=caller_id or "", private_key=private_key or "")
 
 

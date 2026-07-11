@@ -262,7 +262,9 @@ def load_all_models(models_dir: Path) -> dict[str, dict]:
             requires_listing_price = model.requires_listing_price
             loaded_model_type = model.model_type
         except AttributeError as exc:
-            logger.error("Refusing incompatible %s model (%s): %s", model_type, model_path.name, exc)
+            logger.error(
+                "Refusing incompatible %s model (%s): %s", model_type, model_path.name, exc
+            )
             continue
 
         cache[model_type] = {
