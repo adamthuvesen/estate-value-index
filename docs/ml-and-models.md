@@ -39,6 +39,8 @@ intentionally git-ignored.
   asking-price-derived features such as `price_per_sqm`,
   `relative_area_price`, `total_cost_per_sqm`, `cost_benefit_ratio`, and
   `efficiency_premium`.
+- Feature-set names and configured features are checked before training. Missing,
+  unknown, or malformed feature sets stop the run. No full-registry fallback is used.
 - If production retraining fits on all engineered data, treat holdout metrics as
   bounded evidence. Run a fresh temporal backtest before treating them as live
   generalization evidence.
@@ -78,6 +80,11 @@ intentionally git-ignored.
 ```bash
 uv run python -m estate_value_index.cli train-production-models --data-source bigquery
 ```
+
+Add `--tune` when new LightGBM parameters should be tested. Tuning runs once for
+each production model on its temporal training fold. The chosen parameters are
+reused across that model's ensemble and recorded in its metrics artifact. Fixed
+parameters remain the default for routine retraining.
 
 Past experiment results and feature-selection rationale live in
 `docs/internal/` and are intentionally not part of the public repository.

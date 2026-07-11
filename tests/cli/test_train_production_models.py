@@ -31,10 +31,19 @@ def test_local_training_cli_requests_both_production_models(monkeypatch, tmp_pat
     )
 
     exit_code = train_production_models.main(
-        ["--data-source", "json", "--data-file", "listings.jsonl", "--model-dir", str(tmp_path)]
+        [
+            "--data-source",
+            "json",
+            "--data-file",
+            "listings.jsonl",
+            "--model-dir",
+            str(tmp_path),
+            "--tune",
+        ]
     )
 
     assert exit_code == 0
     assert captured["raw_frame"] is raw_frame
     assert captured["model_dir"] == tmp_path
+    assert captured["tune"] is True
     assert [spec.model_id for spec in captured["specs"]] == [NO_LIST_MODEL_ID, LISTING_MODEL_ID]

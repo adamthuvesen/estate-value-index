@@ -1,8 +1,11 @@
 """Tests for feature engineering functionality."""
 
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import pytest
+import yaml
 
 from src.estate_value_index.ml.features import (
     CATEGORICAL_FEATURE_NAMES,
@@ -22,6 +25,32 @@ from src.estate_value_index.ml.features.heuristics import (
 )
 from src.estate_value_index.ml.training_workflow.data import load_feature_subset
 from tests.conftest import assert_valid_dataframe
+
+
+def test_unknown_feature_subset_fails() -> None:
+    with pytest.raises(ValueError, match="Unknown feature set"):
+        load_feature_subset("missing_feature_set")
+
+
+def test_missing_feature_subset_config_fails(monkeypatch, tmp_path) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    with pytest.raises(FileNotFoundError, match="Feature subset config not found"):
+        load_feature_subset("no_list_price_v1")
+
+
+def test_full_feature_set_is_explicit_and_config_free(monkeypatch, tmp_path) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    assert load_feature_subset("full") == (None, None)
+
+
+def test_all_registered_feature_sets_match_the_feature_registry() -> None:
+    config = yaml.safe_load(Path("config/feature_subsets.yaml").read_text(encoding="utf-8"))
+
+    for feature_set in config:
+        if feature_set != "default":
+            load_feature_subset(feature_set)
 
 
 class TestFeatureEngineering:

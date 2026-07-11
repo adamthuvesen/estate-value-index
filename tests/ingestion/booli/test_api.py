@@ -7,7 +7,7 @@ import pytest
 from estate_value_index.ingestion.booli.api import (
     BooliApiCredentials,
     booli_api_record_to_listing,
-    scrape_booli_api_window,
+    fetch_booli_api_window,
     signed_api_params,
 )
 
@@ -66,7 +66,7 @@ def test_booli_api_record_to_listing_maps_core_fields() -> None:
     assert listing["days_on_market"] == 12
 
 
-def test_scrape_booli_api_window_writes_jsonl(tmp_path) -> None:
+def test_fetch_booli_api_window_writes_jsonl(tmp_path) -> None:
     config = tmp_path / "config.json"
     config.write_text(
         json.dumps({"search_parameters": {"q": "stockholm", "minSoldDate": "2026-04-27"}}),
@@ -86,7 +86,7 @@ def test_scrape_booli_api_window_writes_jsonl(tmp_path) -> None:
                 "location": {"streetAddress": "Testvägen 2", "areaName": "Vasastan"},
             }
 
-    scrape_booli_api_window(
+    fetch_booli_api_window(
         config_file=config,
         output_file=output,
         max_pages=3,

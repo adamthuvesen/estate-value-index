@@ -69,11 +69,11 @@ def _log_pipeline_start(
     )
 
 
-def _log_data_collection_summary(logger: Any, scrape_result: dict[str, Any]) -> None:
-    ingestion_info = scrape_result.get("ingestion", {})
-    processing_info = scrape_result.get("processing", {})
-    bq_info = scrape_result.get("bigquery", {})
-    features_info = scrape_result.get("features", {})
+def _log_data_collection_summary(logger: Any, ingestion_result: dict[str, Any]) -> None:
+    ingestion_info = ingestion_result.get("ingestion", {})
+    processing_info = ingestion_result.get("processing", {})
+    bq_info = ingestion_result.get("bigquery", {})
+    features_info = ingestion_result.get("features", {})
 
     fetched = ingestion_info.get("validation", {}).get("valid_listings", 0)
     processed = processing_info.get("total_listings", 0)
@@ -105,7 +105,7 @@ def _run_data_collection_stage(
     # Ensure we pass a string (empty string means "no config file").
     config_path = config_file or ""
 
-    scrape_result = complete_ingestion_flow(
+    ingestion_result = complete_ingestion_flow(
         max_pages=max_pages,
         upload_to_bq=not dry_run,
         materialize_features=not dry_run,
@@ -114,8 +114,8 @@ def _run_data_collection_stage(
         config_file=config_path,
     )
 
-    results["stages"]["data_collection"] = scrape_result
-    _log_data_collection_summary(logger, scrape_result)
+    results["stages"]["data_collection"] = ingestion_result
+    _log_data_collection_summary(logger, ingestion_result)
 
 
 def _run_sync_stage(logger: Any, results: dict[str, Any], *, dry_run: bool) -> None:
@@ -444,18 +444,22 @@ def complete_pipeline_flow(
 
 @flow(name="Estate Value Index Quick Pipeline - Testing")
 def quick_pipeline_flow(max_pages: int = 5) -> dict:
-    """Quick pipeline for testing (no tuning, no deployment)."""
+    """Quick pipeline for testing without deployment."""
     return complete_pipeline_flow(
         max_pages=max_pages, tune=False, deploy_to_prod=False, dry_run=False
     )
 
 
 @flow(name="Estate Value Index Production Pipeline - Full")
-def production_pipeline_flow(max_pages: int = 5, deploy: bool = True) -> dict:
-    """Full production pipeline: ingest, tune, deploy."""
+def production_pipeline_flow(
+    max_pages: int = 5,
+    deploy: bool = True,
+    tune: bool = False,
+) -> dict:
+    """Full production pipeline with optional parameter tuning."""
     return complete_pipeline_flow(
         max_pages=max_pages,
-        tune=True,
+        tune=tune,
         use_vertex=True,
         machine_type="n1-standard-4",
         deploy_to_prod=deploy,
@@ -465,7 +469,7 @@ def production_pipeline_flow(max_pages: int = 5, deploy: bool = True) -> dict:
 
 
 @flow(name="Estate Value Index Retrain Pipeline - No Ingestion")
-def retrain_pipeline_flow(tune: bool = True, deploy: bool = False) -> dict:
+def retrain_pipeline_flow(tune: bool = False, deploy: bool = False) -> dict:
     """Retrain model using existing data (no ingestion)."""
     return complete_pipeline_flow(
         skip_ingestion=True, tune=tune, use_vertex=True, deploy_to_prod=deploy, dry_run=False
@@ -499,9 +503,9 @@ if __name__ == "__main__":
     )
 
     # Preset modes
-    parser.add_argument("--quick", action="store_true", help="Quick test run (5 pages, no tuning)")
+    parser.add_argument("--quick", action="store_true", help="Quick test run (5 pages)")
     parser.add_argument(
-        "--production", action="store_true", help="Full production run (5 pages, tuning, deploy)"
+        "--production", action="store_true", help="Full production run (5 pages and deploy)"
     )
     parser.add_argument("--retrain", action="store_true", help="Retrain only (no ingestion)")
 
@@ -516,7 +520,11 @@ if __name__ == "__main__":
         default=None,
         help="Path to config file (e.g., src/estate_value_index/ingestion/config/booli_all_locations.json)",
     )
-    parser.add_argument("--tune", action="store_true", help="Enable hyperparameter tuning")
+    parser.add_argument(
+        "--tune",
+        action="store_true",
+        help="Tune one LightGBM parameter set per production model",
+    )
     parser.add_argument(
         "--no-vertex", action="store_true", help="Use local training instead of Vertex AI"
     )
@@ -536,10 +544,10 @@ if __name__ == "__main__":
         result = quick_pipeline_flow(max_pages=5)
     elif args.production:
         print("Running PRODUCTION pipeline...")
-        result = production_pipeline_flow(max_pages=5, deploy=True)
+        result = production_pipeline_flow(max_pages=5, deploy=True, tune=args.tune)
     elif args.retrain:
         print("Running RETRAIN pipeline...")
-        result = retrain_pipeline_flow(tune=True, deploy=args.deploy)
+        result = retrain_pipeline_flow(tune=args.tune, deploy=args.deploy)
     else:
         print("Running end-to-end pipeline...")
         result = complete_pipeline_flow(

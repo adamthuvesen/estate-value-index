@@ -144,6 +144,28 @@ class TestResolveArtifactsFromJobInfo:
 
 class TestSubmitTrainingJobStage:
     @pytest.mark.unit
+    def test_passes_tuning_choice_to_vertex_submission(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        captured = {}
+
+        def fake_submit(**kwargs):
+            captured.update(kwargs)
+            return {
+                "success": True,
+                "job_id": "projects/p/locations/europe-north1/customJobs/123",
+                "run_id": "run",
+                "model_uri": "gs://bucket/vertex-ai/models/run",
+            }
+
+        monkeypatch.setattr(training_pipeline, "submit_vertex_training_job_task", fake_submit)
+        results = {"configuration": {"model_prefix": DEFAULT_MODEL_PREFIX}, "steps": {}}
+
+        _submit_training_job_stage(TrainingFlowConfig(tune=True), results, MagicMock())
+
+        assert captured["tune"] is True
+
+    @pytest.mark.unit
     def test_keeps_production_prefix_unresolved_when_submission_omits_it(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:

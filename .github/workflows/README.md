@@ -43,7 +43,7 @@ Manual inputs:
 | `mode` | `retrain` | Pipeline mode listed above |
 | `max_pages` | `5` | Source page limit in `full` mode |
 | `config_file` | all-locations Booli config | Ingestion configuration |
-| `tune` | `true` | Hyperparameter tuning |
+| `tune` | `false` | Tune one LightGBM parameter set for each production model |
 | `rebuild_container` | `false` | Vertex AI training image rebuild |
 | `deploy` | `false` | Cloud Run deployment after validation |
 
@@ -54,6 +54,12 @@ gh workflow run ml-pipeline.yml -f environment=staging -f mode=local -f tune=fal
 gh workflow run ml-pipeline.yml -f environment=production -f mode=vertex -f tune=true
 gh workflow run ml-pipeline.yml -f environment=production -f mode=full -f deploy=true
 ```
+
+Tuning runs two Optuna studies: one for `no_list_price` and one for
+`with_list_price`. Each study reads only that model's temporal training fold.
+The selected parameters are then reused for its evaluation, tier, out-of-fold,
+and final fits. Expect a tuned run to take longer than the default
+fixed-parameter run.
 
 Model promotion is stopped when the MdAPE check fails.
 

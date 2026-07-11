@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -206,6 +207,7 @@ def _fit_tier_expert_predictions(
     *,
     tier_specs: tuple[TierSpec, ...],
     fallback_predictions: np.ndarray,
+    lgbm_params: dict[str, Any] | None = None,
 ) -> TierExpertFit:
     X_train, X_test, y_train, _ = _prepare_matrices(prepared)
     train_index = _market_index(prepared.train_engineered)
@@ -239,6 +241,7 @@ def _fit_tier_expert_predictions(
             y_normalized.loc[valid_train],
             prepared.categorical_features,
             random_state,
+            lgbm_params=lgbm_params,
         )
         normalized_predictions = np.expm1(model.predict(X_test))
         predictions[spec.name] = denormalize_market_predictions(
@@ -264,6 +267,7 @@ def _build_oof_training_data(
     random_state: int,
     tier_specs: tuple[TierSpec, ...],
     include_calibration_features: bool = False,
+    lgbm_params: dict[str, Any] | None = None,
 ) -> pd.DataFrame:
     """Build out-of-fold expert predictions via a forward-chaining time split.
 
@@ -283,17 +287,19 @@ def _build_oof_training_data(
         fold_train_raw = sorted_train.iloc[fold_train_idx].reset_index(drop=True)
         fold_valid_raw = sorted_train.iloc[fold_valid_idx].reset_index(drop=True)
         prepared = _prepare_model_data(fold_train_raw, fold_valid_raw, feature_set)
-        base_fit = _fit_base_model(prepared, random_state)
+        base_fit = _fit_base_model(prepared, random_state, lgbm_params)
         normalized_fit = _fit_market_normalized_predictions(
             prepared,
             random_state,
             fallback_predictions=base_fit.predictions,
+            lgbm_params=lgbm_params,
         )
         tier_fit = _fit_tier_expert_predictions(
             prepared,
             random_state,
             tier_specs=tier_specs,
             fallback_predictions=normalized_fit.predictions,
+            lgbm_params=lgbm_params,
         )
         fold_frame = prepared.test_engineered.reset_index(drop=True)
         if include_calibration_features:

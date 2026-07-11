@@ -236,6 +236,7 @@ def submit_vertex_training_job_task(
     machine_type: str = "n1-standard-4",
     display_name: str | None = None,
     image_uri: str | None = None,
+    tune: bool = False,
     dry_run: bool = False,
 ) -> VertexJobResult:
     """Submit training job to Vertex AI.
@@ -243,6 +244,7 @@ def submit_vertex_training_job_task(
     Args:
         machine_type: GCP machine type
         display_name: Custom job display name
+        tune: Tune one LightGBM parameter set per production model
         dry_run: If True, only show command without submitting
 
     Returns:
@@ -258,6 +260,8 @@ def submit_vertex_training_job_task(
         cmd.extend(["--display-name", display_name])
     if dry_run:
         cmd.append("--dry-run")
+    if tune:
+        cmd.extend(["--", "--tune"])
 
     env = os.environ.copy()
     env["GCP_REGION"] = "europe-north1"

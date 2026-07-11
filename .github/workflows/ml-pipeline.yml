@@ -44,9 +44,9 @@ on:
         default: 'src/estate_value_index/ingestion/config/booli_all_locations.json'
         type: string
       tune:
-        description: 'Enable hyperparameter tuning'
+        description: 'Tune one LightGBM parameter set per production model'
         required: false
-        default: true
+        default: false
         type: boolean
       rebuild_container:
         description: 'Rebuild Vertex AI training container'
@@ -63,7 +63,7 @@ jobs:
     name: Run ML Pipeline
     runs-on: ubuntu-latest
     timeout-minutes: 120  # 2 hours for full pipeline
-    environment: ${{ github.event_name == 'schedule' && 'production' || inputs.environment }}
+    environment: ${{ inputs.environment }}
     env:
       GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
       BIGQUERY_PROJECT_ID: ${{ vars.BIGQUERY_PROJECT_ID || vars.GCP_PROJECT_ID }}
@@ -137,21 +137,12 @@ jobs:
       - name: Set pipeline parameters
         id: params
         run: |
-          if [ "${{ github.event_name }}" = "schedule" ]; then
-            MODE="retrain"
-            TUNE="true"
-            REBUILD="false"
-            DEPLOY="true"
-            MAX_PAGES="5"
-            CONFIG_FILE="src/estate_value_index/ingestion/config/booli_all_locations.json"
-          else
-            MODE="${{ inputs.mode }}"
-            TUNE="${{ inputs.tune }}"
-            REBUILD="${{ inputs.rebuild_container }}"
-            DEPLOY="${{ inputs.deploy }}"
-            MAX_PAGES="${{ inputs.max_pages }}"
-            CONFIG_FILE="${{ inputs.config_file }}"
-          fi
+          MODE="${{ inputs.mode }}"
+          TUNE="${{ inputs.tune }}"
+          REBUILD="${{ inputs.rebuild_container }}"
+          DEPLOY="${{ inputs.deploy }}"
+          MAX_PAGES="${{ inputs.max_pages }}"
+          CONFIG_FILE="${{ inputs.config_file }}"
 
           echo "mode=$MODE" >> $GITHUB_OUTPUT
           echo "tune=$TUNE" >> $GITHUB_OUTPUT

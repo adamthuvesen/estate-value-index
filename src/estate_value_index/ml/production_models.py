@@ -28,9 +28,10 @@ from estate_value_index.ml import (
     create_temporal_holdout_split,
     filter_valid_listings,
 )
-from estate_value_index.ml.ask_price import mask_ask_price_signals
+from estate_value_index.ml.ask_price import ASK_PRICE_SIGNAL_COLUMNS, mask_ask_price_signals
 from estate_value_index.ml.estimate_range_factors import compute_estimate_range_factors
 from estate_value_index.ml.features.context import FeatureEngineeringContext
+from estate_value_index.ml.features.registry import NUMERIC_FEATURE_NAMES
 from estate_value_index.ml.market_normalized_target import (
     _market_index,
     blend_market_predictions,
@@ -70,7 +71,11 @@ from estate_value_index.ml.tiered_ensemble import (
     select_best_expert_weights,
     select_gated_expert_weights,
 )
-from estate_value_index.ml.training_workflow.data import load_training_dataframe
+from estate_value_index.ml.training import LGBMTrainer
+from estate_value_index.ml.training_workflow.data import (
+    load_feature_subset,
+    load_training_dataframe,
+)
 from estate_value_index.model_artifacts import (
     DEFAULT_MODEL_PREFIX,
     LISTING_MODEL_ID,
@@ -240,7 +245,7 @@ def production_specs(
     no_list_feature_set: str = DEFAULT_NO_LIST_FEATURE_SET,
     listing_feature_set: str = DEFAULT_LISTING_FEATURE_SET,
 ) -> tuple[ProductionModelSpec, ProductionModelSpec]:
-    return (
+    specs = (
         ProductionModelSpec(
             model_id=NO_LIST_MODEL_ID,
             feature_set=no_list_feature_set,
@@ -252,6 +257,29 @@ def production_specs(
             requires_listing_price=True,
         ),
     )
+    for spec in specs:
+        _validate_production_spec(spec)
+    return specs
+
+
+def _validate_production_spec(spec: ProductionModelSpec) -> None:
+    numeric_features, _ = load_feature_subset(spec.feature_set)
+    selected_numeric = (
+        set(NUMERIC_FEATURE_NAMES) if numeric_features is None else set(numeric_features)
+    )
+    ask_price_features = selected_numeric.intersection(ASK_PRICE_SIGNAL_COLUMNS)
+    if spec.requires_listing_price:
+        if "listing_price" not in selected_numeric:
+            raise ValueError(
+                f"Feature set {spec.feature_set!r} must include listing_price for {spec.model_id}"
+            )
+        return
+    if ask_price_features:
+        names = ", ".join(sorted(ask_price_features))
+        raise ValueError(
+            f"Feature set {spec.feature_set!r} cannot include asking-price signals "
+            f"for {spec.model_id}: {names}"
+        )
 
 
 def load_raw_training_frame(
@@ -277,26 +305,40 @@ def train_and_persist_production_models(
     specs: tuple[ProductionModelSpec, ...] | None = None,
     n_splits: int = 4,
     random_state: int | None = None,
+    tune: bool = False,
 ) -> dict[str, ProductionTrainingResult]:
     """Run temporal evaluation, refit on all rows, and persist both models."""
+    resolved_specs = specs or production_specs()
+    for spec in resolved_specs:
+        _validate_production_spec(spec)
+
     model_dir.mkdir(parents=True, exist_ok=True)
     seed = get_random_state() if random_state is None else random_state
-    resolved_specs = specs or production_specs()
     results: dict[str, ProductionTrainingResult] = {}
 
     for spec in resolved_specs:
         logger.info("Training production model %s (%s)", spec.model_id, spec.feature_set)
-        filtered = filter_training_rows(raw_frame, spec.feature_set)
+        filtered = filter_training_rows(
+            raw_frame,
+            spec.feature_set,
+            requires_listing_price=spec.requires_listing_price,
+        )
         train_raw, test_raw = create_temporal_holdout_split(
             filtered,
             test_size=get_test_size(),
             date_column="sold_date",
+        )
+        lgbm_params = (
+            tune_production_hyperparameters(train_raw, spec=spec, random_state=seed)
+            if tune
+            else LGBMTrainer.DEFAULT_PARAMS.copy()
         )
         evaluation_model = fit_tiered_production_model(
             train_raw,
             spec=spec,
             n_splits=n_splits,
             random_state=seed,
+            lgbm_params=lgbm_params,
         )
         eval_test = test_raw.reset_index(drop=True)
         y_test = eval_test["sold_price"]
@@ -310,6 +352,7 @@ def train_and_persist_production_models(
             spec=spec,
             n_splits=n_splits,
             random_state=seed,
+            lgbm_params=lgbm_params,
         )
         metrics = _metrics_payload(
             production_model,
@@ -321,6 +364,8 @@ def train_and_persist_production_models(
             production_rows=len(filtered),
             test_start=str(test_raw["sold_date"].min().date()),
             test_end=str(test_raw["sold_date"].max().date()),
+            lgbm_params=lgbm_params,
+            tuned=tune,
         )
         artifact_paths = persist_production_model(
             production_model,
@@ -337,12 +382,38 @@ def train_and_persist_production_models(
     return results
 
 
-def filter_training_rows(raw_frame: pd.DataFrame, feature_set: str) -> pd.DataFrame:
+def tune_production_hyperparameters(
+    raw_frame: pd.DataFrame,
+    *,
+    spec: ProductionModelSpec,
+    random_state: int,
+) -> dict[str, Any]:
+    """Tune once on the temporal training fold for one production model."""
+    ordered = raw_frame.sort_values("sold_date").reset_index(drop=True)
+    raw = _prepare_raw_for_model(ordered, requires_listing_price=spec.requires_listing_price)
+    engineered = create_optimized_features(raw)
+    context = build_feature_context(engineered)
+    numeric_features, categorical_features = _resolve_features(engineered, spec.feature_set)
+    X = _feature_matrix(engineered, numeric_features, categorical_features, context)
+    trainer = LGBMTrainer(random_state=random_state)
+    return trainer.tune_parameters(X, np.log1p(engineered["sold_price"]))
+
+
+def filter_training_rows(
+    raw_frame: pd.DataFrame,
+    feature_set: str,
+    *,
+    requires_listing_price: bool | None = None,
+) -> pd.DataFrame:
     filtered = filter_valid_listings(
         raw_frame,
         min_price=3_000_000,
         drop_na_features=False,
-        require_listing_price=_feature_set_requires_listing_price(feature_set),
+        require_listing_price=(
+            _feature_set_requires_listing_price(feature_set)
+            if requires_listing_price is None
+            else requires_listing_price
+        ),
     )
     filtered = filtered.copy()
     filtered["sold_date"] = pd.to_datetime(filtered["sold_date"], errors="coerce")
@@ -366,6 +437,7 @@ def fit_tiered_production_model(
     gate_high_min: float = DEFAULT_INFERENCE_GATE_HIGH_MIN,
     weight_step: float = DEFAULT_WEIGHT_STEP,
     min_segment_rows: int = DEFAULT_MIN_SEGMENT_ROWS,
+    lgbm_params: dict[str, Any] | None = None,
 ) -> TieredProductionModel:
     if n_splits < 2:
         raise ValueError("n_splits must be at least 2")
@@ -377,7 +449,13 @@ def fit_tiered_production_model(
     X = _feature_matrix(engineered, numeric_features, categorical_features, context)
     y = engineered["sold_price"].copy()
 
-    base_model = _train_lgbm(X, y, categorical_features, random_state)
+    base_model = _train_lgbm(
+        X,
+        y,
+        categorical_features,
+        random_state,
+        lgbm_params=lgbm_params,
+    )
     train_index = _market_index(engineered)
     reference_index = market_index_reference(train_index)
     y_normalized = normalize_prices_to_market_index(
@@ -400,6 +478,7 @@ def fit_tiered_production_model(
         y_normalized.loc[valid_market],
         categorical_features,
         random_state,
+        lgbm_params=lgbm_params,
     )
 
     tier_specs = _tier_specs(
@@ -417,6 +496,7 @@ def fit_tiered_production_model(
         categorical_features,
         tier_specs=tier_specs,
         random_state=random_state,
+        lgbm_params=lgbm_params,
     )
     fit_calibrator = spec.model_id == NO_LIST_MODEL_ID
     blend = _select_blend(
@@ -430,6 +510,7 @@ def fit_tiered_production_model(
         gate_low_max=gate_low_max,
         gate_high_min=gate_high_min,
         include_calibration_features=fit_calibrator,
+        lgbm_params=lgbm_params,
     )
 
     model = TieredProductionModel(
@@ -569,6 +650,7 @@ def _fit_tier_models(
     *,
     tier_specs: tuple[TierSpec, ...],
     random_state: int,
+    lgbm_params: dict[str, Any] | None = None,
 ) -> dict[str, Any | None]:
     models: dict[str, Any | None] = {}
     for tier_spec in tier_specs:
@@ -581,6 +663,7 @@ def _fit_tier_models(
             y_normalized.loc[valid_tier],
             categorical_features,
             random_state,
+            lgbm_params=lgbm_params,
         )
     return models
 
@@ -596,6 +679,7 @@ def _select_blend(
     gate_low_max: float = DEFAULT_INFERENCE_GATE_LOW_MAX,
     gate_high_min: float = DEFAULT_INFERENCE_GATE_HIGH_MIN,
     include_calibration_features: bool = False,
+    lgbm_params: dict[str, Any] | None = None,
 ) -> dict[str, object]:
     oof = _build_oof_training_data(
         raw_frame,
@@ -604,6 +688,7 @@ def _select_blend(
         random_state=random_state,
         tier_specs=tier_specs,
         include_calibration_features=include_calibration_features,
+        lgbm_params=lgbm_params,
     )
     global_selection = select_best_market_blend_weight(
         oof["actual_price"].to_numpy(),
@@ -704,6 +789,8 @@ def _metrics_payload(
     production_rows: int,
     test_start: str,
     test_end: str,
+    lgbm_params: dict[str, Any],
+    tuned: bool,
 ) -> dict[str, object]:
     return {
         "model_id": model.model_id,
@@ -733,6 +820,10 @@ def _metrics_payload(
         "gated_weights_by_gate": model.gated_weights_by_gate,
         "gate_low_max": model.gate_low_max,
         "gate_high_min": model.gate_high_min,
+        "training_parameters": {
+            "source": "optuna" if tuned else "default",
+            "lightgbm": lgbm_params,
+        },
     }
 
 

@@ -9,7 +9,14 @@ import pandas as pd
 import pytest
 from lightgbm import LGBMRegressor
 
-from estate_value_index.ml.training import LGBMTrainer
+from estate_value_index.ml.training import LGBMTrainer, _raw_price_mae
+
+
+def test_raw_price_mae_inverts_log_targets() -> None:
+    y_true_log = np.log1p([100.0, 200.0])
+    y_pred_log = np.log1p([110.0, 180.0])
+
+    assert _raw_price_mae(y_true_log, y_pred_log) == pytest.approx(15.0)
 
 
 class TestLGBMTrainerInit:
@@ -146,6 +153,38 @@ class TestLGBMTrainerTrain:
         )
 
         assert isinstance(model, LGBMRegressor)
+
+    @pytest.mark.unit
+    def test_train_with_preselected_parameters(
+        self,
+        sample_training_features: pd.DataFrame,
+        sample_training_target: np.ndarray,
+    ) -> None:
+        trainer = LGBMTrainer()
+        parameters = {**LGBMTrainer.DEFAULT_PARAMS, "num_leaves": 31}
+
+        model = trainer.train(
+            sample_training_features,
+            sample_training_target,
+            parameters=parameters,
+        )
+
+        assert model.num_leaves == 31
+        assert trainer.best_params == parameters
+
+    @pytest.mark.unit
+    def test_train_rejects_tuning_with_preselected_parameters(
+        self,
+        sample_training_features: pd.DataFrame,
+        sample_training_target: np.ndarray,
+    ) -> None:
+        with pytest.raises(ValueError, match="cannot be combined"):
+            LGBMTrainer().train(
+                sample_training_features,
+                sample_training_target,
+                hyperparameter_tuning=True,
+                parameters=LGBMTrainer.DEFAULT_PARAMS,
+            )
 
 
 class TestLGBMTrainerPredict:

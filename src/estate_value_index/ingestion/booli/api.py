@@ -251,7 +251,7 @@ class BooliApiClient:
                 return
 
 
-def scrape_booli_api_window(
+def fetch_booli_api_window(
     *,
     config_file: str | Path,
     output_file: str | Path,

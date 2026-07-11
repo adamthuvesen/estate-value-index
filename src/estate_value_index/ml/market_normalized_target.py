@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -118,6 +119,7 @@ def _fit_market_normalized_predictions(
     random_state: int,
     *,
     fallback_predictions: np.ndarray,
+    lgbm_params: dict[str, Any] | None = None,
 ) -> MarketNormalizedFit:
     """Fit the normalized target for one training/validation split."""
     X_train, X_test, y_train, _ = _prepare_matrices(prepared)
@@ -144,6 +146,7 @@ def _fit_market_normalized_predictions(
         y_normalized.loc[valid_train],
         prepared.categorical_features,
         random_state,
+        lgbm_params=lgbm_params,
     )
     normalized_predictions = np.expm1(model.predict(X_test))
     predictions = denormalize_market_predictions(

@@ -8,7 +8,7 @@ from typing import Any
 
 from prefect import flow, get_run_logger, task
 
-from estate_value_index.ingestion.booli.api import scrape_booli_api_window
+from estate_value_index.ingestion.booli.api import fetch_booli_api_window
 from estate_value_index.pipelines.utils import get_task_logger
 from estate_value_index.utils.gcs import GCSClient, is_gcs_enabled
 from estate_value_index.utils.settings import get_min_ingestion_validation_rate
@@ -33,7 +33,7 @@ def fetch_booli_api(
         output_file.parent.mkdir(parents=True, exist_ok=True)
     resolved_config = Path(config_file) if config_file else DEFAULT_BOOLI_CONFIG
     logger.info("Fetching Booli API records (max_pages=%s, config=%s)", max_pages, resolved_config)
-    result = scrape_booli_api_window(
+    result = fetch_booli_api_window(
         config_file=resolved_config,
         output_file=output_file,
         max_pages=max_pages,

@@ -153,12 +153,12 @@ def test_run_backfill_dry_run_does_not_read_config(tmp_path: Path) -> None:
     ]
 
 
-def test_run_backfill_retries_window_scrape_failure(tmp_path: Path) -> None:
+def test_run_backfill_retries_window_fetch_failure(tmp_path: Path) -> None:
     base_config = tmp_path / "base.json"
     base_config.write_text(json.dumps({"search_parameters": {}}), encoding="utf-8")
     calls = 0
 
-    def scrape(**kwargs) -> Path:
+    def fetch(**kwargs) -> Path:
         nonlocal calls
         calls += 1
         output_file = Path(kwargs["output_file"])
@@ -179,7 +179,7 @@ def test_run_backfill_retries_window_scrape_failure(tmp_path: Path) -> None:
         max_pages=20,
         dry_run=False,
         max_window_retries=1,
-        scrape=scrape,
+        fetch=fetch,
     )
 
     assert calls == 2
@@ -191,7 +191,7 @@ def test_run_backfill_uses_api_source(tmp_path: Path) -> None:
     base_config.write_text(json.dumps({"search_parameters": {}}), encoding="utf-8")
     seen_kwargs: dict[str, object] = {}
 
-    def scrape(**kwargs) -> Path:
+    def fetch(**kwargs) -> Path:
         seen_kwargs.update(kwargs)
         output_file = Path(kwargs["output_file"])
         output_file.write_text(
@@ -208,7 +208,7 @@ def test_run_backfill_uses_api_source(tmp_path: Path) -> None:
         window_days=1,
         max_pages=3,
         dry_run=False,
-        scrape=scrape,
+        fetch=fetch,
     )
 
     assert seen_kwargs["max_pages"] == 3
@@ -219,7 +219,7 @@ def test_run_backfill_fails_after_low_validation_retry(tmp_path: Path) -> None:
     base_config = tmp_path / "base.json"
     base_config.write_text(json.dumps({"search_parameters": {}}), encoding="utf-8")
 
-    def scrape(**kwargs) -> Path:
+    def fetch(**kwargs) -> Path:
         output_file = Path(kwargs["output_file"])
         output_file.write_text('{"listing_id": "1"}\n', encoding="utf-8")
         return output_file
@@ -235,7 +235,7 @@ def test_run_backfill_fails_after_low_validation_retry(tmp_path: Path) -> None:
             dry_run=False,
             max_window_retries=1,
             min_validation_rate=0.5,
-            scrape=scrape,
+            fetch=fetch,
         )
 
 
@@ -243,7 +243,7 @@ def test_run_backfill_fails_on_zero_fetched_rows(tmp_path: Path) -> None:
     base_config = tmp_path / "base.json"
     base_config.write_text(json.dumps({"search_parameters": {}}), encoding="utf-8")
 
-    def scrape(**kwargs) -> Path:
+    def fetch(**kwargs) -> Path:
         output_file = Path(kwargs["output_file"])
         output_file.write_text("", encoding="utf-8")
         return output_file
@@ -258,7 +258,7 @@ def test_run_backfill_fails_on_zero_fetched_rows(tmp_path: Path) -> None:
             max_pages=20,
             dry_run=False,
             max_window_retries=0,
-            scrape=scrape,
+            fetch=fetch,
         )
 
 

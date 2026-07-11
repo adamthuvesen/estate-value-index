@@ -7,12 +7,13 @@ from __future__ import annotations
 
 import logging
 import time
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 import numpy as np
 import pandas as pd
 from lightgbm import LGBMRegressor
+from sklearn.metrics import make_scorer, mean_absolute_error
 from sklearn.model_selection import TimeSeriesSplit, cross_val_score
 
 logger = logging.getLogger(__name__)
@@ -20,6 +21,11 @@ logger = logging.getLogger(__name__)
 # Type aliases for training data
 Features = pd.DataFrame | np.ndarray
 Target = pd.Series | np.ndarray
+
+
+def _raw_price_mae(y_true_log: Target, y_pred_log: Target) -> float:
+    """Compute MAE in SEK for models trained on log prices."""
+    return float(mean_absolute_error(np.expm1(y_true_log), np.expm1(y_pred_log)))
 
 
 class LGBMTrainer:
@@ -60,6 +66,7 @@ class LGBMTrainer:
         y_train_log: Target,
         hyperparameter_tuning: bool = False,
         categorical_indices: Sequence[int] | None = None,
+        parameters: Mapping[str, Any] | None = None,
     ) -> LGBMRegressor:
         """Train LightGBM model with optional Optuna hyperparameter tuning.
 
@@ -68,12 +75,22 @@ class LGBMTrainer:
             y_train_log: Log-transformed training target
             hyperparameter_tuning: Run Optuna Bayesian optimization
             categorical_indices: Indices of categorical feature columns
+            parameters: Preselected parameters. Cannot be combined with tuning.
 
         Returns:
             Trained LGBMRegressor model
         """
+        if hyperparameter_tuning and parameters is not None:
+            raise ValueError("parameters cannot be combined with hyperparameter_tuning")
         if hyperparameter_tuning:
             return self._train_with_tuning(X_train, y_train_log, categorical_indices)
+        if parameters is not None:
+            return self._train_with_parameters(
+                X_train,
+                y_train_log,
+                dict(parameters),
+                categorical_indices,
+            )
         return self._train_with_defaults(X_train, y_train_log, categorical_indices)
 
     def _train_with_defaults(
@@ -92,6 +109,20 @@ class LGBMTrainer:
 
         return self.model
 
+    def _train_with_parameters(
+        self,
+        X_train: Features,
+        y_train_log: Target,
+        parameters: dict[str, Any],
+        categorical_indices: Sequence[int] | None = None,
+    ) -> LGBMRegressor:
+        """Fit a model with parameters selected by an earlier tuning study."""
+        self.best_params = parameters.copy()
+        self.model = self._create_model(self.best_params)
+        self._fit_model(X_train, y_train_log, categorical_indices)
+        self.tuning_time = 0.0
+        return self.model
+
     def _train_with_tuning(
         self,
         X_train: Features,
@@ -99,17 +130,28 @@ class LGBMTrainer:
         categorical_indices: Sequence[int] | None = None,
     ) -> LGBMRegressor:
         """Train with Bayesian optimization using Optuna."""
+        parameters = self.tune_parameters(X_train, y_train_log)
+        tuning_time = self.tuning_time
+        model = self._train_with_parameters(
+            X_train,
+            y_train_log,
+            parameters,
+            categorical_indices,
+        )
+        self.tuning_time = tuning_time
+        return model
+
+    def tune_parameters(self, X_train: Features, y_train_log: Target) -> dict[str, Any]:
+        """Select one parameter set without fitting the final model."""
         import optuna
 
         logger.info("Starting Optuna hyperparameter optimization")
         start_time = time.time()
-
         study = optuna.create_study(
             direction="minimize",
             sampler=optuna.samplers.TPESampler(seed=self.random_state),
             pruner=optuna.pruners.MedianPruner(n_startup_trials=5, n_warmup_steps=3),
         )
-
         optuna.logging.set_verbosity(optuna.logging.WARNING)
 
         def objective(trial: optuna.Trial) -> float:
@@ -125,31 +167,28 @@ class LGBMTrainer:
                 "max_depth": trial.suggest_int("max_depth", 6, 12),
                 "min_split_gain": trial.suggest_float("min_split_gain", 0.001, 0.01, log=True),
             }
-
             model = self._create_model(params)
-            tscv = TimeSeriesSplit(n_splits=3)
             scores = cross_val_score(
-                model, X_train, y_train_log, cv=tscv, scoring="neg_mean_absolute_error", n_jobs=-1
+                model,
+                X_train,
+                y_train_log,
+                cv=TimeSeriesSplit(n_splits=3),
+                scoring=make_scorer(_raw_price_mae, greater_is_better=False),
+                n_jobs=-1,
             )
-
             return float(-scores.mean())
 
-        n_trials = 5
-        study.optimize(objective, n_trials=n_trials, show_progress_bar=True)
-
-        self.best_params = study.best_params
-        self.model = self._create_model(self.best_params)
-        self._fit_model(X_train, y_train_log, categorical_indices)
-
+        study.optimize(objective, n_trials=5, show_progress_bar=True)
+        self.best_params = dict(study.best_params)
         self.tuning_time = time.time() - start_time
         optuna.logging.set_verbosity(optuna.logging.INFO)
-
         logger.info(
-            "Optimization completed in %.1fs. Best CV MAE: %.2f", self.tuning_time, study.best_value
+            "Optimization completed in %.1fs. Best CV MAE: %.2f",
+            self.tuning_time,
+            study.best_value,
         )
         logger.debug("Best parameters: %s", self.best_params)
-
-        return self.model
+        return self.best_params.copy()
 
     def _create_model(self, params: dict[str, Any]) -> LGBMRegressor:
         """Create LGBMRegressor with given parameters."""

@@ -24,6 +24,10 @@ TRAIN_DEPLOYMENT_PARAMETERS: dict = {
         )
     ),
 }
+INGESTION_DEPLOYMENT_PARAMETERS = {
+    "max_pages": 20,
+    "upload_to_cloud": True,
+}
 
 
 def deploy_all():
@@ -38,17 +42,14 @@ def deploy_all():
             description="Weekly authorized Booli API ingestion",
             version="1.0.0",
             tags=["production", "ingestion", "data-collection"],
-            parameters={
-                "max_pages": 20,
-                "upload_to_cloud": True,
-            },
+            parameters=INGESTION_DEPLOYMENT_PARAMETERS,
             cron="0 2 * * 0",  # Every Sunday at 2 AM CET
             paused=False,
         )
 
         train_deployment = train_model_flow.to_deployment(
             name="Estate Value Index Monthly ML Pipeline",
-            description="Monthly model retraining with hyperparameter tuning",
+            description="Monthly production model retraining",
             version="1.0.0",
             tags=["production", "training", "ml"],
             # `vertex_training_flow` takes a single `config: TrainingFlowConfig`

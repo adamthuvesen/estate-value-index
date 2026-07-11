@@ -96,18 +96,19 @@ def _run_local_training(config: TrainingFlowConfig, results: dict, logger: Logge
     try:
         stdout_capture = io.StringIO()
         with redirect_stdout(stdout_capture):
-            exit_code = train_production_models_main(
-                [
-                    "--data-source",
-                    "json",
-                    "--data-file",
-                    str(data_file),
-                    "--model-dir",
-                    config.local_model_dir,
-                    "--model-prefix",
-                    config.model_prefix,
-                ]
-            )
+            training_args = [
+                "--data-source",
+                "json",
+                "--data-file",
+                str(data_file),
+                "--model-dir",
+                config.local_model_dir,
+                "--model-prefix",
+                config.model_prefix,
+            ]
+            if config.tune:
+                training_args.append("--tune")
+            exit_code = train_production_models_main(training_args)
         if exit_code != 0:
             raise RuntimeError(f"train-production-models exited with code {exit_code}")
 
@@ -211,6 +212,7 @@ def _submit_training_job_stage(
         machine_type=config.machine_type,
         display_name=job_display_name,
         image_uri=(results.get("steps", {}).get("rebuild_container", {}).get("image_uri")),
+        tune=config.tune,
         dry_run=config.dry_run,
     )
     results["steps"]["submit_job"] = submission_results
@@ -630,7 +632,6 @@ def vertex_training_flow(config: TrainingFlowConfig | None = None) -> dict:
         "configuration": {
             "tune": config.tune,
             "machine_type": config.machine_type,
-            "importance_threshold": config.importance_threshold,
             "max_median_ape": config.max_median_ape,
         },
         "steps": {},
@@ -702,12 +703,16 @@ def quick_vertex_training_flow(tune: bool = False) -> dict:
 
 
 @flow(name="Estate Value Index Vertex AI Training - Production Run")
-def production_vertex_training_flow(rebuild: bool = False, register: bool = True) -> dict:
+def production_vertex_training_flow(
+    rebuild: bool = False,
+    register: bool = True,
+    tune: bool = False,
+) -> dict:
     """
     Production flow with full validation and registration.
 
     Features:
-    - Hyperparameter tuning enabled
+    - Optional production-model parameter tuning
     - Standard machine (n1-standard-4)
     - Optional container rebuild
     - Model registry registration
@@ -716,12 +721,13 @@ def production_vertex_training_flow(rebuild: bool = False, register: bool = True
     Args:
         rebuild: Rebuild container before training
         register: Register to Vertex AI Model Registry
+        tune: Tune one LightGBM parameter set per production model
 
     Returns:
         Training results dict
     """
     config = TrainingFlowConfig(
-        tune=True,
+        tune=tune,
         machine_type="n1-standard-4",
         rebuild_container=rebuild,
         skip_materialization=False,

@@ -12,7 +12,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from estate_value_index.ingestion.booli.api import scrape_booli_api_window
+from estate_value_index.ingestion.booli.api import fetch_booli_api_window
 
 if TYPE_CHECKING:
     from argparse import Namespace
@@ -162,7 +162,7 @@ def run_backfill(
     dry_run: bool,
     max_window_retries: int = 2,
     min_validation_rate: float = 0.5,
-    scrape: Callable[..., Path] | None = None,
+    fetch: Callable[..., Path] | None = None,
 ) -> dict[str, Any]:
     windows = list(date_windows(start_date, end_date, window_days))
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -179,7 +179,7 @@ def run_backfill(
             "min_validation_rate": min_validation_rate,
         }
 
-    scrape_fn = scrape or scrape_booli_api_window
+    fetch_fn = fetch or fetch_booli_api_window
 
     listing_files: list[Path] = []
     window_counts: dict[str, int] = {}
@@ -191,18 +191,18 @@ def run_backfill(
         write_window_config(base_config_file, config_file, window)
 
         last_error: Exception | None = None
-        scraped_file: Path | None = None
+        fetched_file: Path | None = None
         for attempt in range(max_window_retries + 1):
             output_file.unlink(missing_ok=True)
             try:
-                scraped_file = Path(
-                    scrape_fn(
+                fetched_file = Path(
+                    fetch_fn(
                         max_pages=max_pages,
                         config_file=str(config_file),
                         output_file=output_file,
                     )
                 )
-                validation = validate_jsonl_file(scraped_file)
+                validation = validate_jsonl_file(fetched_file)
                 window_validation[window.label] = validation
                 if validation["total_listings"] == 0:
                     raise RuntimeError(f"zero fetched rows for window {window.label}")
@@ -218,11 +218,11 @@ def run_backfill(
                 if attempt >= max_window_retries:
                     raise
 
-        if scraped_file is None:
+        if fetched_file is None:
             raise RuntimeError(f"Backfill window {window.label} failed") from last_error
 
-        listing_files.append(scraped_file)
-        window_counts[window.label] = count_jsonl_records(scraped_file)
+        listing_files.append(fetched_file)
+        window_counts[window.label] = count_jsonl_records(fetched_file)
 
     merged_file = output_dir / "all_dedup.jsonl"
     merge_summary = merge_deduped_jsonl(listing_files, merged_file)

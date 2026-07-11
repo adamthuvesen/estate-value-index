@@ -19,6 +19,7 @@ from estate_value_index.pipelines.tasks.training import (
     _parse_vertex_job_output,
     download_model_artifacts_task,
     promote_model_to_production_task,
+    submit_vertex_training_job_task,
     validate_model_performance_task,
 )
 
@@ -127,6 +128,25 @@ class TestGetJobState:
         assert "describe" in cmd
         assert "--region" in cmd
         assert "europe-west1" in cmd
+
+
+def test_vertex_submission_forwards_tuning_flag(mocker: Any) -> None:
+    completed = MagicMock(
+        returncode=0,
+        stdout=(
+            "Created: projects/p/locations/europe-north1/customJobs/123\n"
+            "Run ID: run-1\n"
+            "Model URI: gs://bucket/vertex-ai/models/run-1\n"
+        ),
+        stderr="",
+    )
+    run = mocker.patch("subprocess.run", return_value=completed)
+
+    submit_vertex_training_job_task.fn(tune=True, dry_run=True)
+
+    command = run.call_args.args[0]
+    assert command[-2:] == ["--", "--tune"]
+    assert command.index("--dry-run") < command.index("--")
 
 
 class TestValidateModelPerformance:

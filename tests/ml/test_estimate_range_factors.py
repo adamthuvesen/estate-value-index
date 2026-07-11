@@ -139,6 +139,12 @@ def test_factors_land_in_metrics_payload() -> None:
         production_rows=15,
         test_start="2026-01-01",
         test_end="2026-07-01",
+        lgbm_params={"num_leaves": 20},
+        tuned=True,
     )
 
     assert payload["estimate_range_factors"] is factors
+    assert payload["training_parameters"] == {
+        "source": "optuna",
+        "lightgbm": {"num_leaves": 20},
+    }

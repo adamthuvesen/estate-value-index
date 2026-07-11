@@ -30,15 +30,20 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--no-list-feature-set", default=DEFAULT_NO_LIST_FEATURE_SET)
     parser.add_argument("--listing-feature-set", default=DEFAULT_LISTING_FEATURE_SET)
     parser.add_argument("--n-splits", type=int, default=4)
+    parser.add_argument(
+        "--tune",
+        action="store_true",
+        help="Tune one LightGBM parameter set per production model before fitting the ensemble.",
+    )
     parser.add_argument("--random-state", type=int, default=None)
     parser.add_argument("--summary", type=Path, default=None)
     args = parser.parse_args(argv)
 
-    raw_frame = load_raw_training_frame(data_source=args.data_source, data_file=args.data_file)
     specs = production_specs(
         no_list_feature_set=args.no_list_feature_set,
         listing_feature_set=args.listing_feature_set,
     )
+    raw_frame = load_raw_training_frame(data_source=args.data_source, data_file=args.data_file)
     results = train_and_persist_production_models(
         raw_frame=raw_frame,
         model_dir=args.model_dir,
@@ -46,6 +51,7 @@ def main(argv: list[str] | None = None) -> int:
         specs=specs,
         n_splits=args.n_splits,
         random_state=args.random_state,
+        tune=args.tune,
     )
 
     summary = {

@@ -52,6 +52,9 @@ GCS_ENABLED=false uv run python -m estate_value_index.cli train-production-model
   --data-source bigquery --model-dir web/models
 ```
 
+Add `--tune` only when parameter search is wanted. It runs one Optuna study per
+production model and takes longer than routine retraining.
+
 Orchestrated pipeline: `uv run python -m estate_value_index.pipelines.core.complete_pipeline --quick`
 (see `--help` and [docs/data-pipeline.md](docs/data-pipeline.md)).
 

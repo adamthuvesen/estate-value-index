@@ -103,7 +103,7 @@ def test_fetch_booli_api_forwards_config_and_output(tmp_path, monkeypatch):
         )
         return output_file
 
-    monkeypatch.setattr(data_pipeline, "scrape_booli_api_window", fake_fetch)
+    monkeypatch.setattr(data_pipeline, "fetch_booli_api_window", fake_fetch)
 
     result = data_pipeline.fetch_booli_api.fn(
         max_pages=3,

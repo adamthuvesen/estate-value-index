@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -188,9 +189,16 @@ def _resolve_features(
 def _fit_base_model(
     prepared: PreparedModelData,
     random_state: int,
+    lgbm_params: dict[str, Any] | None = None,
 ) -> BaseFitResult:
     X_train, X_test, y_train, _ = _prepare_matrices(prepared)
-    model = _train_lgbm(X_train, y_train, prepared.categorical_features, random_state)
+    model = _train_lgbm(
+        X_train,
+        y_train,
+        prepared.categorical_features,
+        random_state,
+        lgbm_params=lgbm_params,
+    )
     predictions = np.expm1(model.predict(X_test))
     return BaseFitResult(
         model=model,
@@ -222,6 +230,8 @@ def _train_lgbm(
     y_train: pd.Series,
     categorical_features: list[str],
     random_state: int,
+    *,
+    lgbm_params: dict[str, Any] | None = None,
 ) -> LGBMRegressor:
     trainer = LGBMTrainer(random_state=random_state)
     categorical_indices = get_categorical_indices(X_train, categorical_features)
@@ -230,6 +240,7 @@ def _train_lgbm(
         np.log1p(y_train),
         hyperparameter_tuning=False,
         categorical_indices=categorical_indices,
+        parameters=lgbm_params,
     )
 
 

@@ -77,7 +77,6 @@ class TrainingFlowConfig:
     # Training configuration
     tune: bool = False
     machine_type: str = DEFAULT_MACHINE_TYPE
-    importance_threshold: float | None = None
 
     # Pipeline toggles
     rebuild_container: bool = False
