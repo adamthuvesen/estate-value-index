@@ -6,15 +6,15 @@ The public serving contract has two model ids:
 - ``with_list_price``: uses the listing price when it is available.
 
 ``TieredProductionModel`` wraps the tier-spec, gating, and blend-selection
-helpers from ``ml.tiered_ensemble`` — the experiment track that won
-over ``ml.specialist_model`` and ``ml.premium_specialist``.
+helpers from ``ml.tiered_ensemble``.
 """
 
 from __future__ import annotations
 
 import json
 import logging
-from dataclasses import dataclass
+import math
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
@@ -71,7 +71,6 @@ from estate_value_index.ml.tiered_ensemble import (
     select_gated_expert_weights,
 )
 from estate_value_index.ml.training_workflow.data import load_training_dataframe
-from estate_value_index.ml.training_workflow.runner import _context_payload
 from estate_value_index.model_artifacts import (
     DEFAULT_MODEL_PREFIX,
     LISTING_MODEL_ID,
@@ -90,11 +89,27 @@ logger = logging.getLogger(__name__)
 DEFAULT_NO_LIST_FEATURE_SET = "no_list_price_v1"
 DEFAULT_LISTING_FEATURE_SET = "with_list_price_v1"
 
+
+def _json_safe(value):
+    if isinstance(value, dict):
+        return {key: _json_safe(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_json_safe(item) for item in value]
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
+    return value
+
+
+def _context_payload(context: FeatureEngineeringContext) -> dict[str, object]:
+    payload = asdict(context)
+    payload["reference_date"] = context.reference_date.isoformat()
+    return {key: _json_safe(value) for key, value in payload.items()}
+
 # Residual calibration is applied only to the no_list_price model, and only to high
 # predictions where the tiered model still underpredicts. Offline proof showed
 # global calibration worsened aggregate bias by nudging the well-calibrated
 # mid-market down; restricting to the tail improves MAE, bias, and the high-end
-# at once. See ml/production_residual_calibration.py.
+# at once. The supporting experiment results live in docs/internal/.
 DEFAULT_CALIBRATION_MAX_ABS = 1_000_000.0
 DEFAULT_CALIBRATION_MAX_FRAC = 0.12
 DEFAULT_CALIBRATION_MIN_PREDICTION = 8_000_000.0

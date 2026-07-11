@@ -65,59 +65,6 @@ def test_unrecognised_token_returns_na_at_feature(raw):
     assert coerced.isna().iloc[0]
 
 
-def test_pipeline_unrecognised_token_stays_nullable_and_warns():
-    """BooliPipeline must NOT collapse 'unknown' to True via bare bool()."""
-    from estate_value_index.ingestion.booli.pipelines import BooliPipeline
-
-    class _StubLogger:
-        def __init__(self) -> None:
-            self.warnings: list[tuple[str, tuple]] = []
-
-        def warning(self, msg, *args):
-            self.warnings.append((msg, args))
-
-        def debug(self, *_a, **_kw):
-            pass
-
-    class _StubSpider:
-        def __init__(self) -> None:
-            self.logger = _StubLogger()
-
-    pipeline = BooliPipeline()
-    spider = _StubSpider()
-    pipeline.open_spider(spider)
-
-    item = {
-        "listing_id": "L1",
-        "balcony": "unknown",
-        "elevator": True,
-        "address": None,
-        "area": None,
-        "municipality": None,
-        "property_type": None,
-        "description": None,
-        "living_area": None,
-        "listing_price": 4_500_000,
-        "sold_price": None,
-        "price_per_sqm": None,
-        "monthly_fee": None,
-        "rooms": None,
-        "construction_year": None,
-        "days_on_market": None,
-        "price_change": None,
-        "floor": None,
-        "source_page": None,
-        "images": None,
-    }
-    out = pipeline.process_item(item, spider)
-    assert out["balcony"] is None, "Unrecognised token must stay nullable"
-    assert out["elevator"] is True, "Native bool input must stay True"
-    pipeline.close_spider(spider)
-    formatted = [(msg % args) if args else msg for msg, args in spider.logger.warnings]
-    assert any("Unrecognised boolean token for balcony" in m for m in formatted), formatted
-    assert any("Unrecognised boolean tokens summary" in m for m in formatted), formatted
-
-
 def test_amenity_feature_block_handles_string_no():
     """A scraped 'no' for elevator/balcony must not become has_*='yes'."""
     from estate_value_index.ml.features.basic import _create_amenity_features

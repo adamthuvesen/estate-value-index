@@ -110,15 +110,15 @@ def _add_context_address_comp_features(
     _init_address_comp_features(df)
     street_area = _context_stats_frame(
         df["_street_area_key"],
-        getattr(context, "street_area_ppsqm_stats", None),
+        context.street_area_ppsqm_stats,
     )
     street_size = _context_stats_frame(
         df["_street_size_key"],
-        getattr(context, "street_size_ppsqm_stats", None),
+        context.street_size_ppsqm_stats,
     )
     address = _context_stats_frame(
         df["_address_comp_key"],
-        getattr(context, "address_ppsqm_stats", None),
+        context.address_ppsqm_stats,
     )
     _choose_address_comp_stats(df, street_area, street_size, address)
     return df

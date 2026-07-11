@@ -124,20 +124,6 @@ export const SAMPLE_LISTINGS: SampleListing[] = [
   }
 ];
 
-export const DEFAULT_AREAS = [
-  "Södermalm",
-  "Östermalm",
-  "Kungsholmen",
-  "Vasastan",
-  "Norrmalm",
-  "Gamla Stan",
-  "Fredhäll",
-  "Gärdet",
-  "Årsta",
-  "Gröndal",
-  "Hammarby Sjöstad",
-];
-
 export const MODEL_LABELS: Record<string, string> = {
   auto: "Auto",
   no_list_price: "No listing price",

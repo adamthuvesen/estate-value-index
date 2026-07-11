@@ -39,8 +39,8 @@ export function toAreaOverview(area: AreaStatistics): AreaOverview {
 
 /**
  * Overview list of all areas, sorted by listing count (desc).
- * Built on the shared 5-minute area-statistics cache; consumed by `/api/area`,
- * the `/areas` register, and the predictor's area-name list.
+ * Built on the shared 5-minute area-statistics cache; consumed by the `/areas`
+ * register and the predictor's area-name list.
  */
 export async function getAreaOverviewList(): Promise<AreaOverview[]> {
   const data = await getAreaStatisticsData();

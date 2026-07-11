@@ -2,7 +2,7 @@
 
 **estate-value-index** predicts Swedish real estate values: authorized listing
 ingestion -> BigQuery -> LightGBM -> Next.js + FastAPI. Python 3.11+ via
-**uv**; Node 20+ for `web/`; Next.js 15; Prefect 3.
+**uv**; Node 20+ for `web/`; Next.js 16; Prefect 3.
 
 This file is project facts only. Tone, principles, and git etiquette live in
 the user-level `~/.claude/CLAUDE.md` and `~/dotfiles/agents/AGENTS.md`.
@@ -19,9 +19,8 @@ Read the matching guide before touching that part of the system:
 `docs/internal/` (git-ignored) holds model metrics, experiment reports, and
 research notes. Put performance numbers and experiment results there, never in
 the public docs tree. Index: `docs/internal/README.md`. The root `reports/`
-directory (git-ignored) holds raw experiment artifacts emitted by the
-`estate_value_index.experiments` modules; the writeups live in
-`docs/internal/experiments/`.
+directory (git-ignored) holds historical raw experiment artifacts; the
+writeups live in `docs/internal/experiments/`.
 
 ## Rules
 

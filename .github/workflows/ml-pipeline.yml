@@ -29,17 +29,17 @@ on:
         default: 'retrain'
         type: choice
         options:
-          - retrain          # Retrain only (no scraping)
-          - full             # Full pipeline (scrape + train)
+          - retrain          # Retrain only (no ingestion)
+          - full             # Full pipeline (ingest + train)
           - vertex           # Vertex AI training only
           - local            # Local training only
       max_pages:
-        description: 'Maximum pages to scrape (full mode only)'
+        description: 'Maximum source pages to ingest (full mode only)'
         required: false
         default: '5'
         type: string
       config_file:
-        description: 'Booli scraper config file'
+        description: 'Booli ingestion config file'
         required: false
         default: 'src/estate_value_index/ingestion/config/booli_all_locations.json'
         type: string
@@ -69,6 +69,8 @@ jobs:
       BIGQUERY_PROJECT_ID: ${{ vars.BIGQUERY_PROJECT_ID || vars.GCP_PROJECT_ID }}
       GCP_REGION: ${{ vars.GCP_REGION }}
       GCS_BUCKET: ${{ vars.GCS_BUCKET }}
+      BOOLI_API_CALLER_ID: ${{ secrets.BOOLI_API_CALLER_ID }}
+      BOOLI_API_PRIVATE_KEY: ${{ secrets.BOOLI_API_PRIVATE_KEY }}
       BIGQUERY_DATASET_RAW: ${{ vars.BIGQUERY_DATASET_RAW || 'booli_raw' }}
       BIGQUERY_TABLE_LISTINGS: ${{ vars.BIGQUERY_TABLE_LISTINGS || 'listings' }}
       BIGQUERY_DATASET_FEATURES: ${{ vars.BIGQUERY_DATASET_FEATURES || 'booli_features' }}
@@ -105,6 +107,10 @@ jobs:
           test -n "${BIGQUERY_PROJECT_ID}" || { echo "BIGQUERY_PROJECT_ID environment variable is required"; exit 1; }
           test -n "${GCP_REGION}" || { echo "GCP_REGION environment variable is required"; exit 1; }
           test -n "${GCS_BUCKET}" || { echo "GCS_BUCKET environment variable is required"; exit 1; }
+          if [ "${{ inputs.mode }}" = "full" ]; then
+            test -n "${BOOLI_API_CALLER_ID}" || { echo "BOOLI_API_CALLER_ID secret is required in full mode"; exit 1; }
+            test -n "${BOOLI_API_PRIVATE_KEY}" || { echo "BOOLI_API_PRIVATE_KEY secret is required in full mode"; exit 1; }
+          fi
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
@@ -180,16 +186,16 @@ jobs:
 
           # Configure based on mode
           if mode == 'retrain':
-              skip_scraping = True
+              skip_ingestion = True
               use_vertex = True
           elif mode == 'full':
-              skip_scraping = False
+              skip_ingestion = False
               use_vertex = True
           elif mode == 'vertex':
-              skip_scraping = True
+              skip_ingestion = True
               use_vertex = True
           elif mode == 'local':
-              skip_scraping = True
+              skip_ingestion = True
               use_vertex = False
           else:
               print(f'❌ Unknown mode: {mode}')
@@ -201,7 +207,7 @@ jobs:
           result = complete_pipeline_flow(
               max_pages=max_pages,
               config_file=config_file,
-              skip_scraping=skip_scraping,
+              skip_ingestion=skip_ingestion,
               tune=tune,
               use_vertex=use_vertex,
               machine_type='n1-standard-4',

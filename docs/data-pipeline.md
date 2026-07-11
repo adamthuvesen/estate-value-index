@@ -2,8 +2,7 @@
 
 The data path starts with authorized listing ingestion output, lands raw listings in BigQuery,
 materializes engineered features, then feeds model training or serving artifacts. The public
-repo contains code and synthetic fixtures only. It does not include redistributable scraped
-listing data.
+repo contains code and synthetic fixtures only. Redistributable listing data is not included.
 
 ## Main flow
 
@@ -15,7 +14,7 @@ Permissioned listing source -> JSONL + upload path -> process_listings -> booli_
 
 ## Where to work
 
-- Booli ingestion adapters and extraction logic: `src/estate_value_index/ingestion/booli/`
+- Signed Booli API adapter: `src/estate_value_index/ingestion/booli/api.py`
 - Ingestion utilities and loaders: `src/estate_value_index/ingestion/`
 - Pipeline orchestration: `src/estate_value_index/pipelines/core/complete_pipeline.py`
 - Pipeline tasks: `src/estate_value_index/pipelines/tasks/`
@@ -40,20 +39,17 @@ BIGQUERY_TABLE_FEATURES=engineered_features
 GCS_BUCKET=your-gcs-bucket
 ```
 
-Optional knobs (examples): `GCS_ENABLED`, `MAX_MEDIAN_APE_THRESHOLD`, `DATA_SOURCE`, `MODEL_PREFIX`, `MODEL_OUTPUT_DIR`, `DEBUG`, `TRUST_PROXY_HEADERS`.
+Optional knobs (examples): `GCS_ENABLED`, `MAX_MEDIAN_APE_THRESHOLD`, `DATA_SOURCE`, `MODEL_PREFIX`, `MODEL_OUTPUT_DIR`, `DEBUG`.
 
-Optional signed Booli API credentials for local/private catch-up runs:
+Signed Booli API credentials for ingestion runs:
 
 ```bash
 BOOLI_API_CALLER_ID=your-booli-caller-id
 BOOLI_API_PRIVATE_KEY=your-booli-private-key
-BACKFILL_SOURCE=api
 ```
 
-Use the signed API source for catch-up/backfill when credentials are available.
-The public HTML spider exists for parser development and local experiments only. Do
-not use it to bypass access controls or source terms; use permissioned API or export
-access for real training data. The API path writes the same raw-listing JSONL schema.
+The signed API path writes the raw-listing JSONL schema consumed by processing and
+BigQuery upload. Authorized exports may provide the same schema directly.
 
 Precedence: environment -> `config/pipeline_config.yaml` -> code defaults.
 
@@ -83,4 +79,4 @@ BigQuery datasets:
 - General pipeline/data changes: `uv run pytest`
 - BigQuery safety: `uv run pytest tests/utils/test_bigquery_safety.py tests/utils/test_no_unsafe_sql.py tests/ml/test_filter_api_contract.py`
 - Temporal behavior: `uv run pytest tests/ml/test_temporal_leakage.py tests/test_time_series_utils.py`
-- Ingestion behavior: `uv run pytest tests/ingestion tests/test_ingestion_parsers.py tests/test_ingestion_utils.py`
+- Ingestion behavior: `uv run pytest tests/ingestion tests/test_ingestion_utils.py`

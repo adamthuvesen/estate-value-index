@@ -81,36 +81,3 @@ class AnalyticsResult(TaskResult):
 
     output_file: str
     records_generated: int
-
-
-class RebuildContainerResult(TaskResult):
-    """Result from container rebuild tasks."""
-
-    image_uri: str | None
-    build_id: str | None
-
-
-class JobStatusResult(TaskResult):
-    """Result from job status checks."""
-
-    status: str
-    job_name: str
-
-
-class DownloadArtifactsResult(TaskResult):
-    """Result from artifact download tasks."""
-
-    artifacts: dict[str, str]
-    local_dir: str
-
-
-class PromotionResult(TaskResult):
-    """Result from model promotion tasks."""
-
-    model_path: str
-
-
-class RollbackResult(TaskResult):
-    """Result from rollback tasks."""
-
-    revision: str

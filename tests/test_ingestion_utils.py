@@ -7,7 +7,6 @@ from src.estate_value_index.ingestion.booli.normalization import (
     to_float,
     to_int,
 )
-from src.estate_value_index.ingestion.booli.urls import extract_listing_id
 
 
 def test_clean_text_trims_and_none():
@@ -42,11 +41,3 @@ def test_ensure_list_converts_values():
     assert ensure_list(None) == []
     assert ensure_list([1, 2]) == [1, 2]
     assert ensure_list("value") == ["value"]
-
-
-def test_extract_listing_id_variants():
-    assert extract_listing_id("https://www.booli.se/annons/4566") == "4566"
-    assert extract_listing_id("https://www.booli.se/bostad/stockholm/sodermalm/654321") == "654321"
-    assert extract_listing_id("https://www.booli.se/listing?id=777888") == "777888"
-    assert extract_listing_id("https://www.booli.se/path?booliId=999") == "999"
-    assert extract_listing_id("https://www.booli.se/no-id") is None

@@ -82,8 +82,8 @@ def get_bigquery_config() -> dict[str, Any]:
     return load_yaml_config().get("bigquery", {})
 
 
-def get_scraping_config() -> dict[str, Any]:
-    return load_yaml_config().get("scraping", {})
+def get_ingestion_config() -> dict[str, Any]:
+    return load_yaml_config().get("ingestion", {})
 
 
 # env → YAML → default. MdAPE (median absolute % error) as a fraction, e.g. 0.08.
@@ -113,18 +113,11 @@ def get_batch_size() -> int:
     return get_bigquery_config().get("batch_size", 1000)
 
 
-def get_max_pages() -> int:
-    env_pages = os.getenv("SCRAPER_MAX_PAGES")
-    if env_pages:
-        return int(env_pages)
-    return get_scraping_config().get("default_max_pages", 10)
-
-
-def get_min_scrape_validation_rate() -> float:
-    env_rate = os.getenv("SCRAPER_MIN_VALIDATION_RATE")
+def get_min_ingestion_validation_rate() -> float:
+    env_rate = os.getenv("INGESTION_MIN_VALIDATION_RATE")
     if env_rate:
         return float(env_rate)
-    return float(get_scraping_config().get("min_validation_rate", 0.5))
+    return float(get_ingestion_config().get("min_validation_rate", 0.5))
 
 
 def is_debug() -> bool:
@@ -141,32 +134,6 @@ def is_verbose_logging() -> bool:
 
 def is_gcs_enabled() -> bool:
     return os.getenv("GCS_ENABLED", "false").lower() in _TRUTHY
-
-
-def is_trust_proxy_headers() -> bool:
-    """Whether to trust ``X-Forwarded-For`` (only behind a known reverse proxy)."""
-    return os.getenv("TRUST_PROXY_HEADERS", "false").lower() in _TRUTHY
-
-
-def get_rate_limit_max_ips() -> int:
-    return int(os.getenv("RATE_LIMIT_MAX_IPS", "10000"))
-
-
-def get_rate_limit_requests() -> int:
-    return int(os.getenv("RATE_LIMIT_REQUESTS", "100"))
-
-
-def get_rate_limit_window_seconds() -> int:
-    return int(os.getenv("RATE_LIMIT_WINDOW", "60"))
-
-
-def get_web_concurrency() -> int:
-    """FastAPI worker count from ``WEB_CONCURRENCY``; falls back to 1 on bad input."""
-    raw = os.getenv("WEB_CONCURRENCY", "1")
-    try:
-        return int(raw)
-    except ValueError:
-        return 1
 
 
 def get_data_source() -> str:

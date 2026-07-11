@@ -2,8 +2,7 @@
 
 This module provides a unified interface to all pipeline tasks, organized by domain:
 
-- **Ingestion**: Process scraped listings and upload to BigQuery
-- **Validation**: Data quality checks (duplicates, prices, schema)
+- **Ingestion**: Process ingested listings and upload them to BigQuery
 - **Sync**: BigQuery ↔ Local ↔ GCS synchronization
 - **Analytics**: Area statistics and value analysis generation
 - **Training**: Feature materialization and Vertex AI training jobs
@@ -48,26 +47,11 @@ from .training import (
     validate_model_performance_task,
 )
 
-# Validation tasks
-from .validation import (
-    check_duplicates,
-    check_minimum_listing_count,
-    check_required_fields,
-    run_all_data_quality_checks,
-    validate_price_ranges,
-)
-
 __all__ = [
     # Ingestion
     "geocode_new_addresses_task",
     "process_listings_task",
     "upload_to_bigquery_task",
-    # Validation
-    "check_duplicates",
-    "check_minimum_listing_count",
-    "check_required_fields",
-    "run_all_data_quality_checks",
-    "validate_price_ranges",
     # Sync
     "sync_bigquery_to_local_task",
     "sync_local_to_gcs_task",

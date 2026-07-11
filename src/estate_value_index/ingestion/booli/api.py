@@ -1,8 +1,7 @@
 """Signed Booli API client and mappers.
 
-The public Booli HTML pages are now Cloudflare-challenged for automated
-clients. Booli's documented API path uses callerId/private-key signing; this
-module keeps that authorized path separate from the Scrapy spider.
+Booli's API uses callerId/private-key signing. This module maps its responses
+to the raw-listing JSONL schema consumed by the rest of the pipeline.
 """
 
 from __future__ import annotations
@@ -47,7 +46,7 @@ class BooliApiCredentials:
         ]
         if missing:
             raise RuntimeError(
-                "Booli API credentials are required for --source api: " + ", ".join(missing)
+                "Booli API credentials are required: " + ", ".join(missing)
             )
         return cls(caller_id=caller_id or "", private_key=private_key or "")
 
@@ -259,14 +258,10 @@ def scrape_booli_api_window(
     config_file: str | Path,
     output_file: str | Path,
     max_pages: int,
-    concurrent_requests: int | None = None,
-    delay: float | None = None,
     credentials: BooliApiCredentials | None = None,
     client: BooliApiClient | None = None,
 ) -> Path:
     """Fetch one sold-date window from Booli's signed API into JSONL."""
-
-    del concurrent_requests, delay
 
     config = json.loads(Path(config_file).read_text(encoding="utf-8"))
     params = config.get("search_parameters", {})

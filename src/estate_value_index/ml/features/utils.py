@@ -15,7 +15,7 @@ def _coerce_nullable_bool(series: pd.Series) -> pd.Series:
     """Normalize heterogeneous truthy/falsy values to pandas nullable Boolean.
 
     Truth table matches `estate_value_index.ingestion.booli.normalization.to_bool`
-    so the spider layer and the feature layer cannot disagree about whether
+    so the ingestion layer and the feature layer cannot disagree about whether
     `'no'` means False (it does) or `'unknown'` is a valid bool (it isn't).
     """
 

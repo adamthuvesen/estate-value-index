@@ -224,32 +224,6 @@ class TestFeatureConfiguration:
         assert "luxury_location_tier" in CATEGORICAL_FEATURE_NAMES
 
     @pytest.mark.unit
-    def test_no_list_price_subset_excludes_same_row_price_features(self):
-        numeric, categorical = load_feature_subset("no_list_price_25")
-
-        blocked = {
-            "listing_price",
-            "price_per_sqm",
-            "relative_area_price",
-            "total_cost_per_sqm",
-            "fee_price_interaction",
-            "luxury_score",
-            "value_score",
-            "cost_benefit_ratio",
-            "efficiency_premium",
-        }
-
-        assert numeric is not None
-        assert blocked.isdisjoint(numeric)
-        assert len(numeric) == 25
-        assert "micro_area_ppsqm_median" in numeric
-        assert "condition_score" in numeric
-        assert "area" in categorical
-        assert "h3_res10" in categorical
-        assert "area_price_tier" not in categorical
-        assert "area_price_momentum" not in categorical
-
-    @pytest.mark.unit
     def test_production_variants_are_explicit_about_asking_price(self):
         no_list_numeric, no_list_categorical = load_feature_subset("no_list_price_v1")
         listing_numeric, listing_categorical = load_feature_subset("with_list_price_v1")
@@ -272,43 +246,18 @@ class TestFeatureConfiguration:
     @pytest.mark.unit
     def test_comparison_feature_subsets_isolate_h3(self):
         listing_numeric, listing_categorical = load_feature_subset("with_list_price_v1")
-        no_h3_numeric, no_h3_categorical = load_feature_subset("no_list_price_22_no_h3")
-        core_numeric, core_categorical = load_feature_subset("no_list_price_h3_core")
         comps_numeric, comps_categorical = load_feature_subset("no_list_price_h3_comps")
         street_numeric, street_categorical = load_feature_subset("no_list_price_h3_market_street")
-        tail_numeric, tail_categorical = load_feature_subset("no_list_price_h3_market_tail")
-        luxury_numeric, luxury_categorical = load_feature_subset("no_list_price_h3_market_luxury")
-        fee_numeric, fee_categorical = load_feature_subset("no_list_price_h3_fee")
 
         assert "listing_price" in listing_numeric
         assert "h3_neighbor_ppsqm" in listing_numeric
         assert "h3_res10" in listing_categorical
 
-        assert "listing_price" not in no_h3_numeric
-        assert "micro_area_ppsqm_median" not in no_h3_numeric
-        assert "h3_res10" not in no_h3_categorical
-        assert "area" in no_h3_categorical
-
-        assert "listing_price" not in core_numeric
-        assert "micro_area_ppsqm_median" in core_numeric
-        assert "h3_res10" in core_categorical
-        assert "monthly_fee" not in core_numeric
-
         assert "listing_price" not in comps_numeric
         assert "h3_neighbor_ppsqm" in comps_numeric
-        assert "listing_price" not in luxury_numeric
-        assert "price_per_sqm" not in luxury_numeric
-        assert "h3_market_ppsqm_ratio" in luxury_numeric
-        assert "micro_luxury_score" in luxury_numeric
-        assert "luxury_location_tier" in luxury_categorical
         assert "same_size_ppsqm_median" in comps_numeric
         assert "market_interest_rate" not in comps_numeric
         assert "same_size_scope_used" in comps_categorical
-
-        assert "listing_price" not in tail_numeric
-        assert "micro_area_ppsqm_p90" in tail_numeric
-        assert "h3_neighbor_upper_tail_ratio" in tail_numeric
-        assert "same_size_ppsqm_p90" in tail_numeric
 
         market_numeric, market_categorical = load_feature_subset("no_list_price_h3_market")
         assert "listing_price" not in market_numeric
@@ -316,8 +265,6 @@ class TestFeatureConfiguration:
         assert "same_size_ppsqm_median" in market_numeric
         assert "market_interest_rate" in market_numeric
         assert "same_size_scope_used" in market_categorical
-        assert tail_categorical == market_categorical
-
         assert "listing_price" not in street_numeric
         assert "street_area_ppsqm_p90" in street_numeric
         assert "street_size_ppsqm_median" in street_numeric
@@ -325,11 +272,6 @@ class TestFeatureConfiguration:
         assert "street_name" in street_categorical
         assert "address_comp_scope_used" in street_categorical
         assert "micro_area_ppsqm_p90" not in street_numeric
-
-        assert "listing_price" not in fee_numeric
-        assert "monthly_fee" in fee_numeric
-        assert "fee_efficiency" in fee_numeric
-        assert fee_categorical == core_categorical
 
     @pytest.mark.unit
     def test_rfe_compact_feature_subsets_are_registered(self):

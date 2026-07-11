@@ -43,18 +43,6 @@ REVIEWED_DYNAMIC_SQL: dict[str, str] = {
         "MERGE interpolates the validated full_table_id + a safe_table_ref() "
         "temp ref; column lists go through quote_identifier()."
     ),
-    "estate_value_index.ingestion.bigquery_upload:_merge_temp_table": (
-        "`full_table_id`/`temp_table_id` are validated by bq_table()/safe_table_ref() "
-        "at their construction sites; column list is a static literal."
-    ),
-    "estate_value_index.ingestion.bigquery_upload:_verify_row_count": (
-        "`full_table_id` is the validated bq_table() result."
-    ),
-    "estate_value_index.monitoring.cost_monitoring:monitor_bigquery_costs": (
-        "`project_id` is validated via _validate_bq_project_id() above; the region "
-        "+ INFORMATION_SCHEMA.JOBS path components are static literals; `days` is a "
-        "ScalarQueryParameter."
-    ),
 }
 
 _SRC_ROOT = Path(__file__).resolve().parents[2] / "src"

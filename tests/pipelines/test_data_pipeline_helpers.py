@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import subprocess
 from unittest.mock import MagicMock
 
 import pytest
@@ -8,16 +7,14 @@ import pytest
 from estate_value_index.pipelines.core import data_pipeline
 
 
-def test_listing_record_loader_accepts_scrapy_array_lines(tmp_path):
-    listings_path = tmp_path / "listings.json"
+def test_listing_record_loader_accepts_jsonl_and_skips_invalid_lines(tmp_path):
+    listings_path = tmp_path / "listings.jsonl"
     listings_path.write_text(
         "\n".join(
             [
-                "[",
-                '{"listing_id": "1", "sold_price": 1, "living_area": 40, "area": "A"},',
+                '{"listing_id": "1", "sold_price": 1, "living_area": 40, "area": "A"}',
                 '{"listing_id": "2", "sold_price": null, "living_area": 50, "area": "B"}',
                 "not-json",
-                "]",
             ]
         ),
         encoding="utf-8",
@@ -92,36 +89,34 @@ def test_sync_stage_raises_failure():
         )
 
 
-def test_run_scrapy_spider_fails_when_booli_returns_403_in_log_file(tmp_path, monkeypatch):
-    output_file = tmp_path / "blocked.jsonl"
-    log_file = tmp_path / "booli.log"
-    monkeypatch.setenv("BOOLI_LOG_FILE", str(log_file))
+def test_fetch_booli_api_forwards_config_and_output(tmp_path, monkeypatch):
+    output_file = tmp_path / "listings.jsonl"
+    config_file = tmp_path / "config.json"
+    config_file.write_text('{"search_parameters": {}}', encoding="utf-8")
+    calls = {}
 
-    def fake_run(cmd, **kwargs):
-        output_file.write_text("", encoding="utf-8")
-        log_file.write_text(
-            "WARNING: 403 Forbidden for URL: https://www.booli.se/sok/slutpriser\n",
+    def fake_fetch(**kwargs):
+        calls.update(kwargs)
+        output_file.write_text(
+            '{"listing_id": "1", "sold_price": 1, "living_area": 40, "area": "A"}\n',
             encoding="utf-8",
         )
-        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+        return output_file
 
-    monkeypatch.setattr(data_pipeline.subprocess, "run", fake_run)
+    monkeypatch.setattr(data_pipeline, "scrape_booli_api_window", fake_fetch)
 
-    with pytest.raises(RuntimeError, match="Booli scrape blocked with HTTP 403"):
-        data_pipeline.run_scrapy_spider.fn(max_pages=1, output_file=output_file)
+    result = data_pipeline.fetch_booli_api.fn(
+        max_pages=3,
+        config_file=str(config_file),
+        output_file=output_file,
+    )
 
-
-def test_run_scrapy_spider_fails_on_empty_output(tmp_path, monkeypatch):
-    output_file = tmp_path / "empty.jsonl"
-
-    def fake_run(cmd, **kwargs):
-        output_file.write_text("", encoding="utf-8")
-        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
-
-    monkeypatch.setattr(data_pipeline.subprocess, "run", fake_run)
-
-    with pytest.raises(RuntimeError, match="zero listings"):
-        data_pipeline.run_scrapy_spider.fn(max_pages=1, output_file=output_file)
+    assert result == output_file
+    assert calls == {
+        "config_file": config_file,
+        "output_file": output_file,
+        "max_pages": 3,
+    }
 
 
 def test_validate_listings_fails_below_threshold(tmp_path):

@@ -1,12 +1,3 @@
-// Re-use from value-finder-types
-export type ValueTier =
-  | "Excellent Value"
-  | "Great Value"
-  | "Good Value"
-  | "Fair Value"
-  | "Overvalued"
-  | "Highly Overvalued";
-
 export type PriceTier = "budget" | "medium" | "upper" | "premium";
 
 export type RoomFilter = "all" | "1" | "2" | "3" | "4+";
@@ -167,16 +158,7 @@ export interface AreaStatistics {
   sample_size: number;
 }
 
-export interface AreaDetails extends AreaStatistics {
-  metadata: AreaStatisticsMetadata;
-}
-
 export interface AreaStatisticsData {
   metadata: AreaStatisticsMetadata;
   areas: Record<string, AreaStatistics>;
-}
-
-export interface AreaListResponse {
-  metadata: AreaStatisticsMetadata;
-  areas: AreaOverview[];
 }

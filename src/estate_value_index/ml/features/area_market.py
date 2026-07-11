@@ -131,7 +131,7 @@ def _add_group_area_market_features(df: pd.DataFrame) -> None:
 def _add_context_area_market_features(
     df: pd.DataFrame, context: FeatureEngineeringContext
 ) -> pd.DataFrame:
-    if hasattr(context, "area_market_stats") and context.area_market_stats:
+    if context.area_market_stats:
         area_stats_df = pd.DataFrame.from_dict(
             context.area_market_stats, orient="index"
         ).reset_index()

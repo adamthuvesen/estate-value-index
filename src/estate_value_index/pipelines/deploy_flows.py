@@ -7,7 +7,7 @@ from dataclasses import asdict
 from prefect import serve
 
 # Import flows from package structure
-from estate_value_index.pipelines.core.data_pipeline import scrape_booli_flow
+from estate_value_index.pipelines.core.data_pipeline import ingest_booli_flow
 from estate_value_index.pipelines.core.training_pipeline import (
     vertex_training_flow as train_model_flow,
 )
@@ -33,15 +33,13 @@ def deploy_all():
 
     try:
         # Create deployments using .to_deployment()
-        scrape_deployment = scrape_booli_flow.to_deployment(
-            name="Estate Value Index Weekly Scrape",
-            description="Weekly automated scraping of Booli listings",
+        ingestion_deployment = ingest_booli_flow.to_deployment(
+            name="Estate Value Index Weekly Ingestion",
+            description="Weekly authorized Booli API ingestion",
             version="1.0.0",
-            tags=["production", "scraping", "data-collection"],
+            tags=["production", "ingestion", "data-collection"],
             parameters={
-                "max_pages": 20,  # Scrape more pages in production
-                "concurrent_requests": 4,
-                "delay": 0.1,
+                "max_pages": 20,
                 "upload_to_cloud": True,
             },
             cron="0 2 * * 0",  # Every Sunday at 2 AM CET
@@ -60,7 +58,7 @@ def deploy_all():
             paused=False,
         )
 
-        print("Created scraping deployment: weekly-scrape")
+        print("Created ingestion deployment: weekly-ingestion")
         print("  Schedule: Every Sunday at 2:00 AM CET")
         print()
         print("Created training deployment: monthly-training")
@@ -75,8 +73,8 @@ def deploy_all():
         print("  - Executes flows on schedule")
         print()
         print("To trigger manual runs (in another terminal):")
-        print("  prefect deployment run 'scrape-booli-flow/weekly-scrape'")
-        print("  prefect deployment run 'train-model-flow/monthly-training'")
+        print("  Use 'prefect deployment ls' to find the registered deployment names.")
+        print("  Then run one with 'prefect deployment run <flow-name>/<deployment-name>'.")
         print()
         print("To view deployments:")
         print("  prefect deployment ls")
@@ -84,7 +82,7 @@ def deploy_all():
         print("=" * 60)
 
         # Serve both deployments (blocking call)
-        serve(scrape_deployment, train_deployment)
+        serve(ingestion_deployment, train_deployment)
 
     except Exception as e:
         print(f"Deployment failed: {e}", file=sys.stderr)

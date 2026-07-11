@@ -1,11 +1,9 @@
 """Google Cloud Storage utilities for data and model management."""
 
 import hashlib
-import json
 import logging
 import os
 import posixpath
-import tempfile
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -94,49 +92,10 @@ class GCSClient:
         logger.info("Downloaded gs://%s/%s to %s", self.bucket_name, gcs_path, local_path)
         return local_path
 
-    def upload_json(self, data: dict, gcs_path: str) -> str:
-        """Upload a dict as JSON; when disabled, write to a temp file and return its path."""
-        if not self.enabled:
-            temp_file = Path(tempfile.gettempdir()) / Path(gcs_path).name
-            with open(temp_file, "w", encoding="utf-8") as f:
-                json.dump(data, f, indent=2, ensure_ascii=False)
-            return str(temp_file)
-
-        blob = self._bucket.blob(gcs_path)
-        blob.upload_from_string(
-            json.dumps(data, indent=2, ensure_ascii=False), content_type="application/json"
-        )
-        gcs_uri = f"gs://{self.bucket_name}/{gcs_path}"
-        logger.info("Uploaded JSON to %s", gcs_uri)
-        return gcs_uri
-
-    def download_json(self, gcs_path: str) -> dict:
-        """Download and parse JSON from GCS, falling back to a local path when disabled."""
-        if not self.enabled:
-            local_path = Path(gcs_path)
-            if not local_path.exists():
-                local_path = Path("data") / gcs_path
-            with open(local_path, encoding="utf-8") as f:
-                return json.load(f)
-
-        blob = self._bucket.blob(gcs_path)
-        return json.loads(blob.download_as_text())
-
     def exists(self, gcs_path: str) -> bool:
         if not self.enabled:
             return Path(gcs_path).exists()
         return self._bucket.blob(gcs_path).exists()
-
-    def list_files(self, prefix: str = "") -> list[str]:
-        """List files under ``prefix``; when disabled, list local files under that dir."""
-        if not self.enabled:
-            local_dir = Path(prefix) if prefix else Path(".")
-            if local_dir.is_dir():
-                return [str(p) for p in local_dir.rglob("*") if p.is_file()]
-            return []
-
-        blobs = self._client.list_blobs(self.bucket_name, prefix=prefix)
-        return [blob.name for blob in blobs]
 
 
 def resolve_data_path(

@@ -14,8 +14,8 @@ from src.estate_value_index.utils.settings import (
     get_cloud_run_service_name,
     get_cv_folds,
     get_data_source,
-    get_max_pages,
     get_median_ape_threshold,
+    get_min_ingestion_validation_rate,
     get_model_output_dir,
     get_model_prefix,
     get_random_state,
@@ -88,10 +88,8 @@ training:
 bigquery:
   batch_size: 2000
 
-scraping:
-  default_max_pages: 20
-  max_concurrent_requests: 8
-  download_delay: 0.2
+ingestion:
+  min_validation_rate: 0.6
 """
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
@@ -106,9 +104,7 @@ scraping:
                 assert config["training"]["cv_folds"] == 3
                 assert config["training"]["test_size"] == 0.3
                 assert config["bigquery"]["batch_size"] == 2000
-                assert config["scraping"]["default_max_pages"] == 20
-                assert config["scraping"]["max_concurrent_requests"] == 8
-                assert config["scraping"]["download_delay"] == 0.2
+                assert config["ingestion"]["min_validation_rate"] == 0.6
             finally:
                 os.unlink(f.name)
 
@@ -180,20 +176,11 @@ class TestHelperFunctions:
             with patch("src.estate_value_index.utils.settings.load_yaml_config", return_value={}):
                 assert get_batch_size() == 1000
 
-    def test_get_max_pages_from_env(self):
-        with patch.dict(os.environ, {"SCRAPER_MAX_PAGES": "25"}):
-            assert get_max_pages() == 25
-
-    def test_get_max_pages_from_yaml(self):
-        with patch.dict(os.environ, {"SCRAPER_MAX_PAGES": ""}):
-            with patch("src.estate_value_index.utils.settings.load_yaml_config") as mock_load:
-                mock_load.return_value = {"scraping": {"default_max_pages": 15}}
-                assert get_max_pages() == 15
-
-    def test_get_max_pages_default(self):
+    def test_get_min_ingestion_validation_rate(self):
         with patch.dict(os.environ, {}, clear=True):
-            with patch("src.estate_value_index.utils.settings.load_yaml_config", return_value={}):
-                assert get_max_pages() == 10
+            with patch("src.estate_value_index.utils.settings.load_yaml_config") as mock_load:
+                mock_load.return_value = {"ingestion": {"min_validation_rate": 0.6}}
+                assert get_min_ingestion_validation_rate() == 0.6
 
 
 class TestBooleanFlags:
@@ -322,7 +309,7 @@ class TestConfigSummary:
                 mock_load.return_value = {
                     "training": {"median_ape_threshold": 0.07},
                     "bigquery": {"batch_size": 2000},
-                    "scraping": {"default_max_pages": 20},
+                    "ingestion": {"min_validation_rate": 0.6},
                 }
 
                 print_config_summary()

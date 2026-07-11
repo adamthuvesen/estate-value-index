@@ -64,6 +64,7 @@ export interface ListingPrefillResponse {
   days_on_market?: number | null;
   construction_year?: number | null;
   property_type?: string | null;
+  municipality?: string | null;
   area?: string | null;
   floor?: number | null;
   elevator?: boolean | null;

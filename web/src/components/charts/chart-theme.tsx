@@ -26,13 +26,6 @@ export const axisDefaults = {
   axisLine: false,
 } as const;
 
-/** Spread into `<CartesianGrid/>` — faint horizontal hairlines only. */
-export const gridDefaults = {
-  stroke: chartColors.grid,
-  strokeDasharray: "3 3",
-  vertical: false,
-} as const;
-
 export const chartPalette = {
   ink: chartColors.ink,
   accent: chartColors.accent,

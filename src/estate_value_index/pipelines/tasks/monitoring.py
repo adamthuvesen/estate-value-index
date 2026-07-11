@@ -19,7 +19,7 @@ from estate_value_index.utils.gcs import get_gcs_bucket, upload_blob, upload_htm
 # contract test in tests/pipelines/test_flow_signatures.py can validate every
 # key against the flow's actual signature without duplicating literals.
 _DRIFT_RETRAIN_KWARGS: dict = {
-    "skip_scraping": True,
+    "skip_ingestion": True,
     "tune": True,
     "use_vertex": True,
     "deploy_to_prod": True,

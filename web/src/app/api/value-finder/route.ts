@@ -10,7 +10,7 @@ import {
 } from "@/lib/value-finder-types";
 import { getValueAnalysisData } from "@/lib/value-analysis-cache";
 import {
-  isValueAnalysisDataMissingError,
+  isMissingDataError,
   valueAnalysisDataErrorResponse,
   valueAnalysisDataMissingResponse,
 } from "@/lib/api-errors";
@@ -311,7 +311,7 @@ export async function GET(request: NextRequest) {
 
     console.error("Error in value-finder API:", error);
 
-    return isValueAnalysisDataMissingError(error)
+    return isMissingDataError(error)
       ? valueAnalysisDataMissingResponse()
       : valueAnalysisDataErrorResponse();
   }

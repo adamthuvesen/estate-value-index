@@ -56,7 +56,7 @@ MIN_PREMIUM_AREA_N = 30
 
 # Ceiling for the biggest-bid-up record. In the production data every premium
 # above this is an exact 2x/10x listing-price typo (the p99.9 premium is ~40%),
-# so anything higher is a scrape error, not a bidding war.
+# so anything higher is a source-data error, not a bidding war.
 MAX_PLAUSIBLE_PREMIUM_PCT = 75.0
 
 

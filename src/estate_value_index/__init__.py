@@ -1,6 +1,6 @@
 """Estate Value Index - Swedish Real Estate ML System.
 
-Architecture: Scraping → BigQuery → Feature Engineering → Training → Deployment
+Architecture: Authorized ingestion → BigQuery → Feature Engineering → Training → Deployment
 """
 
 __version__ = "1.0.0"

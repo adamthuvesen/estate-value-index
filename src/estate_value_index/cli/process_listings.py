@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CLI to process scraped Booli listings (merge + clean + impute).
+"""CLI to process ingested Booli listings (merge + clean + impute).
 
 Usage:
     uv run python -m estate_value_index.cli process --input data/raw/booli/booli_listings_*.json
@@ -18,21 +18,21 @@ from estate_value_index.ingestion.processing import process_pipeline
 
 
 def main(argv: list[str] | None = None, *, args: Namespace | None = None) -> int:
-    """Process scraped Booli listings. ``args`` takes precedence over ``argv``."""
+    """Process ingested Booli listings. ``args`` takes precedence over ``argv``."""
     if args is None:
         parser = argparse.ArgumentParser(
-            description="Process scraped Booli listings: merge, clean areas, and impute missing values",
+            description="Process ingested Booli listings: merge, clean areas, and impute missing values",
             formatter_class=argparse.RawDescriptionHelpFormatter,
             epilog="""
 Examples:
-  # Process new scrape and update production data
+  # Process a new ingestion file and update production data
   uv run python -m estate_value_index.cli process --input data/raw/booli/booli_listings_20251002.json
 
   # Dry run to preview changes
-  uv run python -m estate_value_index.cli process --input new_scrape.json --dry-run
+  uv run python -m estate_value_index.cli process --input new_listings.json --dry-run
 
   # Custom parameters
-  uv run python -m estate_value_index.cli process --input new_scrape.json --min-area-count 3 --days-threshold 500
+  uv run python -m estate_value_index.cli process --input new_listings.json --min-area-count 3 --days-threshold 500
             """,
         )
 
@@ -40,7 +40,7 @@ Examples:
             "--input",
             type=Path,
             required=True,
-            help="Path to new scraped listings file (JSON or JSONL)",
+            help="Path to a new ingested listings file (JSON or JSONL)",
         )
         parser.add_argument(
             "--production",

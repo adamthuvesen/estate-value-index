@@ -104,7 +104,7 @@ jobs:
             --timeout 900s \
             --port 8080 \
             --ingress internal \
-            --set-env-vars "GCS_ENABLED=true,GCS_BUCKET=${{ env.GCS_BUCKET }},NODE_ENV=production,PREDICTION_API_URL=http://127.0.0.1:8000,TRUST_PROXY_HEADERS=true" \
+            --set-env-vars "GCS_ENABLED=true,GCS_BUCKET=${{ env.GCS_BUCKET }},NODE_ENV=production,PREDICTION_API_URL=http://127.0.0.1:8000" \
             --quiet
 
       - name: Get deployment URL

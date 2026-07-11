@@ -2,7 +2,7 @@
 """Complete end-to-end ML pipeline orchestration.
 
 This flow connects all pipeline stages into a single automated workflow:
-1. Data Collection: Scrape → Process → BigQuery → Features
+1. Data Collection: Ingest → Process → BigQuery → Features
 2. Model Training: Train (Vertex AI or local) → Validate
 3. Enrichment: Generate area statistics → Upload to GCS
 4. Deployment: Deploy to Cloud Run (optional)
@@ -15,7 +15,7 @@ from typing import Any
 from prefect import flow, get_run_logger
 
 # Import flows from package structure
-from estate_value_index.pipelines.core.data_pipeline import complete_scrape_flow
+from estate_value_index.pipelines.core.data_pipeline import complete_ingestion_flow
 from estate_value_index.pipelines.core.training_pipeline import vertex_training_flow
 from estate_value_index.pipelines.tasks import (
     deploy_to_cloud_run_task,
@@ -31,7 +31,7 @@ def _initial_results(
     start_time: datetime,
     *,
     max_pages: int,
-    skip_scraping: bool,
+    skip_ingestion: bool,
     tune: bool,
     use_vertex: bool,
     deploy_to_prod: bool,
@@ -41,7 +41,7 @@ def _initial_results(
         "pipeline_start": start_time.isoformat(),
         "configuration": {
             "max_pages": max_pages,
-            "skip_scraping": skip_scraping,
+            "skip_ingestion": skip_ingestion,
             "tune": tune,
             "use_vertex": use_vertex,
             "deploy_to_prod": deploy_to_prod,
@@ -55,7 +55,7 @@ def _log_pipeline_start(
     logger: Any,
     *,
     max_pages: int,
-    skip_scraping: bool,
+    skip_ingestion: bool,
     tune: bool,
     use_vertex: bool,
     deploy_to_prod: bool,
@@ -63,25 +63,25 @@ def _log_pipeline_start(
 ) -> None:
     logger.info("Starting complete ML pipeline")
     logger.info(
-        f"Config: scraping={'skip' if skip_scraping else max_pages}, "
+        f"Config: ingestion={'skip' if skip_ingestion else max_pages}, "
         f"training={'vertex' if use_vertex else 'local'}, tune={tune}, "
         f"deploy={deploy_to_prod}, dry_run={dry_run}"
     )
 
 
 def _log_data_collection_summary(logger: Any, scrape_result: dict[str, Any]) -> None:
-    scraping_info = scrape_result.get("scraping", {})
+    ingestion_info = scrape_result.get("ingestion", {})
     processing_info = scrape_result.get("processing", {})
     bq_info = scrape_result.get("bigquery", {})
     features_info = scrape_result.get("features", {})
 
-    scraped = scraping_info.get("validation", {}).get("valid_listings", 0)
+    fetched = ingestion_info.get("validation", {}).get("valid_listings", 0)
     processed = processing_info.get("total_listings", 0)
     bq_rows = bq_info.get("uploaded", 0) if bq_info else 0
     feat_rows = features_info.get("row_count", 0) if features_info else 0
     logger.info(
         "Stage 1 complete: "
-        f"scraped={scraped}, processed={processed}, bq={bq_rows}, features={feat_rows}"
+        f"fetched={fetched}, processed={processed}, bq={bq_rows}, features={feat_rows}"
     )
 
 
@@ -90,26 +90,27 @@ def _run_data_collection_stage(
     results: dict[str, Any],
     *,
     max_pages: int,
-    skip_scraping: bool,
+    skip_ingestion: bool,
     config_file: str | None,
     dry_run: bool,
 ) -> None:
-    if skip_scraping:
+    if skip_ingestion:
         logger.info("Stage 1: Skipped (using existing data)")
-        results["stages"]["data_collection"] = {"skipped": True, "reason": "skip_scraping=True"}
+        results["stages"]["data_collection"] = {"skipped": True, "reason": "skip_ingestion=True"}
         return
 
-    logger.info("Stage 1: Data collection (scrape, process, bigquery, features)")
+    logger.info("Stage 1: Data collection (ingest, process, BigQuery, features)")
 
     # Prefect parameter validation in some environments rejects None for str-typed params.
     # Ensure we pass a string (empty string means "no config file").
     config_path = config_file or ""
 
-    scrape_result = complete_scrape_flow(
+    scrape_result = complete_ingestion_flow(
         max_pages=max_pages,
         upload_to_bq=not dry_run,
         materialize_features=not dry_run,
-        upload_to_cloud=not dry_run,
+        upload_to_cloud=False,
+        sync_after_upload=False,
         config_file=config_path,
     )
 
@@ -151,7 +152,7 @@ def _training_config(
     use_vertex: bool,
     machine_type: str,
     rebuild_container: bool,
-    skip_scraping: bool,
+    skip_ingestion: bool,
     dry_run: bool,
 ) -> TrainingFlowConfig:
     if use_vertex:
@@ -159,7 +160,7 @@ def _training_config(
             tune=tune,
             machine_type=machine_type,
             rebuild_container=rebuild_container,
-            skip_materialization=not skip_scraping,
+            skip_materialization=not skip_ingestion,
             register_to_vertex=False,
             stream_logs=True,
             dry_run=dry_run,
@@ -180,7 +181,7 @@ def _run_training_stage(
     use_vertex: bool,
     machine_type: str,
     rebuild_container: bool,
-    skip_scraping: bool,
+    skip_ingestion: bool,
     dry_run: bool,
 ) -> dict[str, Any]:
     logger.info(f"Stage 2: Training ({'vertex' if use_vertex else 'local'}, tune={tune})")
@@ -189,7 +190,7 @@ def _run_training_stage(
         use_vertex=use_vertex,
         machine_type=machine_type,
         rebuild_container=rebuild_container,
-        skip_scraping=skip_scraping,
+        skip_ingestion=skip_ingestion,
         dry_run=dry_run,
     )
     training_result = vertex_training_flow(config=config)
@@ -351,9 +352,9 @@ def _record_pipeline_failure(
 
 @flow(name="Estate Value Index Complete ML Pipeline", log_prints=True)
 def complete_pipeline_flow(
-    # Scraping configuration
+    # Ingestion configuration
     max_pages: int = 10,
-    skip_scraping: bool = False,
+    skip_ingestion: bool = False,
     config_file: str | None = None,
     # Training configuration
     tune: bool = False,
@@ -371,7 +372,7 @@ def complete_pipeline_flow(
     _log_pipeline_start(
         logger,
         max_pages=max_pages,
-        skip_scraping=skip_scraping,
+        skip_ingestion=skip_ingestion,
         tune=tune,
         use_vertex=use_vertex,
         deploy_to_prod=deploy_to_prod,
@@ -382,7 +383,7 @@ def complete_pipeline_flow(
     results = _initial_results(
         start_time,
         max_pages=max_pages,
-        skip_scraping=skip_scraping,
+        skip_ingestion=skip_ingestion,
         tune=tune,
         use_vertex=use_vertex,
         deploy_to_prod=deploy_to_prod,
@@ -394,7 +395,7 @@ def complete_pipeline_flow(
             logger,
             results,
             max_pages=max_pages,
-            skip_scraping=skip_scraping,
+            skip_ingestion=skip_ingestion,
             config_file=config_file,
             dry_run=dry_run,
         )
@@ -407,7 +408,7 @@ def complete_pipeline_flow(
             use_vertex=use_vertex,
             machine_type=machine_type,
             rebuild_container=rebuild_container,
-            skip_scraping=skip_scraping,
+            skip_ingestion=skip_ingestion,
             dry_run=dry_run,
         )
         if not training_result.get("success", False):
@@ -451,7 +452,7 @@ def quick_pipeline_flow(max_pages: int = 5) -> dict:
 
 @flow(name="Estate Value Index Production Pipeline - Full")
 def production_pipeline_flow(max_pages: int = 5, deploy: bool = True) -> dict:
-    """Full production pipeline: scrape, tune, deploy."""
+    """Full production pipeline: ingest, tune, deploy."""
     return complete_pipeline_flow(
         max_pages=max_pages,
         tune=True,
@@ -463,11 +464,11 @@ def production_pipeline_flow(max_pages: int = 5, deploy: bool = True) -> dict:
     )
 
 
-@flow(name="Estate Value Index Retrain Pipeline - No Scraping")
+@flow(name="Estate Value Index Retrain Pipeline - No Ingestion")
 def retrain_pipeline_flow(tune: bool = True, deploy: bool = False) -> dict:
-    """Retrain model using existing data (no scraping)."""
+    """Retrain model using existing data (no ingestion)."""
     return complete_pipeline_flow(
-        skip_scraping=True, tune=tune, use_vertex=True, deploy_to_prod=deploy, dry_run=False
+        skip_ingestion=True, tune=tune, use_vertex=True, deploy_to_prod=deploy, dry_run=False
     )
 
 
@@ -502,18 +503,18 @@ if __name__ == "__main__":
     parser.add_argument(
         "--production", action="store_true", help="Full production run (5 pages, tuning, deploy)"
     )
-    parser.add_argument("--retrain", action="store_true", help="Retrain only (no scraping)")
+    parser.add_argument("--retrain", action="store_true", help="Retrain only (no ingestion)")
 
     # Custom configuration
-    parser.add_argument("--max-pages", type=int, default=10, help="Maximum pages to scrape")
+    parser.add_argument("--max-pages", type=int, default=10, help="Maximum source pages to ingest")
     parser.add_argument(
-        "--skip-scraping", action="store_true", help="Skip scraping, use existing data"
+        "--skip-ingestion", action="store_true", help="Skip ingestion, use existing data"
     )
     parser.add_argument(
         "--config-file",
         type=str,
         default=None,
-        help="Path to config file (e.g., ingestion/config/booli_all_locations.json)",
+        help="Path to config file (e.g., src/estate_value_index/ingestion/config/booli_all_locations.json)",
     )
     parser.add_argument("--tune", action="store_true", help="Enable hyperparameter tuning")
     parser.add_argument(
@@ -543,7 +544,7 @@ if __name__ == "__main__":
         print("Running end-to-end pipeline...")
         result = complete_pipeline_flow(
             max_pages=args.max_pages,
-            skip_scraping=args.skip_scraping,
+            skip_ingestion=args.skip_ingestion,
             config_file=args.config_file,
             tune=args.tune,
             use_vertex=not args.no_vertex,

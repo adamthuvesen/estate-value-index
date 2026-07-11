@@ -94,7 +94,7 @@ gcloud run deploy "$SERVICE_NAME" \
   --timeout 900s \
   --port 8080 \
   --ingress internal \
-  --set-env-vars "GCS_ENABLED=true,GCS_BUCKET=${GCS_BUCKET},NODE_ENV=production,PREDICTION_API_URL=http://127.0.0.1:8000,TRUST_PROXY_HEADERS=true" \
+  --set-env-vars "GCS_ENABLED=true,GCS_BUCKET=${GCS_BUCKET},NODE_ENV=production,PREDICTION_API_URL=http://127.0.0.1:8000" \
   --no-cpu-throttling \
   --cpu-boost
 

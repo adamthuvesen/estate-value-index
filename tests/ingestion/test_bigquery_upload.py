@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from estate_value_index.ingestion.bigquery_upload import _prepare_rows, prepare_bq_row
+from estate_value_index.ingestion.bigquery_upload import prepare_bq_row
 
 
 def test_prepare_bq_row_rejects_missing_listing_id() -> None:
@@ -10,9 +10,9 @@ def test_prepare_bq_row_rejects_missing_listing_id() -> None:
         prepare_bq_row({"listing_id": None})
 
 
-def test_prepare_rows_rejects_blank_listing_id() -> None:
+def test_prepare_bq_row_rejects_blank_listing_id() -> None:
     with pytest.raises(ValueError, match="listing_id"):
-        _prepare_rows([{"listing_id": " "}])
+        prepare_bq_row({"listing_id": " "})
 
 
 def test_prepare_bq_row_strips_listing_id() -> None:
