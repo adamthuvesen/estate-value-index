@@ -601,13 +601,28 @@ def monitor_pipeline_health_task() -> dict:
     except Exception as e:
         checks["model_artifacts"] = {"healthy": False, "error": str(e)}
 
-    # Check Cloud Run
+    # Check Cloud Run. The service deploys with internal ingress, so an
+    # external GET from here hits a Google Frontend 404 and always reads
+    # unhealthy; judge by revision readiness unless ingress is public.
     cloud_run_url = os.getenv("CLOUD_RUN_URL")
     if cloud_run_url:
+        service_name = os.getenv("CLOUD_RUN_SERVICE_NAME", "estate-value-index-app")
+        region = os.getenv("CLOUD_RUN_REGION") or os.getenv("GCP_REGION", "europe-north1")
+        gcp_project = os.getenv("GCP_PROJECT_ID")
         try:
-            health_result = health_check_task(f"{cloud_run_url}/api/health")
-            checks["cloud_run"] = {"healthy": health_result["healthy"]}
-            if not health_result["healthy"]:
+            # Deploy always sets --ingress internal; if the lookup fails, assume internal.
+            ingress = _get_service_ingress(service_name, region, gcp_project) or "internal"
+            if ingress == "all":
+                health_result = health_check_task(f"{cloud_run_url}/api/health")
+                cloud_run_healthy = health_result["healthy"]
+                checks["cloud_run"] = {"healthy": cloud_run_healthy, "check": "http"}
+            else:
+                cloud_run_healthy = _revision_ready(service_name, region, gcp_project)
+                checks["cloud_run"] = {
+                    "healthy": cloud_run_healthy,
+                    "check": "revision-readiness",
+                }
+            if not cloud_run_healthy:
                 issues.append("Cloud Run service unhealthy")
         except Exception as e:
             checks["cloud_run"] = {"healthy": False, "error": str(e)}

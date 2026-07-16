@@ -503,6 +503,129 @@ class TestHealthCheckTask:
         assert result["timestamp"] is not None
 
 
+class TestMonitorPipelineHealthCloudRun:
+    def _set_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("BIGQUERY_PROJECT_ID", "my-project")
+        monkeypatch.setenv("GCP_PROJECT_ID", "my-project")
+        monkeypatch.setenv("CLOUD_RUN_URL", "https://app-abc.run.app")
+
+    def _mock_bq(self, mocker: Any) -> None:
+        mock_client = MagicMock()
+        mock_client.get_table.return_value = MagicMock(num_rows=1000)
+        mocker.patch(
+            "estate_value_index.pipelines.tasks.deployment.get_bq_client",
+            return_value=mock_client,
+        )
+
+    @pytest.mark.unit
+    def test_internal_ingress_uses_revision_readiness_not_external_probe(
+        self, monkeypatch: pytest.MonkeyPatch, mocker: Any
+    ) -> None:
+        self._set_env(monkeypatch)
+        self._mock_bq(mocker)
+        mocker.patch(
+            "estate_value_index.pipelines.tasks.deployment._get_service_ingress",
+            return_value="internal",
+        )
+        revision_ready = mocker.patch(
+            "estate_value_index.pipelines.tasks.deployment._revision_ready",
+            return_value=True,
+        )
+        probe = mocker.patch("estate_value_index.pipelines.tasks.deployment.requests.get")
+
+        result = monitor_pipeline_health_task.fn()
+
+        assert result["checks"]["cloud_run"] == {
+            "healthy": True,
+            "check": "revision-readiness",
+        }
+        assert "Cloud Run service unhealthy" not in result["issues"]
+        revision_ready.assert_called_once_with(
+            "estate-value-index-app", "europe-north1", "my-project"
+        )
+        probe.assert_not_called()
+
+    @pytest.mark.unit
+    def test_internal_ingress_not_ready_reports_unhealthy(
+        self, monkeypatch: pytest.MonkeyPatch, mocker: Any
+    ) -> None:
+        self._set_env(monkeypatch)
+        self._mock_bq(mocker)
+        mocker.patch(
+            "estate_value_index.pipelines.tasks.deployment._get_service_ingress",
+            return_value="internal",
+        )
+        mocker.patch(
+            "estate_value_index.pipelines.tasks.deployment._revision_ready",
+            return_value=False,
+        )
+
+        result = monitor_pipeline_health_task.fn()
+
+        assert result["checks"]["cloud_run"]["healthy"] is False
+        assert "Cloud Run service unhealthy" in result["issues"]
+
+    @pytest.mark.unit
+    def test_unknown_ingress_defaults_to_revision_readiness(
+        self, monkeypatch: pytest.MonkeyPatch, mocker: Any
+    ) -> None:
+        self._set_env(monkeypatch)
+        self._mock_bq(mocker)
+        mocker.patch(
+            "estate_value_index.pipelines.tasks.deployment._get_service_ingress",
+            return_value=None,
+        )
+        revision_ready = mocker.patch(
+            "estate_value_index.pipelines.tasks.deployment._revision_ready",
+            return_value=True,
+        )
+        probe = mocker.patch("estate_value_index.pipelines.tasks.deployment.requests.get")
+
+        result = monitor_pipeline_health_task.fn()
+
+        assert result["checks"]["cloud_run"]["check"] == "revision-readiness"
+        revision_ready.assert_called_once()
+        probe.assert_not_called()
+
+    @pytest.mark.unit
+    def test_public_ingress_probes_health_endpoint(
+        self, monkeypatch: pytest.MonkeyPatch, mocker: Any
+    ) -> None:
+        self._set_env(monkeypatch)
+        self._mock_bq(mocker)
+        mocker.patch(
+            "estate_value_index.pipelines.tasks.deployment._get_service_ingress",
+            return_value="all",
+        )
+        revision_ready = mocker.patch(
+            "estate_value_index.pipelines.tasks.deployment._revision_ready"
+        )
+        health_check = mocker.patch(
+            "estate_value_index.pipelines.tasks.deployment.health_check_task",
+            return_value={"healthy": True},
+        )
+
+        result = monitor_pipeline_health_task.fn()
+
+        assert result["checks"]["cloud_run"] == {"healthy": True, "check": "http"}
+        health_check.assert_called_once_with("https://app-abc.run.app/api/health")
+        revision_ready.assert_not_called()
+
+    @pytest.mark.unit
+    def test_no_cloud_run_url_skips_check(
+        self, monkeypatch: pytest.MonkeyPatch, mocker: Any
+    ) -> None:
+        monkeypatch.setenv("BIGQUERY_PROJECT_ID", "my-project")
+        monkeypatch.delenv("CLOUD_RUN_URL", raising=False)
+        self._mock_bq(mocker)
+        ingress = mocker.patch("estate_value_index.pipelines.tasks.deployment._get_service_ingress")
+
+        result = monitor_pipeline_health_task.fn()
+
+        assert result["checks"]["cloud_run"] == {"skipped": True}
+        ingress.assert_not_called()
+
+
 class TestLogMetricsTask:
     @pytest.mark.unit
     def test_logs_to_local_file(self, tmp_path: Path, mocker: Any) -> None:
