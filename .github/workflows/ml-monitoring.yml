@@ -11,7 +11,13 @@ name: ML Monitoring - Drift Detection
 #   GCP_REGION
 #   GCS_BUCKET
 
+# A drift schedule is prepared but DISABLED: uncomment the block below to run
+# weekly. Scheduled runs detect drift and alert only (failed run + issue);
+# retraining and deployment stay manual — the weekly auto-retrain was
+# deliberately removed.
 on:
+  # schedule:
+  #   - cron: '0 6 * * 1'  # Mondays 06:00 UTC, against production
   workflow_dispatch:
     inputs:
       environment:
@@ -27,7 +33,8 @@ jobs:
   drift-detection:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    environment: ${{ inputs.environment }}
+    # Scheduled runs have no inputs; they check production.
+    environment: ${{ inputs.environment || 'production' }}
     env:
       GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
       BIGQUERY_PROJECT_ID: ${{ vars.BIGQUERY_PROJECT_ID || vars.GCP_PROJECT_ID }}
