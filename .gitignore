@@ -84,5 +84,3 @@ build/
 # Images (scraped property images)
 data/images/
 
-# OpenSpec
-openspec/
