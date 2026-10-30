@@ -2,15 +2,17 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.estate_value_index.ml.constants import MIN_VALID_PRICE
-from src.estate_value_index.ml.preprocessing import (
+from estate_value_index.areas import (
+    extract_area_name,
+    normalize_area_for_model,
+    transliterate_swedish,
+)
+from estate_value_index.ml.constants import MIN_VALID_PRICE
+from estate_value_index.ml.preprocessing import (
     FeatureSpec,
     drop_outliers_quantile,
-    extract_area_name,
     filter_valid_listings,
-    normalize_area_for_model,
     preprocess_area_field,
-    transliterate_swedish,
 )
 
 
@@ -107,12 +109,6 @@ class TestSwedishCharacterHandling:
     def test_normalize_area_for_model_empty(self):
         assert normalize_area_for_model("") == "unknown"
         assert normalize_area_for_model(None) == "unknown"
-
-    @pytest.mark.unit
-    def test_normalize_area_for_model_empty_for_unknown(self):
-        assert normalize_area_for_model("", empty_for_unknown=True) == ""
-        assert normalize_area_for_model(None, empty_for_unknown=True) == ""
-        assert normalize_area_for_model("Östermalm", empty_for_unknown=True) == "ostermalm"
 
     @pytest.mark.integration
     def test_preprocess_area_field(self):
@@ -287,9 +283,9 @@ class TestFeatureSpec:
         spec = FeatureSpec(numeric=["price", "area"], categorical=["location"], target="sold_price")
 
         with pytest.raises(AttributeError):
-            spec.numeric = ["different_price"]
+            spec.numeric = ["different_price"]  # pyright: ignore[reportAttributeAccessIssue]  # asserts that FeatureSpec is frozen
         with pytest.raises(AttributeError):
-            spec.target = "different_target"
+            spec.target = "different_target"  # pyright: ignore[reportAttributeAccessIssue]  # asserts that FeatureSpec is frozen
 
     @pytest.mark.unit
     def test_feature_spec_equality(self):

@@ -11,17 +11,19 @@ from sklearn.metrics import mean_absolute_error
 from sklearn.model_selection import TimeSeriesSplit
 
 from estate_value_index.ml.market_normalized_target import (
-    _fit_market_normalized_predictions,
-    _market_index,
+    build_market_index,
     denormalize_market_predictions,
+    fit_market_normalized_predictions,
     market_index_reference,
     normalize_prices_to_market_index,
 )
 from estate_value_index.ml.residual_calibration import (
-    _fit_base_model,
-    _prepare_matrices,
-    _prepare_model_data,
-    _train_lgbm,
+    PreparedModelData,
+    fit_base_model,
+    predict_prices,
+    prepare_matrices,
+    prepare_model_data,
+    train_lgbm,
 )
 
 DEFAULT_TRAIN_TIER_LOW_MAX_PRICE = 5_000_000.0
@@ -88,10 +90,10 @@ def select_best_expert_weights(
     *,
     weight_step: float = DEFAULT_WEIGHT_STEP,
     model_names: tuple[str, ...] = MODEL_NAMES,
-) -> dict[str, object]:
+) -> dict[str, Any]:
     """Pick one convex blend across all rows using OOF MAE."""
     y = np.asarray(y_true, dtype=float)
-    best: dict[str, object] | None = None
+    best: dict[str, Any] | None = None
     candidate_count = 0
 
     for weights in _weight_grid(model_names, weight_step):
@@ -120,7 +122,7 @@ def select_gated_expert_weights(
     weight_step: float = DEFAULT_WEIGHT_STEP,
     min_segment_rows: int = DEFAULT_MIN_SEGMENT_ROWS,
     model_names: tuple[str, ...] = MODEL_NAMES,
-) -> dict[str, object]:
+) -> dict[str, Any]:
     """Pick separate convex expert weights per predicted-price gate."""
     if min_segment_rows < 1:
         raise ValueError("min_segment_rows must be at least 1")
@@ -128,7 +130,7 @@ def select_gated_expert_weights(
     y = np.asarray(y_true, dtype=float)
     labels = np.asarray(gate_labels, dtype=object)
     weights_by_gate: dict[str, dict[str, float]] = {}
-    segments: dict[str, dict[str, object]] = {}
+    segments: dict[str, dict[str, Any]] = {}
 
     for label in ("low", "mid", "high"):
         mask = labels == label
@@ -202,16 +204,16 @@ def apply_gated_expert_blend(
 
 
 def _fit_tier_expert_predictions(
-    prepared,
+    prepared: PreparedModelData,
     random_state: int,
     *,
     tier_specs: tuple[TierSpec, ...],
     fallback_predictions: np.ndarray,
     lgbm_params: dict[str, Any] | None = None,
 ) -> TierExpertFit:
-    X_train, X_test, y_train, _ = _prepare_matrices(prepared)
-    train_index = _market_index(prepared.train_engineered)
-    test_index = _market_index(prepared.test_engineered)
+    X_train, X_test, y_train, _ = prepare_matrices(prepared)
+    train_index = build_market_index(prepared.train_engineered)
+    test_index = build_market_index(prepared.test_engineered)
     reference_index = market_index_reference(train_index)
     y_normalized = normalize_prices_to_market_index(
         y_train,
@@ -230,20 +232,20 @@ def _fit_tier_expert_predictions(
     train_rows: dict[str, int] = {}
 
     for spec in tier_specs:
-        valid_train = base_valid & _tier_mask(y_train, spec)
+        valid_train = base_valid & tier_mask(y_train, spec)
         train_rows[spec.name] = int(valid_train.sum())
         if valid_train.sum() < 100:
             predictions[spec.name] = np.asarray(fallback_predictions, dtype=float)
             continue
 
-        model = _train_lgbm(
+        model = train_lgbm(
             X_train.loc[valid_train],
             y_normalized.loc[valid_train],
             prepared.categorical_features,
             random_state,
             lgbm_params=lgbm_params,
         )
-        normalized_predictions = np.expm1(model.predict(X_test))
+        normalized_predictions = predict_prices(model, X_test)
         predictions[spec.name] = denormalize_market_predictions(
             normalized_predictions,
             test_index,
@@ -259,7 +261,7 @@ def _fit_tier_expert_predictions(
     )
 
 
-def _build_oof_training_data(
+def build_oof_training_data(
     train_raw: pd.DataFrame,
     *,
     feature_set: str,
@@ -286,9 +288,9 @@ def _build_oof_training_data(
     ):
         fold_train_raw = sorted_train.iloc[fold_train_idx].reset_index(drop=True)
         fold_valid_raw = sorted_train.iloc[fold_valid_idx].reset_index(drop=True)
-        prepared = _prepare_model_data(fold_train_raw, fold_valid_raw, feature_set)
-        base_fit = _fit_base_model(prepared, random_state, lgbm_params)
-        normalized_fit = _fit_market_normalized_predictions(
+        prepared = prepare_model_data(fold_train_raw, fold_valid_raw, feature_set)
+        base_fit = fit_base_model(prepared, random_state, lgbm_params)
+        normalized_fit = fit_market_normalized_predictions(
             prepared,
             random_state,
             fallback_predictions=base_fit.predictions,
@@ -322,7 +324,7 @@ def _build_oof_training_data(
     return pd.concat(rows, ignore_index=True)
 
 
-def _tier_specs(
+def build_tier_specs(
     *,
     low_max_price: float,
     mid_min_price: float,
@@ -336,7 +338,7 @@ def _tier_specs(
     )
 
 
-def _tier_mask(prices: pd.Series, spec: TierSpec) -> pd.Series:
+def tier_mask(prices: pd.Series, spec: TierSpec) -> pd.Series:
     mask = pd.Series(True, index=prices.index)
     if spec.min_price is not None:
         mask &= prices.ge(spec.min_price)
@@ -345,7 +347,7 @@ def _tier_mask(prices: pd.Series, spec: TierSpec) -> pd.Series:
     return mask
 
 
-def _prediction_frame(
+def prediction_frame(
     *,
     global_predictions: np.ndarray,
     tier_predictions: dict[str, np.ndarray],

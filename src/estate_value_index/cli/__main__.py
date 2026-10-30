@@ -19,7 +19,7 @@ class Command:
 
 _COMMANDS: dict[str, Command] = {
     "backfill": Command(
-        "Backfill Booli listings by sold-date windows",
+        "Fetch Booli listings by sold-date window; --load also writes BigQuery",
         "estate_value_index.cli.backfill_booli",
         supports_json=True,
     ),
@@ -36,9 +36,31 @@ _COMMANDS: dict[str, Command] = {
         "Generate value analysis enrichment JSON",
         "estate_value_index.cli.generate_value_analysis",
     ),
+    "sync": Command(
+        "Copy BigQuery listings to the local production file and check them",
+        "estate_value_index.cli.sync_listings",
+    ),
     "train-production-models": Command(
         "Train the two production prediction models",
         "estate_value_index.cli.train_production_models",
+    ),
+    "vertex-train": Command(
+        "Train on Vertex AI, wait for the job, and download the artifacts",
+        "estate_value_index.cli.vertex_train",
+    ),
+    "check-model": Command(
+        "Fail unless the trained model meets the MdAPE quality gate",
+        "estate_value_index.cli.model_release",
+        handler="check_main",
+    ),
+    "promote-model": Command(
+        "Copy validated Vertex artifacts to the production GCS path",
+        "estate_value_index.cli.model_release",
+        handler="promote_main",
+    ),
+    "upload-enrichment": Command(
+        "Upload the derived web JSON files to GCS",
+        "estate_value_index.cli.publish_enrichment",
     ),
 }
 

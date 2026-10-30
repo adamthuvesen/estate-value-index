@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+from typing import Any
+
 import pandas as pd
 
 from estate_value_index.ml.features import build_feature_context, create_optimized_features
 from estate_value_index.ml.features.micro_area import create_h3_cell
+from tests.fakes import value_at
 
 
 def _listing(
@@ -14,7 +17,7 @@ def _listing(
     area: str = "Södermalm",
     lat: float = 59.315,
     lon: float = 18.07,
-) -> dict:
+) -> dict[str, Any]:
     return {
         "listing_id": listing_id,
         "area": area,
@@ -53,18 +56,16 @@ def test_micro_area_uses_res10_after_min_prior_count() -> None:
 
     engineered = create_optimized_features(pd.DataFrame(rows)).set_index("listing_id")
 
-    assert engineered.loc["TARGET", "micro_area_resolution_used"] == "h3_res10"
-    assert engineered.loc["TARGET", "micro_area_ppsqm_count"] == 20
-    assert engineered.loc["TARGET", "micro_area_ppsqm_median"] > 0
-    assert (
-        engineered.loc["TARGET", "micro_area_ppsqm_p75"]
-        >= engineered.loc["TARGET", "micro_area_ppsqm_median"]
+    assert value_at(engineered, "TARGET", "micro_area_resolution_used") == "h3_res10"
+    assert value_at(engineered, "TARGET", "micro_area_ppsqm_count") == 20
+    assert value_at(engineered, "TARGET", "micro_area_ppsqm_median") > 0
+    assert value_at(engineered, "TARGET", "micro_area_ppsqm_p75") >= value_at(
+        engineered, "TARGET", "micro_area_ppsqm_median"
     )
-    assert (
-        engineered.loc["TARGET", "micro_area_ppsqm_p90"]
-        >= engineered.loc["TARGET", "micro_area_ppsqm_p75"]
+    assert value_at(engineered, "TARGET", "micro_area_ppsqm_p90") >= value_at(
+        engineered, "TARGET", "micro_area_ppsqm_p75"
     )
-    assert engineered.loc["TARGET", "micro_area_upper_tail_ratio"] >= 1.0
+    assert value_at(engineered, "TARGET", "micro_area_upper_tail_ratio") >= 1.0
 
 
 def test_sparse_micro_area_falls_back_to_area() -> None:
@@ -76,8 +77,8 @@ def test_sparse_micro_area_falls_back_to_area() -> None:
 
     engineered = create_optimized_features(pd.DataFrame(rows)).set_index("listing_id")
 
-    assert engineered.loc["TARGET", "micro_area_resolution_used"] == "area"
-    assert engineered.loc["TARGET", "micro_area_ppsqm_count"] == 3
+    assert value_at(engineered, "TARGET", "micro_area_resolution_used") == "area"
+    assert value_at(engineered, "TARGET", "micro_area_ppsqm_count") == 3
 
 
 def test_context_micro_area_features_do_not_use_holdout_labels() -> None:
@@ -140,18 +141,16 @@ def test_same_size_comp_uses_prior_h3_size_history() -> None:
 
     engineered = create_optimized_features(pd.DataFrame(rows)).set_index("listing_id")
 
-    assert engineered.loc["TARGET", "same_size_scope_used"] == "h3_res9_size"
-    assert engineered.loc["TARGET", "same_size_ppsqm_count"] == 5
-    assert engineered.loc["TARGET", "same_size_ppsqm_median"] > 0
-    assert (
-        engineered.loc["TARGET", "same_size_ppsqm_p75"]
-        >= engineered.loc["TARGET", "same_size_ppsqm_median"]
+    assert value_at(engineered, "TARGET", "same_size_scope_used") == "h3_res9_size"
+    assert value_at(engineered, "TARGET", "same_size_ppsqm_count") == 5
+    assert value_at(engineered, "TARGET", "same_size_ppsqm_median") > 0
+    assert value_at(engineered, "TARGET", "same_size_ppsqm_p75") >= value_at(
+        engineered, "TARGET", "same_size_ppsqm_median"
     )
-    assert (
-        engineered.loc["TARGET", "same_size_ppsqm_p90"]
-        >= engineered.loc["TARGET", "same_size_ppsqm_p75"]
+    assert value_at(engineered, "TARGET", "same_size_ppsqm_p90") >= value_at(
+        engineered, "TARGET", "same_size_ppsqm_p75"
     )
-    assert engineered.loc["TARGET", "same_size_upper_tail_ratio"] >= 1.0
+    assert value_at(engineered, "TARGET", "same_size_upper_tail_ratio") >= 1.0
 
 
 def test_h3_neighbor_features_use_prior_adjacent_cells() -> None:
@@ -169,14 +168,12 @@ def test_h3_neighbor_features_use_prior_adjacent_cells() -> None:
 
     engineered = create_optimized_features(pd.DataFrame(rows)).set_index("listing_id")
 
-    assert engineered.loc["TARGET", "h3_neighbor_ppsqm_count"] == 3
-    assert engineered.loc["TARGET", "h3_neighbor_ppsqm"] > 0
-    assert (
-        engineered.loc["TARGET", "h3_neighbor_ppsqm_p75"]
-        >= engineered.loc["TARGET", "h3_neighbor_ppsqm"]
+    assert value_at(engineered, "TARGET", "h3_neighbor_ppsqm_count") == 3
+    assert value_at(engineered, "TARGET", "h3_neighbor_ppsqm") > 0
+    assert value_at(engineered, "TARGET", "h3_neighbor_ppsqm_p75") >= value_at(
+        engineered, "TARGET", "h3_neighbor_ppsqm"
     )
-    assert (
-        engineered.loc["TARGET", "h3_neighbor_ppsqm_p90"]
-        >= engineered.loc["TARGET", "h3_neighbor_ppsqm_p75"]
+    assert value_at(engineered, "TARGET", "h3_neighbor_ppsqm_p90") >= value_at(
+        engineered, "TARGET", "h3_neighbor_ppsqm_p75"
     )
-    assert engineered.loc["TARGET", "h3_neighbor_upper_tail_ratio"] >= 1.0
+    assert value_at(engineered, "TARGET", "h3_neighbor_upper_tail_ratio") >= 1.0

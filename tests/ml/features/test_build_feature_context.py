@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import pandas as pd
 
 from estate_value_index.ml.features import build_feature_context
 
 
-def _minimal_frame(extra: dict[str, list]) -> pd.DataFrame:
+def _minimal_frame(extra: dict[str, Any]) -> pd.DataFrame:
     """Return a frame with the columns build_feature_context needs to succeed."""
     n = max(len(v) for v in extra.values()) if extra else 2
     base = {
@@ -33,7 +35,7 @@ def test_reference_date_uses_sold_date_max():
 def test_reference_date_falls_back_to_scraped_at_when_sold_all_nat():
     df = _minimal_frame(
         {
-            "sold_date": pd.to_datetime([None, None]),
+            "sold_date": pd.DatetimeIndex([pd.NaT, pd.NaT]),
             "scraped_at": pd.to_datetime(["2024-11-01", "2024-12-01"]),
         }
     )

@@ -11,10 +11,10 @@ from estate_value_index.ml.features.context import FeatureEngineeringContext
 from estate_value_index.ml.features.micro_area import (
     MICRO_AREA_SOURCE_COLUMN,
     SIZE_BAND_COLUMN,
-    _size_band,
+    compute_size_band,
     observed_price_per_sqm,
 )
-from estate_value_index.ml.features.utils import _safe_divide
+from estate_value_index.ml.features.utils import safe_divide
 
 STREET_AREA_MIN_PRIOR_COUNT = 5
 STREET_SIZE_MIN_PRIOR_COUNT = 3
@@ -65,10 +65,10 @@ def _ensure_address_keys(df: pd.DataFrame) -> pd.DataFrame:
     street_valid = df["street_name"].ne("unknown") & area_key.ne("unknown")
     address_valid = address_key.ne("unknown") & area_key.ne("unknown")
 
-    df["_street_area_key"] = np.where(street_valid, area_key + "|" + df["street_name"], None)
-    df["_address_comp_key"] = np.where(address_valid, area_key + "|" + address_key, None)
+    df["_street_area_key"] = _where_valid(street_valid, area_key + "|" + df["street_name"])
+    df["_address_comp_key"] = _where_valid(address_valid, area_key + "|" + address_key)
     if SIZE_BAND_COLUMN not in df.columns:
-        df[SIZE_BAND_COLUMN] = _size_band(df)
+        df[SIZE_BAND_COLUMN] = compute_size_band(df)
     size_band = (
         df[SIZE_BAND_COLUMN]
         .astype("object")
@@ -77,12 +77,16 @@ def _ensure_address_keys(df: pd.DataFrame) -> pd.DataFrame:
             "unknown",
         )
     )
-    df["_street_size_key"] = np.where(
+    df["_street_size_key"] = _where_valid(
         street_valid,
         pd.Series(df["_street_area_key"], index=df.index).astype(str) + "|" + size_band.astype(str),
-        None,
     )
     return df
+
+
+def _where_valid(valid: pd.Series, keys: pd.Series) -> np.ndarray:
+    """``keys`` where ``valid``, otherwise None."""
+    return np.where(valid, keys, np.full(len(keys), None, dtype=object))
 
 
 def _add_training_address_comp_features(df: pd.DataFrame) -> pd.DataFrame:
@@ -165,21 +169,21 @@ def _choose_address_comp_stats(
     _assign_stats(df, "address", address_ok, address, "address_comp_scope_used", "address")
     _finish_stats(df, "address")
 
-    street_premium = _safe_divide(
+    street_premium = safe_divide(
         df["street_area_ppsqm_median"],
         _numeric_column(df, "micro_area_ppsqm_median"),
         df.index,
     )
     df["street_area_premium_vs_micro"] = (street_premium - 1.0).fillna(0.0)
 
-    size_premium = _safe_divide(
+    size_premium = safe_divide(
         df["street_size_ppsqm_median"],
         df["street_area_ppsqm_median"],
         df.index,
     )
     df["street_size_premium_vs_street"] = (size_premium - 1.0).fillna(0.0)
 
-    address_premium = _safe_divide(
+    address_premium = safe_divide(
         df["address_ppsqm_median"],
         df["street_area_ppsqm_median"],
         df.index,
@@ -231,7 +235,7 @@ def _finish_stats(df: pd.DataFrame, prefix: str) -> None:
         .fillna(df[f"{prefix}_ppsqm_median"])
     )
     df[f"{prefix}_ppsqm_count"] = df[f"{prefix}_ppsqm_count"].fillna(0.0)
-    upper_tail = _safe_divide(
+    upper_tail = safe_divide(
         df[f"{prefix}_ppsqm_p90"],
         df[f"{prefix}_ppsqm_median"],
         df.index,

@@ -3,14 +3,14 @@
 import numpy as np
 import pytest
 
-from src.estate_value_index.ml.training import LGBMTrainer
+from estate_value_index.ml.training import LGBMTrainer
 from tests.conftest import assert_valid_predictions
 
 
 class TestTrainerIntegration:
     @pytest.mark.integration
     def test_trainer_with_lgbm_pipeline(self, sample_swedish_properties):
-        from src.estate_value_index.ml.features import (
+        from estate_value_index.ml.features import (
             SimplePredictionPipeline,
             build_feature_context,
             create_optimized_features,
@@ -36,7 +36,9 @@ class TestTrainerIntegration:
 
         feature_context = build_feature_context(df_engineered)
         categorical_indices = [
-            X_train.columns.get_loc(col) for col in categorical_features if col in X_train.columns
+            X_train.columns.to_list().index(col)
+            for col in categorical_features
+            if col in X_train.columns
         ]
 
         lgbm_trainer = LGBMTrainer(random_state=42)

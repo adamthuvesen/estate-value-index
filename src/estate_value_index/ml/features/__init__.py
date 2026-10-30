@@ -17,7 +17,7 @@ from estate_value_index.ml.features.registry import (
     get_feature_lists,
     handle_missing_values,
 )
-from estate_value_index.ml.features.utils import _coerce_nullable_bool, _safe_divide
+from estate_value_index.ml.features.utils import coerce_nullable_bool, safe_divide
 
 __all__ = [
     "ALL_FEATURE_NAMES",
@@ -25,11 +25,11 @@ __all__ = [
     "NUMERIC_FEATURE_NAMES",
     "FeatureEngineeringContext",
     "SimplePredictionPipeline",
-    "_coerce_nullable_bool",
-    "_safe_divide",
     "build_feature_context",
+    "coerce_nullable_bool",
     "create_optimized_features",
     "get_categorical_indices",
     "get_feature_lists",
     "handle_missing_values",
+    "safe_divide",
 ]

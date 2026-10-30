@@ -6,7 +6,7 @@ Three workflows are defined for tests, deployment, and model training.
 | --- | --- | --- |
 | `ci.yml` | Push to `main`, `develop`, or `ml-production-time`; pull request to `main` or `develop` | Python and web checks, plus affected Docker builds |
 | `deploy.yml` | Manual | Cloud Run deployment |
-| `ml-pipeline.yml` | Manual | Ingestion, local or Vertex AI training, model promotion, and optional deployment |
+| `ml-pipeline.yml` | Manual | Ingestion, local or Vertex AI training, the quality gate, model promotion, and analytics. Deploy with `deploy.yml` |
 
 ## CI
 
@@ -22,7 +22,10 @@ Coverage output is uploaded as the `coverage-report` artifact.
 
 ## ML pipeline
 
-`ml-pipeline.yml` is started from `workflow_dispatch`. A GitHub environment named
+`ml-pipeline.yml` is started from `workflow_dispatch`. Each step is one `evi` command:
+`backfill --load` (full mode) or `sync`, `train-production-models` or `vertex-train`,
+`check-model`, `promote-model` (Vertex modes), the three analytics commands, and
+`upload-enrichment` (Vertex modes). A GitHub environment named
 `staging` or `production` supplies its cloud configuration.
 
 Modes:
@@ -40,18 +43,20 @@ Manual inputs:
 | --- | --- | --- |
 | `environment` | `staging` | GitHub environment containing GCP variables and secrets |
 | `mode` | `retrain` | Pipeline mode listed above |
-| `max_pages` | `5` | Source page limit in `full` mode |
+| `max_pages` | `5` | Source page limit per sold-date window in `full` mode |
+| `start_date` | empty | First sold date in `full` mode; empty uses the `evi backfill` default |
 | `config_file` | all-locations Booli config | Ingestion configuration |
 | `tune` | `false` | Tune one LightGBM parameter set for each production model |
 | `rebuild_container` | `false` | Vertex AI training image rebuild |
-| `deploy` | `false` | Cloud Run deployment after validation |
+| `approved` | `false` | Required for every mode except `local` |
 
 Examples:
 
 ```bash
 gh workflow run ml-pipeline.yml -f environment=staging -f mode=local -f tune=false
-gh workflow run ml-pipeline.yml -f environment=production -f mode=vertex -f tune=true
-gh workflow run ml-pipeline.yml -f environment=production -f mode=full -f deploy=true
+gh workflow run ml-pipeline.yml -f environment=production -f mode=vertex -f tune=true -f approved=true
+gh workflow run ml-pipeline.yml -f environment=production -f mode=full -f approved=true
+gh workflow run deploy.yml -f environment=production -f approved=true
 ```
 
 Tuning runs two Optuna studies: one for `no_list_price` and one for

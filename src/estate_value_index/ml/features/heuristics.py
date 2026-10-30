@@ -8,7 +8,7 @@ import pandas as pd
 """Heuristic spatial and energy estimates."""
 
 
-def _estimate_energy_efficiency_series(
+def estimate_energy_efficiency_series(
     years: pd.Series | None, areas: pd.Series | None
 ) -> pd.Series:
     """Estimate energy efficiency (1-10) per row from construction year and area.
@@ -64,7 +64,7 @@ def _estimate_energy_efficiency_series(
     return pd.Series(result, index=years.index, dtype=float)
 
 
-def _calculate_distance_to_center(area_string: Any) -> float:
+def calculate_distance_to_center(area_string: Any) -> float:
     """Calculate approximate distance score from Stockholm city center."""
     if pd.isna(area_string) or not isinstance(area_string, str):
         return 5.0  # Default medium distance

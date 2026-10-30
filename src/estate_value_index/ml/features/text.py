@@ -5,6 +5,8 @@ import unicodedata
 
 import pandas as pd
 
+from estate_value_index.utils.narrowing import is_missing
+
 """Description-derived listing quality features."""
 
 
@@ -84,7 +86,7 @@ _LUXURY_PHRASES = (
 
 
 def _normalize_description(value: object) -> str:
-    if pd.isna(value):
+    if is_missing(value):
         return ""
     text = unicodedata.normalize("NFKD", str(value).lower())
     text = "".join(ch for ch in text if not unicodedata.combining(ch))

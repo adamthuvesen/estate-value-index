@@ -161,11 +161,11 @@ function buildPredicates(filters: ValueFinderFilters): Predicate[] {
 
   if (filters.min_living_area !== undefined) {
     const min = filters.min_living_area;
-    predicates.push((p) => p.living_area >= min);
+    predicates.push((p) => p.living_area !== null && p.living_area >= min);
   }
   if (filters.max_living_area !== undefined) {
     const max = filters.max_living_area;
-    predicates.push((p) => p.living_area <= max);
+    predicates.push((p) => p.living_area !== null && p.living_area <= max);
   }
   if (filters.min_rooms !== undefined) {
     const min = filters.min_rooms;

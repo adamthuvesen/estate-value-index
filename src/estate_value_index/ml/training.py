@@ -103,11 +103,10 @@ class LGBMTrainer:
         logger.info("Training LightGBM with default parameters")
 
         self.best_params = self.DEFAULT_PARAMS.copy()
-        self.model = self._create_model(self.best_params)
-        self._fit_model(X_train, y_train_log, categorical_indices)
+        model = self._fit_model(self.best_params, X_train, y_train_log, categorical_indices)
         self.tuning_time = 0.0
 
-        return self.model
+        return model
 
     def _train_with_parameters(
         self,
@@ -118,10 +117,9 @@ class LGBMTrainer:
     ) -> LGBMRegressor:
         """Fit a model with parameters selected by an earlier tuning study."""
         self.best_params = parameters.copy()
-        self.model = self._create_model(self.best_params)
-        self._fit_model(X_train, y_train_log, categorical_indices)
+        model = self._fit_model(self.best_params, X_train, y_train_log, categorical_indices)
         self.tuning_time = 0.0
-        return self.model
+        return model
 
     def _train_with_tuning(
         self,
@@ -192,7 +190,7 @@ class LGBMTrainer:
 
     def _create_model(self, params: dict[str, Any]) -> LGBMRegressor:
         """Create LGBMRegressor with given parameters."""
-        base_params = {
+        base_params: dict[str, Any] = {
             "objective": "regression",
             "metric": "mae",
             "boosting_type": "gbdt",
@@ -205,18 +203,22 @@ class LGBMTrainer:
 
     def _fit_model(
         self,
+        params: dict[str, Any],
         X_train: Features,
         y_train_log: Target,
         categorical_indices: Sequence[int] | None = None,
-    ) -> None:
-        """Fit the model with optional categorical feature handling."""
+    ) -> LGBMRegressor:
+        """Create and fit the model with optional categorical feature handling."""
+        model = self._create_model(params)
         if categorical_indices:
-            self.model.fit(X_train, y_train_log, categorical_feature=categorical_indices)
+            model.fit(X_train, y_train_log, categorical_feature=list(categorical_indices))
         else:
-            self.model.fit(X_train, y_train_log)
+            model.fit(X_train, y_train_log)
+        self.model = model
+        return model
 
     def predict(self, X: Features) -> np.ndarray:
         """Make predictions with the trained model."""
         if self.model is None:
             raise ValueError("Model not trained. Call train() first.")
-        return self.model.predict(X)
+        return np.asarray(self.model.predict(X), dtype=float)

@@ -79,7 +79,7 @@ def test_tuning_runs_once_per_model_and_parameters_are_reused(monkeypatch, tmp_p
 
     monkeypatch.setattr(production_models, "tune_production_hyperparameters", fake_tune)
     monkeypatch.setattr(production_models, "fit_tiered_production_model", fake_fit)
-    monkeypatch.setattr(production_models, "_prediction_metrics", lambda *args: {"mae": 1.0})
+    monkeypatch.setattr(production_models, "prediction_metrics", lambda *args: {"mae": 1.0})
     monkeypatch.setattr(
         production_models,
         "_calibration_report",

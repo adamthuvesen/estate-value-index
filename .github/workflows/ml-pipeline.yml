@@ -29,14 +29,19 @@ on:
         default: 'retrain'
         type: choice
         options:
-          - retrain          # Retrain only (no ingestion)
-          - full             # Full pipeline (ingest + train)
-          - vertex           # Vertex AI training only
-          - local            # Local training only
+          - retrain          # Vertex AI training on existing data (no ingestion)
+          - full             # Ingest, then Vertex AI training
+          - vertex           # Same as retrain
+          - local            # Local training; no cloud writes
       max_pages:
-        description: 'Maximum source pages to ingest (full mode only)'
+        description: 'Maximum source pages per sold-date window (full mode only)'
         required: false
         default: '5'
+        type: string
+      start_date:
+        description: 'First sold date to ingest, YYYY-MM-DD (full mode only; empty uses the evi backfill default)'
+        required: false
+        default: ''
         type: string
       config_file:
         description: 'Booli ingestion config file'
@@ -53,13 +58,8 @@ on:
         required: false
         default: false
         type: boolean
-      deploy:
-        description: 'Deploy to Cloud Run after training'
-        required: false
-        default: false
-        type: boolean
       approved:
-        description: 'Approve spend and production writes (BigQuery, Vertex AI, GCS, Cloud Run); a local run without deploy does not need it'
+        description: 'Approve spend and production writes (BigQuery, Vertex AI, GCS); a local run does not need it'
         required: true
         default: false
         type: boolean
@@ -80,10 +80,8 @@ jobs:
       BIGQUERY_TABLE_LISTINGS: ${{ vars.BIGQUERY_TABLE_LISTINGS || 'listings' }}
       BIGQUERY_DATASET_FEATURES: ${{ vars.BIGQUERY_DATASET_FEATURES || 'booli_features' }}
       BIGQUERY_TABLE_FEATURES: ${{ vars.BIGQUERY_TABLE_FEATURES || 'engineered_features' }}
-      # The pipeline runs against a temporary local Prefect server. Its analytics
-      # heartbeat writes to an ephemeral SQLite and logs noisy "database is locked"
-      # tracebacks under concurrency. We get nothing from that telemetry.
-      PREFECT_SERVER_ANALYTICS_ENABLED: "false"
+      LISTINGS_FILE: data/raw/booli/booli_listings_prod.json
+      MODEL_DIR: web/models
 
     permissions:
       contents: read
@@ -92,9 +90,7 @@ jobs:
     steps:
       - name: Require approval
         run: |
-          spends=false
-          if [ "${{ inputs.mode }}" != "local" ] || [ "${{ inputs.deploy }}" = "true" ]; then spends=true; fi
-          if [ "$spends" = "true" ] && [ "${{ inputs.approved }}" != "true" ]; then
+          if [ "${{ inputs.mode }}" != "local" ] && [ "${{ inputs.approved }}" != "true" ]; then
             echo "Refused: this run spends money or writes to production and needs the approved input set to true"
             exit 1
           fi
@@ -114,7 +110,7 @@ jobs:
           enable-cache: true
 
       - name: Install dependencies
-        run: uv sync --all-extras
+        run: uv sync --locked --all-extras
 
       - name: Validate environment configuration
         run: |
@@ -136,144 +132,65 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f # v2.2.1
 
-      - name: Validate BigQuery access
+      - name: Ingest listings into BigQuery
+        if: inputs.mode == 'full'
+        env:
+          CONFIG_FILE: ${{ inputs.config_file }}
+          MAX_PAGES: ${{ inputs.max_pages }}
+          START_DATE: ${{ inputs.start_date }}
         run: |
-          echo "Validating BigQuery datasets..."
-          bq ls ${{ env.GCP_PROJECT_ID }}:${{ env.BIGQUERY_DATASET_RAW }} > /dev/null || {
-            echo "❌ Error: Cannot access BigQuery dataset ${{ env.BIGQUERY_DATASET_RAW }}"
-            exit 1
-          }
-          bq ls ${{ env.GCP_PROJECT_ID }}:${{ env.BIGQUERY_DATASET_FEATURES }} > /dev/null || {
-            echo "❌ Error: Cannot access BigQuery dataset ${{ env.BIGQUERY_DATASET_FEATURES }}"
-            exit 1
-          }
-          echo "✅ BigQuery access validated"
+          args=(--base-config "$CONFIG_FILE" --max-pages "$MAX_PAGES" --load --approved)
+          if [ -n "$START_DATE" ]; then args+=(--start-date "$START_DATE"); fi
+          uv run evi --json backfill "${args[@]}"
 
-      - name: Set pipeline parameters
-        id: params
+      - name: Sync listings from BigQuery
+        if: inputs.mode != 'full'
+        run: uv run evi sync --output "$LISTINGS_FILE"
+
+      - name: Rebuild the Vertex training container
+        if: inputs.mode != 'local' && inputs.rebuild_container
+        run: ./vertex_ai/build_and_push.sh --project "$GCP_PROJECT_ID" --region "$GCP_REGION"
+
+      - name: Train locally
+        if: inputs.mode == 'local'
         run: |
-          MODE="${{ inputs.mode }}"
-          TUNE="${{ inputs.tune }}"
-          REBUILD="${{ inputs.rebuild_container }}"
-          DEPLOY="${{ inputs.deploy }}"
-          APPROVED="${{ inputs.approved }}"
-          MAX_PAGES="${{ inputs.max_pages }}"
-          CONFIG_FILE="${{ inputs.config_file }}"
+          args=(--data-source json --data-file "$LISTINGS_FILE" --model-dir "$MODEL_DIR")
+          if [ "${{ inputs.tune }}" = "true" ]; then args+=(--tune); fi
+          uv run evi train-production-models "${args[@]}"
 
-          echo "mode=$MODE" >> $GITHUB_OUTPUT
-          echo "tune=$TUNE" >> $GITHUB_OUTPUT
-          echo "rebuild=$REBUILD" >> $GITHUB_OUTPUT
-          echo "deploy=$DEPLOY" >> $GITHUB_OUTPUT
-          echo "approved=$APPROVED" >> $GITHUB_OUTPUT
-          echo "max_pages=$MAX_PAGES" >> $GITHUB_OUTPUT
-          echo "config_file=$CONFIG_FILE" >> $GITHUB_OUTPUT
-
-          echo "Pipeline Configuration:"
-          echo "  Mode: $MODE"
-          echo "  Tune: $TUNE"
-          echo "  Rebuild container: $REBUILD"
-          echo "  Deploy: $DEPLOY"
-          echo "  Max pages: $MAX_PAGES"
-          echo "  Config file: $CONFIG_FILE"
-
-      - name: Run ML Pipeline
-        id: pipeline
+      - name: Train on Vertex AI
+        id: vertex
+        if: inputs.mode != 'local'
         run: |
-          uv run python -c "
-          import sys
-          import json
-          from estate_value_index.pipelines.core.complete_pipeline import complete_pipeline_flow
+          args=(--model-dir "$MODEL_DIR" --approved)
+          if [ "${{ inputs.tune }}" = "true" ]; then args+=(--tune); fi
+          uv run evi vertex-train "${args[@]}" > vertex-train.json
+          cat vertex-train.json
+          echo "model_uri=$(jq -er .model_uri vertex-train.json)" >> "$GITHUB_OUTPUT"
 
-          # Parse parameters
-          mode = '${{ steps.params.outputs.mode }}'
-          tune = '${{ steps.params.outputs.tune }}'.lower() == 'true'
-          rebuild = '${{ steps.params.outputs.rebuild }}'.lower() == 'true'
-          deploy = '${{ steps.params.outputs.deploy }}'.lower() == 'true'
-          approved = '${{ steps.params.outputs.approved }}'.lower() == 'true'
-          max_pages = int('${{ steps.params.outputs.max_pages }}')
-          config_file = '${{ steps.params.outputs.config_file }}'
+      - name: Quality gate
+        run: uv run evi check-model --model-dir "$MODEL_DIR"
 
-          # Configure based on mode
-          if mode == 'retrain':
-              skip_ingestion = True
-              use_vertex = True
-          elif mode == 'full':
-              skip_ingestion = False
-              use_vertex = True
-          elif mode == 'vertex':
-              skip_ingestion = True
-              use_vertex = True
-          elif mode == 'local':
-              skip_ingestion = True
-              use_vertex = False
-          else:
-              print(f'❌ Unknown mode: {mode}')
-              sys.exit(1)
+      - name: Promote the model to production
+        if: inputs.mode != 'local'
+        env:
+          MODEL_URI: ${{ steps.vertex.outputs.model_uri }}
+        run: uv run evi promote-model --model-uri "$MODEL_URI" --approved
 
-          # Run pipeline
-          print(f'🚀 Running pipeline: mode={mode}, tune={tune}, deploy={deploy}, config_file={config_file}')
+      - name: Generate analytics
+        run: |
+          uv run evi value-analysis --data-file "$LISTINGS_FILE" --models-dir "$MODEL_DIR" --no-training-filters
+          uv run evi areas --data-source bigquery \
+            --feature-context "$MODEL_DIR/price_prediction_model_no_list_price_feature_context.json" \
+            --value-analysis data/derived/value_analysis.json \
+            --raw-listings "$LISTINGS_FILE"
+          uv run evi overall-stats --data-source bigquery \
+            --value-analysis data/derived/value_analysis.json \
+            --raw-listings "$LISTINGS_FILE"
 
-          result = complete_pipeline_flow(
-              max_pages=max_pages,
-              config_file=config_file,
-              skip_ingestion=skip_ingestion,
-              tune=tune,
-              use_vertex=use_vertex,
-              machine_type='n1-standard-4',
-              rebuild_container=rebuild,
-              deploy_to_prod=deploy,
-              validate_deployment=True,
-              approved=approved
-          )
-
-          # Check results
-          success = result.get('success', False)
-          validation_passed = result.get('stages', {}).get('training', {}).get('validation_passed', False)
-          validation_median_ape = result.get('stages', {}).get('training', {}).get('validation_median_ape_passed', True)
-
-          print(f'Pipeline completed: {success}')
-          print(f'Validation passed: {validation_passed}')
-          print(f'  - MdAPE check: {validation_median_ape}')
-
-          # Write validation status for notifications
-          with open('validation_status.txt', 'w') as f:
-              if not validation_passed:
-                  f.write('VALIDATION_FAILED')
-              else:
-                  f.write('SUCCESS')
-
-          # Extract metrics
-          metrics = result.get('stages', {}).get('training', {}).get('metrics', {})
-          median_ape = metrics.get('median_ape')
-          if median_ape is None:
-              print('❌ median_ape missing from pipeline metrics — cannot evaluate quality gate')
-              sys.exit(1)
-
-          # Quality gate: MdAPE threshold (kept in sync with DEFAULT_MEDIAN_APE_THRESHOLD)
-          if median_ape > 0.08:
-              print(f'❌ MdAPE quality gate failed: {median_ape:.2%} exceeds threshold of 8.00%')
-              sys.exit(1)
-          else:
-              print(f'✅ MdAPE quality gate passed: {median_ape:.2%}')
-
-          # Fail if validation failed
-          if not validation_passed:
-              print('❌ Pipeline validation failed (MdAPE threshold not met)')
-              sys.exit(1)
-
-          print('✅ Pipeline validation passed')
-          "
-
-      - name: Upload pipeline logs
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: pipeline-logs-${{ github.run_number }}
-          path: |
-            data/derived/metrics/*.json
-            *.log
-          retention-days: 30
-          if-no-files-found: ignore
+      - name: Upload analytics to GCS
+        if: inputs.mode != 'local'
+        run: uv run evi upload-enrichment --approved
 
       - name: Upload model artifacts
         if: always()
@@ -283,43 +200,26 @@ jobs:
           path: |
             web/models/*.joblib
             web/models/*.json
+            vertex-train.json
           if-no-files-found: warn
           retention-days: 30
-
-      - name: Log failure details
-        if: failure()
-        run: |
-          echo "❌ ML Pipeline Failed"
-          echo "Workflow: ${{ github.workflow }}"
-          echo "Run: ${{ github.run_number }}"
-          echo "Trigger: ${{ github.event_name }}"
-          echo "Mode: ${{ steps.params.outputs.mode }}"
-          echo "Config file: ${{ steps.params.outputs.config_file }}"
-
-          # Check if it was a validation failure vs other failure
-          if [ -f validation_status.txt ] && grep -q "VALIDATION_FAILED" validation_status.txt; then
-            echo "Reason: Validation Failed (MdAPE threshold)"
-          else
-            echo "Reason: Pipeline Error"
-          fi
 
       - name: Summary
         if: always()
         run: |
-          echo "## ML Pipeline Summary"
-          echo "Mode: ${{ steps.params.outputs.mode }}"
-          echo "Hyperparameter Tuning: ${{ steps.params.outputs.tune }}"
-          echo "Deploy: ${{ steps.params.outputs.deploy }}"
-          echo "Config file: ${{ steps.params.outputs.config_file }}"
-          echo "Commit SHA: ${{ github.sha }}"
-
-          if [ -f "web/models/price_prediction_model_metrics_lgbm.json" ]; then
+          {
+            echo "## ML Pipeline Summary"
+            echo "Mode: ${{ inputs.mode }}"
+            echo "Tune: ${{ inputs.tune }}"
+            echo "Commit SHA: ${{ github.sha }}"
+            if [ -f "$MODEL_DIR/price_prediction_model_no_list_price_metrics.json" ]; then
+              echo ""
+              echo "## no_list_price metrics"
+              echo '```json'
+              jq '{median_ape, mae, rmse, mape, within_10_pct, n_train, n_test, data_fingerprint}' \
+                "$MODEL_DIR/price_prediction_model_no_list_price_metrics.json"
+              echo '```'
+            fi
             echo ""
-            echo "## Model Metrics"
-            cat web/models/price_prediction_model_metrics_lgbm.json | uv run python -m json.tool
-          fi
-
-          echo ""
-          echo "## Model Location"
-          echo "Models uploaded to: gs://${{ env.GCS_BUCKET }}/models/"
-          echo "Loaded at runtime by: scripts/startup.sh"
+            echo "Deploy the serving app with the Deploy Web App workflow (deploy.yml)."
+          } >> "$GITHUB_STEP_SUMMARY"

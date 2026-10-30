@@ -15,6 +15,10 @@ PRICE_TIER_MID = 4_000_000
 # Minimum valid price threshold (SEK) for filtering listings
 MIN_VALID_PRICE = 3_000_000
 
+# Production training: seed and the share of the newest rows held out for evaluation
+TRAINING_RANDOM_STATE = 42
+TRAINING_TEST_SIZE = 0.2
+
 # Default fallback values when data is missing
 DEFAULT_MEDIAN_PRICE = 5_000_000.0
 DEFAULT_AREA_INVENTORY = 50.0

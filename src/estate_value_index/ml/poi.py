@@ -22,7 +22,7 @@ STOCKHOLM_CENTER_LON = 18.0649
 STOCKHOLM_CENTER = (STOCKHOLM_CENTER_LAT, STOCKHOLM_CENTER_LON)
 
 # Default POI data paths
-GEO_DATA_DIR = Path("data/reference/geo")
+GEO_DATA_DIR = Path(__file__).resolve().parent / "reference" / "geo"
 METRO_STATIONS_PATH = GEO_DATA_DIR / "stockholm_metro_stations.csv"
 TRAIN_STATIONS_PATH = GEO_DATA_DIR / "stockholm_train_stations.csv"
 
@@ -42,8 +42,8 @@ def compute_distance_to_city_center_series(
     distances = haversine_distance_vectorized(
         STOCKHOLM_CENTER_LAT,
         STOCKHOLM_CENTER_LON,
-        lat_series.values,
-        lon_series.values,
+        lat_series.to_numpy(),
+        lon_series.to_numpy(),
     )
     return pd.Series(distances, index=lat_series.index)
 
@@ -52,7 +52,7 @@ def load_metro_stations(path: Path | str | None = None) -> np.ndarray:
     """Load metro station coordinates.
 
     Args:
-        path: Path to metro stations CSV (default: data/reference/geo/stockholm_metro_stations.csv)
+        path: Path to metro stations CSV (default: the packaged ml/reference/geo copy)
 
     Returns:
         NumPy array of shape (N, 2) with [lat, lon] for each station
@@ -72,7 +72,7 @@ def load_train_stations(path: Path | str | None = None) -> np.ndarray:
     """Load train station coordinates.
 
     Args:
-        path: Path to train stations CSV (default: data/reference/geo/stockholm_train_stations.csv)
+        path: Path to train stations CSV (default: the packaged ml/reference/geo copy)
 
     Returns:
         NumPy array of shape (N, 2) with [lat, lon] for each station

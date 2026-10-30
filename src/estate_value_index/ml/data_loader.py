@@ -14,12 +14,12 @@ from estate_value_index.exceptions import BigQueryError, exception_context
 from estate_value_index.ml.features.micro_area import normalize_coordinate_columns
 from estate_value_index.utils.bigquery_safety import (
     Filter,
-    _validate_bq_project_id,
     build_filter_clause,
     safe_table_ref,
+    validate_bq_project_id,
 )
 from estate_value_index.utils.clients import get_bq_client
-from estate_value_index.utils.settings import load_env_config
+from estate_value_index.utils.settings import get_settings
 
 JSON_GLOB = "*.json"
 _NUMERIC_COLUMNS = [
@@ -82,7 +82,7 @@ def _iter_json_objects(raw_text: str) -> Iterator[Any]:
         idx = offset
 
 
-def _coerce_records(value: Any) -> list[dict]:
+def _coerce_records(value: Any) -> list[dict[str, Any]]:
     """Normalise a decoded JSON object into a list of dict records."""
 
     if isinstance(value, list):
@@ -93,10 +93,10 @@ def _coerce_records(value: Any) -> list[dict]:
     raise ValueError(f"Unsupported JSON payload type: {type(value)!r}")
 
 
-def load_raw_records(paths: Sequence[Path]) -> list[dict]:
+def load_raw_records(paths: Sequence[Path]) -> list[dict[str, Any]]:
     """Load raw listing records from the provided JSON files."""
 
-    all_records: list[dict] = []
+    all_records: list[dict[str, Any]] = []
     for path in paths:
         raw_text = path.read_text(encoding="utf-8")
         for obj in _iter_json_objects(raw_text):
@@ -156,11 +156,11 @@ def _resolve_bigquery_table(
     dataset_attr: str,
     table_attr: str,
 ) -> tuple[str, str, str]:
-    env_config = load_env_config()
+    settings = get_settings()
     return (
-        _validate_bq_project_id(project_id or env_config.bigquery_project_id),
-        dataset_id or getattr(env_config, dataset_attr),
-        table_id or getattr(env_config, table_attr),
+        validate_bq_project_id(project_id or settings.require_bigquery_project_id()),
+        dataset_id or getattr(settings, dataset_attr),
+        table_id or getattr(settings, table_attr),
     )
 
 
@@ -271,8 +271,8 @@ def load_from_bigquery(
         project_id,
         dataset_id,
         table_id,
-        dataset_attr="bq_dataset_raw",
-        table_attr="bq_table_listings",
+        dataset_attr="bigquery_dataset_raw",
+        table_attr="bigquery_table_listings",
     )
     df = _query_bigquery_table(
         project_id=project_id,
@@ -320,8 +320,8 @@ def load_features_from_bigquery(
         project_id,
         dataset_id,
         table_id,
-        dataset_attr="bq_dataset_features",
-        table_attr="bq_table_features",
+        dataset_attr="bigquery_dataset_features",
+        table_attr="bigquery_table_features",
     )
     df = _query_bigquery_table(
         project_id=project_id,

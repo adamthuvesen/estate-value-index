@@ -3,20 +3,20 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from estate_value_index.ml.features.utils import _safe_divide
+from estate_value_index.ml.features.utils import safe_divide
 
 """Interaction and composite feature builders."""
 
 CENTRAL_LUXURY_AREAS = frozenset({"ostermalm", "vasastan", "sodermalm", "kungsholmen", "norrmalm"})
 
 
-def _create_interaction_features(df: pd.DataFrame) -> pd.DataFrame:
+def create_interaction_features(df: pd.DataFrame) -> pd.DataFrame:
     """Create interaction and composite features."""
     # Property efficiency features
-    df["rooms_per_sqm"] = _safe_divide(df.get("rooms"), df.get("living_area"), df.index)
-    df["fee_efficiency"] = _safe_divide(df.get("monthly_fee"), df.get("living_area"), df.index)
-    total_cost = df.get("monthly_fee") * 12 + df.get("listing_price")
-    df["total_cost_per_sqm"] = _safe_divide(total_cost, df.get("living_area"), df.index)
+    df["rooms_per_sqm"] = safe_divide(df.get("rooms"), df.get("living_area"), df.index)
+    df["fee_efficiency"] = safe_divide(df.get("monthly_fee"), df.get("living_area"), df.index)
+    total_cost = _feature_series(df, "monthly_fee") * 12 + _feature_series(df, "listing_price")
+    df["total_cost_per_sqm"] = safe_divide(total_cost, df.get("living_area"), df.index)
 
     # Space utilization categories
     df["space_efficiency"] = pd.cut(
@@ -45,14 +45,14 @@ def _create_interaction_features(df: pd.DataFrame) -> pd.DataFrame:
     # Premium and value scores
     price_median = df["price_per_sqm"].median(skipna=True)
     living_area_median = df["living_area"].median(skipna=True)
-    price_norm = _safe_divide(
+    price_norm = safe_divide(
         df["price_per_sqm"], price_median if price_median else np.nan, df.index
     )
-    area_norm = _safe_divide(
+    area_norm = safe_divide(
         df["living_area"], living_area_median if living_area_median else np.nan, df.index
     )
     df["luxury_score"] = price_norm * area_norm * (df["construction_quality_score"] / 10)
-    df["value_score"] = _safe_divide(
+    df["value_score"] = safe_divide(
         df["living_area"], df["listing_price"] + df["monthly_fee"] * 12, df.index
     )
 
@@ -75,21 +75,23 @@ def _create_interaction_features(df: pd.DataFrame) -> pd.DataFrame:
     df["enhancement_potential"] = renovation_boost + era_boost + location_boost
 
     # Derived market indicators
-    df["price_acceleration_3m"] = _safe_divide(
+    df["price_acceleration_3m"] = safe_divide(
         df.get("area_sold_price_median_1m", 0) - df.get("area_sold_price_median_3m", 0),
         df.get("area_sold_price_median_3m", 1),
         df.index,
     )
-    total_ownership_cost = df.get("listing_price") + (df.get("monthly_fee", 0) * 12 * 5)
-    df["cost_benefit_ratio"] = _safe_divide(
+    total_ownership_cost = _feature_series(df, "listing_price") + (
+        df.get("monthly_fee", 0) * 12 * 5
+    )
+    df["cost_benefit_ratio"] = safe_divide(
         df.get("living_area", 1) * df.get("energy_efficiency_est", 5),
         total_ownership_cost,
         df.index,
     )
-    trend_1m = _safe_divide(
+    trend_1m = safe_divide(
         df.get("area_sold_price_median_1m"), df.get("area_sold_price_median_3m", 1), df.index
     )
-    trend_3m = _safe_divide(
+    trend_3m = safe_divide(
         df.get("area_sold_price_median_3m"), df.get("area_sold_price_median_6m", 1), df.index
     )
     df["temporal_price_trend"] = (trend_1m + trend_3m) / 2
@@ -97,7 +99,7 @@ def _create_interaction_features(df: pd.DataFrame) -> pd.DataFrame:
     efficiency_factor = df.get("energy_efficiency_est", 5) / 10
     quality_factor = df.get("construction_quality_score", 5) / 10
     df["efficiency_premium"] = base_price_per_sqm * efficiency_factor * quality_factor
-    df["demand_supply_ratio"] = _safe_divide(
+    df["demand_supply_ratio"] = safe_divide(
         df.get("area_sales_volume_3m", 0), df.get("area_inventory", 50), df.index
     )
     df = _create_luxury_tier_features(df)
@@ -109,17 +111,17 @@ def _create_luxury_tier_features(df: pd.DataFrame) -> pd.DataFrame:
     """Create inference-safe high-end proxy features from prior comp signals."""
     market_ppsqm = _feature_series(df, "market_ppsqm_index")
 
-    df["h3_market_ppsqm_ratio"] = _safe_divide(
+    df["h3_market_ppsqm_ratio"] = safe_divide(
         _feature_series(df, "micro_area_ppsqm_median"),
         market_ppsqm,
         df.index,
     ).replace([np.inf, -np.inf], np.nan)
-    df["same_size_market_ppsqm_ratio"] = _safe_divide(
+    df["same_size_market_ppsqm_ratio"] = safe_divide(
         _feature_series(df, "same_size_ppsqm_median"),
         market_ppsqm,
         df.index,
     ).replace([np.inf, -np.inf], np.nan)
-    df["neighbor_market_ppsqm_ratio"] = _safe_divide(
+    df["neighbor_market_ppsqm_ratio"] = safe_divide(
         _feature_series(df, "h3_neighbor_ppsqm"),
         market_ppsqm,
         df.index,
@@ -166,9 +168,11 @@ def _ratio_component(values: pd.Series, *, low: float, high: float) -> pd.Series
 
 
 def _feature_series(df: pd.DataFrame, column: str) -> pd.Series:
-    values = df.get(column)
-    if values is None:
+    if column not in df.columns:
         return pd.Series(np.nan, index=df.index)
-    if isinstance(values, pd.DataFrame):
-        return values.iloc[:, 0]
-    return values
+    return _first_column(df[column])
+
+
+def _first_column(selected: pd.Series | pd.DataFrame) -> pd.Series:
+    """``df[column]`` is a DataFrame when the frame has duplicate column names."""
+    return selected.iloc[:, 0] if isinstance(selected, pd.DataFrame) else selected

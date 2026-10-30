@@ -128,7 +128,7 @@ echo "Permissions granted"
 # BigQuery — so this account gets object-read on the bucket and nothing else: no
 # project Editor, no BigQuery. Running the public service under it means even a
 # compromise of the request path cannot reach BigQuery, because the attached
-# credentials cannot. deploy_cloud_run.sh attaches it via --service-account.
+# credentials cannot. deploy.yml attaches it via --service-account.
 RUNTIME_SA_NAME="evi-cloud-run-runtime"
 RUNTIME_SA_EMAIL="${RUNTIME_SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
 

@@ -8,19 +8,19 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 import secrets
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from collections.abc import Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 from estate_value_index.ingestion.booli.normalization import clean_text, to_float, to_int
+from estate_value_index.utils.settings import get_settings
 
 BOOLI_API_BASE_URL = "https://api.booli.se"
 BOOLI_API_ACCEPT = "application/vnd.booli-v2+json"
@@ -34,8 +34,17 @@ class BooliApiCredentials:
 
     @classmethod
     def from_env(cls) -> BooliApiCredentials:
-        caller_id = os.getenv("BOOLI_API_CALLER_ID")
-        private_key = os.getenv("BOOLI_API_PRIVATE_KEY")
+        settings = get_settings()
+        caller_id = (
+            settings.booli_api_caller_id.get_secret_value()
+            if settings.booli_api_caller_id
+            else None
+        )
+        private_key = (
+            settings.booli_api_private_key.get_secret_value()
+            if settings.booli_api_private_key
+            else None
+        )
         missing = [
             name
             for name, value in (
@@ -194,13 +203,21 @@ def booli_api_record_to_listing(record: Mapping[str, Any], *, source: str) -> di
     }
 
 
+class SoldListingsSource(Protocol):
+    """What ``fetch_booli_api_window`` needs from a client."""
+
+    def iter_sold(
+        self, params: Mapping[str, Any], *, max_pages: int
+    ) -> Iterator[dict[str, Any]]: ...
+
+
 class BooliApiClient:
     def __init__(
         self,
         credentials: BooliApiCredentials,
         *,
         base_url: str = BOOLI_API_BASE_URL,
-        opener=urllib.request.urlopen,
+        opener: Callable[..., Any] = urllib.request.urlopen,
     ) -> None:
         self.credentials = credentials
         self.base_url = base_url.rstrip("/")
@@ -257,7 +274,7 @@ def fetch_booli_api_window(
     output_file: str | Path,
     max_pages: int,
     credentials: BooliApiCredentials | None = None,
-    client: BooliApiClient | None = None,
+    client: SoldListingsSource | None = None,
 ) -> Path:
     """Fetch one sold-date window from Booli's signed API into JSONL."""
 

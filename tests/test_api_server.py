@@ -6,6 +6,7 @@ import asyncio
 import logging
 import threading
 from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -87,7 +88,7 @@ def test_predict_accepts_optional_coordinates() -> None:
         {"living_area": "nan"},
     ],
 )
-def test_predict_rejects_invalid_request_fields(payload: dict) -> None:
+def test_predict_rejects_invalid_request_fields(payload: dict[str, Any]) -> None:
     with TestClient(api_server.app) as client:
         response = client.post("/predict", json=payload)
 
@@ -186,17 +187,20 @@ def test_health_responds_while_predicts_in_flight() -> None:
 
     transport = ASGITransport(app=api_server.app)
     api_server.MODEL_CACHE.clear()
+    info = api_server.LoadedModelInfo(package_version="1.0.0", sha256="ab", data_fingerprint=None)
     api_server.MODEL_CACHE["with_list_price"] = {
         "model": mock_model,
         "path": Path("dummy.joblib"),
         "requires_listing_price": True,
         "model_type": "price_tiered_ensemble",
+        "info": info,
     }
     api_server.MODEL_CACHE["no_list_price"] = {
         "model": MagicMock(),
         "path": Path("dummy.joblib"),
         "requires_listing_price": False,
         "model_type": "price_tiered_ensemble",
+        "info": info,
     }
 
     body = {"listing_price": 5_000_000.0, "living_area": 65.0, "model": "with_list_price"}

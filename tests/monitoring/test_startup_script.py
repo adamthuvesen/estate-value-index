@@ -24,7 +24,7 @@ def _write_artifact(model_dir: Path, filename: str, payload: bytes | None = None
 
 def _run_startup(
     tmp_path: Path, model_dir: Path, **env_overrides: str
-) -> subprocess.CompletedProcess:
+) -> subprocess.CompletedProcess[str]:
     env = {
         **os.environ,
         "MODEL_DIR": str(model_dir),

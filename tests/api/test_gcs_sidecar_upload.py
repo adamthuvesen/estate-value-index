@@ -12,7 +12,7 @@ from pathlib import Path
 import joblib
 import pytest
 
-from src.estate_value_index.utils import gcs as gcs_module
+from estate_value_index.utils import gcs as gcs_module
 
 
 class _FakeBlob:

@@ -176,6 +176,60 @@ CATEGORICAL_FEATURE_NAMES: tuple[str, ...] = (
 ALL_FEATURE_NAMES = NUMERIC_FEATURE_NAMES + CATEGORICAL_FEATURE_NAMES
 
 
+# Production feature sets. Column order is the model's input order: do not reorder.
+# The with-list-price set is the no-list set plus the listing-price columns.
+NO_LIST_PRICE_V1_NUMERIC: tuple[str, ...] = (
+    "living_area",
+    "rooms_per_sqm",
+    "floor_per_sqm",
+    "street_size_upper_tail_ratio",
+    "micro_area_ppsqm_count",
+    "same_size_premium_vs_area",
+    "same_size_ppsqm_count",
+    "address_upper_tail_ratio",
+    "temporal_price_trend",
+    "h3_neighbor_ppsqm_count",
+    "street_area_upper_tail_ratio",
+    "price_acceleration_3m",
+    "h3_neighbor_premium_vs_micro",
+    "area_sales_volume_3m",
+    "market_construction_confidence",
+    "same_size_ppsqm_median",
+    "area_sold_price_median_3m",
+    "area_sales_volume_1m",
+    "area_sold_price_median_1m",
+    "h3_neighbor_ppsqm",
+    "address_ppsqm_count",
+)
+WITH_LIST_PRICE_V1_NUMERIC: tuple[str, ...] = (
+    *NO_LIST_PRICE_V1_NUMERIC,
+    "listing_price",
+    "relative_area_price",
+    "total_cost_per_sqm",
+    "monthly_fee_per_sqm",
+    "efficiency_premium",
+)
+PRODUCTION_CATEGORICAL: tuple[str, ...] = (
+    "area",
+    "h3_res10",
+    "h3_res9",
+    "street_name",
+)
+FEATURE_SUBSETS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
+    "no_list_price_v1": (NO_LIST_PRICE_V1_NUMERIC, PRODUCTION_CATEGORICAL),
+    "with_list_price_v1": (WITH_LIST_PRICE_V1_NUMERIC, PRODUCTION_CATEGORICAL),
+}
+
+
+def load_feature_subset(feature_set: str) -> tuple[list[str], list[str]]:
+    """Return the (numeric, categorical) feature names of a production feature set."""
+    if feature_set not in FEATURE_SUBSETS:
+        available = ", ".join(sorted(FEATURE_SUBSETS))
+        raise ValueError(f"Unknown feature set {feature_set!r}; available: {available}")
+    numeric, categorical = FEATURE_SUBSETS[feature_set]
+    return list(numeric), list(categorical)
+
+
 def get_feature_lists() -> tuple[list[str], list[str], list[str]]:
     """Get feature lists for model training."""
     return (list(NUMERIC_FEATURE_NAMES), list(CATEGORICAL_FEATURE_NAMES), list(ALL_FEATURE_NAMES))

@@ -53,7 +53,7 @@ class TestLGBMTrainerCreateModel:
 
         assert model.random_state == 99
         assert model.objective == "regression"
-        assert model.metric == "mae"
+        assert model.get_params()["metric"] == "mae"
         assert model.boosting_type == "gbdt"
 
     @pytest.mark.unit
@@ -149,7 +149,7 @@ class TestLGBMTrainerTrain:
         model = LGBMTrainer().train(
             df,
             sample_training_target,
-            categorical_indices=[df.columns.get_loc("property_type")],
+            categorical_indices=[df.columns.to_list().index("property_type")],
         )
 
         assert isinstance(model, LGBMRegressor)

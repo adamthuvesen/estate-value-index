@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, cast
 
 import pandas as pd
 
@@ -52,17 +52,19 @@ def _price_tier(avg_price: float) -> str:
     return "affordable"
 
 
+def _by_area(series: pd.Series) -> dict[str, Any]:
+    # Area labels are strings; pandas types the index keys as Hashable.
+    return cast("dict[str, Any]", series.to_dict())
+
+
 def _area_avg_price(training_frame: pd.DataFrame) -> dict[str, float]:
-    return (
-        training_frame.groupby("area", dropna=False, observed=True)["listing_price"]
-        .mean()
-        .dropna()
-        .to_dict()
+    return _by_area(
+        training_frame.groupby("area", dropna=False, observed=True)["listing_price"].mean().dropna()
     )
 
 
 def _area_listing_count(training_frame: pd.DataFrame) -> dict[str, int]:
-    return training_frame.groupby("area", dropna=False, observed=True).size().to_dict()
+    return _by_area(training_frame.groupby("area", dropna=False, observed=True).size())
 
 
 def _area_target_mean(training_frame: pd.DataFrame) -> tuple[float, dict[str, float]]:
@@ -71,11 +73,10 @@ def _area_target_mean(training_frame: pd.DataFrame) -> tuple[float, dict[str, fl
 
     return (
         float(training_frame["sold_price"].mean()),
-        (
+        _by_area(
             training_frame.groupby("area", dropna=False, observed=True)["sold_price"]
             .mean()
             .dropna()
-            .to_dict()
         ),
     )
 
@@ -90,7 +91,7 @@ def _latest_area_metric(training_frame: pd.DataFrame, column: str) -> dict[str, 
 
     subset = subset.sort_values(["area", "sold_date"])
     latest = subset.groupby("area", observed=True)[column].last().dropna()
-    return latest.astype(float).to_dict()
+    return _by_area(latest.astype(float))
 
 
 def _global_median(training_frame: pd.DataFrame, column: str, default: float) -> float:

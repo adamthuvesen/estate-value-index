@@ -5,7 +5,7 @@ import json
 import pandas as pd
 import pytest
 
-from src.estate_value_index.ml.data_loader import (
+from estate_value_index.ml.data_loader import (
     _coerce_numeric,
     _coerce_records,
     _iter_json_objects,

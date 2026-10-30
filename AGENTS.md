@@ -2,7 +2,7 @@
 
 **estate-value-index** predicts Swedish real estate values: authorized listing
 ingestion -> BigQuery -> LightGBM -> Next.js + FastAPI. Python 3.14 via
-**uv**; Node 20 for `web/`; Next.js 16; Prefect 3.
+**uv**; Node 20 for `web/`; Next.js 16. The `evi` CLI and GitHub Actions are the only orchestrators.
 
 This file is project facts only. Tone, principles, and git etiquette live in
 the user-level `~/.claude/CLAUDE.md` and `~/dotfiles/agents/AGENTS.md`.
@@ -48,7 +48,8 @@ just check                       # lint, format check, tests; CI runs the same
 just fix                         # apply safe automatic fixes
 just slow                        # full suite with the coverage gate, plus the route check
 cd web && npm run dev            # app on localhost:3000
-./scripts/deploy_cloud_run.sh    # deploy (see docs/api-web-deploy.md)
+just types                       # regenerate web/src/lib/generated/api-types.ts
+gh workflow run deploy.yml -f environment=staging -f approved=true   # deploy
 ```
 
 Typical local training:
@@ -61,11 +62,11 @@ GCS_ENABLED=false uv run python -m estate_value_index.cli train-production-model
 Add `--tune` only when parameter search is wanted. It runs one Optuna study per
 production model and takes longer than routine retraining.
 
-Orchestrated pipeline: `uv run python -m estate_value_index.pipelines.core.complete_pipeline --quick`
-(see `--help` and [docs/data-pipeline.md](docs/data-pipeline.md)).
+Orchestrated pipeline: `.github/workflows/ml-pipeline.yml` runs the `evi` steps in order
+(see [docs/data-pipeline.md](docs/data-pipeline.md)).
 
-Config precedence: environment -> [config/pipeline_config.yaml](config/pipeline_config.yaml)
--> code defaults. Required env vars: [docs/data-pipeline.md](docs/data-pipeline.md#environment).
+Config precedence: environment -> `.env` -> the defaults in
+[src/estate_value_index/utils/settings.py](src/estate_value_index/utils/settings.py). Required env vars: [docs/data-pipeline.md](docs/data-pipeline.md#environment).
 
 ## Where things live
 

@@ -100,7 +100,6 @@ COPY web/src/ /app/web/src/
 COPY web/next.config.ts /app/web/
 COPY web/tsconfig.json /app/web/
 COPY web/postcss.config.mjs /app/web/
-COPY data/reference/ /app/data/reference/
 
 # Create directories for models and data (data loaded from GCS at runtime)
 RUN mkdir -p /app/web/models /app/data/derived

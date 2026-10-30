@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 import pandas as pd
+from pandas.core.groupby import DataFrameGroupBy
 
 from estate_value_index.ml.constants import (
     DEFAULT_AREA_INVENTORY,
@@ -11,9 +14,9 @@ from estate_value_index.ml.constants import (
     DEFAULT_PRICE_VOLATILITY,
     TEMPORAL_WINDOWS,
 )
-from estate_value_index.ml.features.classifiers import _classify_area_price_momentum
+from estate_value_index.ml.features.classifiers import classify_area_price_momentum
 from estate_value_index.ml.features.context import FeatureEngineeringContext
-from estate_value_index.ml.features.utils import _safe_divide
+from estate_value_index.ml.features.utils import safe_divide
 
 """Area-level market and temporal aggregate features."""
 
@@ -28,7 +31,7 @@ _AREA_MARKET_DEFAULTS = {
 }
 
 
-def _create_area_market_features(
+def create_area_market_features(
     df: pd.DataFrame, context: FeatureEngineeringContext | None
 ) -> pd.DataFrame:
     """Create area-level market microstructure features.
@@ -100,14 +103,16 @@ def _add_prior_area_market_features(df: pd.DataFrame) -> None:
         df[column] = stats[column].reindex(df.index)
 
 
-def _prior_rolling(grouped, column: str, window: str, method: str) -> pd.Series:
+def _prior_rolling(
+    grouped: DataFrameGroupBy[Any, Any], column: str, window: str, method: str
+) -> pd.Series:
     return grouped[column].transform(
         lambda values: getattr(values.rolling(window=window, closed="left"), method)()
     )
 
 
 def _price_change_rolling(
-    work_indexed: pd.DataFrame, grouped, window: str, method: str
+    work_indexed: pd.DataFrame, grouped: DataFrameGroupBy[Any, Any], window: str, method: str
 ) -> pd.Series:
     if "price_change" not in work_indexed.columns:
         return pd.Series(np.nan, index=work_indexed.index)
@@ -172,19 +177,19 @@ def _median_or_default(series: pd.Series, default: float) -> float:
 
 
 def _add_area_market_indicators(df: pd.DataFrame) -> None:
-    df["area_liquidity"] = _safe_divide(
+    df["area_liquidity"] = safe_divide(
         df["area_inventory"], df["area_days_on_market_median"], df.index
     )
-    df["relative_area_price"] = _safe_divide(df["listing_price"], df["area_price_median"], df.index)
-    df["area_volatility_score"] = _safe_divide(
+    df["relative_area_price"] = safe_divide(df["listing_price"], df["area_price_median"], df.index)
+    df["area_volatility_score"] = safe_divide(
         df["area_price_volatility"], df["area_price_median"], df.index
     )
 
     # Area price momentum (categorical, based on area stats)
-    df["area_price_momentum"] = df["area_price_change_mean"].apply(_classify_area_price_momentum)
+    df["area_price_momentum"] = df["area_price_change_mean"].apply(classify_area_price_momentum)
 
 
-def _create_area_temporal_metrics(
+def create_area_temporal_metrics(
     df: pd.DataFrame, context: FeatureEngineeringContext | None
 ) -> pd.DataFrame:
     """Create rolling temporal metrics for areas (1m, 3m, 6m, 12m windows).

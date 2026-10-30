@@ -10,9 +10,11 @@ value window the web app shows in place of the raw point estimate.
 from __future__ import annotations
 
 import itertools
+from typing import Any
 
 import numpy as np
 import pandas as pd
+from pydantic import BaseModel, ConfigDict
 
 # Bucket edges by predicted price; the final bucket runs to infinity.
 BUCKET_EDGES: tuple[float, ...] = (
@@ -35,10 +37,45 @@ RECENT_SLICE_MONTHS = 3
 MIN_BUCKET_SAMPLES = 100
 
 
+class EstimateRangeBucket(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    lower_edge: int | None
+    upper_edge: int | None
+    lower: float
+    upper: float
+    sample_size: int
+    fallback: bool
+
+
+class PooledEstimateRange(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    lower: float
+    upper: float
+
+
+class EstimateRangeFactors(BaseModel):
+    """The ``estimate_range_factors`` block in the metrics artifact and the predict response."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    interval_pct: int
+    lower_percentile: int
+    upper_percentile: int
+    recent_slice_months: int
+    min_bucket_samples: int
+    slice_start: str
+    slice_end: str
+    sample_size: int
+    pooled: PooledEstimateRange
+    buckets: list[EstimateRangeBucket]
+
+
 def compute_estimate_range_factors(
     eval_test: pd.DataFrame,
     predictions: np.ndarray,
-) -> dict[str, object]:
+) -> dict[str, Any]:
     """Compute per-bucket ``actual / predicted`` quantile factors.
 
     Args:
@@ -76,7 +113,7 @@ def compute_estimate_range_factors(
     pooled_lower = round(float(np.percentile(ratio, LOWER_PERCENTILE)), 4)
     pooled_upper = round(float(np.percentile(ratio, UPPER_PERCENTILE)), 4)
 
-    buckets: list[dict[str, object]] = []
+    buckets: list[dict[str, Any]] = []
     for lower_edge, upper_edge in itertools.pairwise(BUCKET_EDGES):
         mask = (predicted >= lower_edge) & (predicted < upper_edge)
         n = int(mask.sum())

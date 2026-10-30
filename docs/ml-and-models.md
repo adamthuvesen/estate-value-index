@@ -15,7 +15,7 @@ intentionally git-ignored.
 - Feature engineering: `src/estate_value_index/ml/features/`
 - Data loading and preprocessing: `src/estate_value_index/ml/data_loader.py`, `src/estate_value_index/ml/preprocessing.py`
 - Model serving: `api_server.py`
-- Feature subsets: `config/feature_subsets.yaml`
+- Feature sets: `NO_LIST_PRICE_V1_NUMERIC`, `WITH_LIST_PRICE_V1_NUMERIC`, and `PRODUCTION_CATEGORICAL` in `src/estate_value_index/ml/features/registry.py`
 
 ## Training contract
 
@@ -32,7 +32,7 @@ intentionally git-ignored.
 - H3 comp features add prior adjacent-cell PPSQM and same-size PPSQM fallbacks.
   They must exclude same-day rows during training and use train-fold context for
   holdout/inference.
-- Market/economy features come from local CSVs in `data/reference/economy/` and
+- Market/economy features come from local CSVs in `src/estate_value_index/ml/reference/economy/` and
   use the latest previous month to avoid same-month lookahead. Refresh them with
   `uv run python scripts/fetch_economic_data.py --replace`.
 - Feature sets that hide asking price must also exclude same-row

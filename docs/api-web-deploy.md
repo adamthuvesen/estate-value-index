@@ -8,7 +8,7 @@ The app serves predictions through FastAPI and a Next.js frontend/API layer in o
 - Next.js pages and API routes: `web/src/app/`, `web/src/app/api/`
 - Shared web parsing and URL utilities: `web/src/lib/`
 - Container startup: `Dockerfile`, `scripts/startup.sh`
-- Cloud Run deploy: `scripts/deploy_cloud_run.sh`
+- Cloud Run deploy: `.github/workflows/deploy.yml` (the only deploy path)
 
 ## API and web rules
 

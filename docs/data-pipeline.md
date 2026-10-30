@@ -7,18 +7,23 @@ repo contains code and synthetic fixtures only. Redistributable listing data is 
 ## Main flow
 
 ```text
-Permissioned listing source -> JSONL + upload path -> process_listings -> booli_raw.listings
-  -> train-production-models -> web/models/* -> Next /api/* -> FastAPI /predict
+evi backfill --load: fetch -> process -> booli_raw.listings -> geocode -> sync back
+  -> evi train-production-models | evi vertex-train -> evi check-model -> evi promote-model
+  -> evi value-analysis / areas / overall-stats -> evi upload-enrichment
 ```
 
 ## Where to work
 
 - Signed Booli API adapter: `src/estate_value_index/ingestion/booli/api.py`
 - Ingestion utilities and loaders: `src/estate_value_index/ingestion/`
-- Pipeline orchestration: `src/estate_value_index/pipelines/core/complete_pipeline.py`
-- Pipeline tasks: `src/estate_value_index/pipelines/tasks/`
+- The one ingestion path: `src/estate_value_index/ingestion/ingest.py` (`ingest_listings`),
+  called by `evi backfill` and the workflow
+- BigQuery load and its row contract: `ingestion/bigquery_upload.py`, `ingestion/listing_row.py`
+  (one bad row stops the load, with a count)
+- Sync and geocoding: `ingestion/sync.py`, `ingestion/geocoding.py`
+- Orchestration: `.github/workflows/ml-pipeline.yml`
 - BigQuery schemas: `schemas/bq_raw_listings.json`
-- Pipeline config: `config/pipeline_config.yaml`
+- Settings: `src/estate_value_index/utils/settings.py`
 - Web enrichment JSON (`data/derived/`, synced to GCS): `area_statistics.json`,
   `value_analysis.json`, and `overall_statistics.json` (city-wide stats for `/stats`;
   regenerate with `uv run python -m estate_value_index.cli overall-stats`)
@@ -38,7 +43,7 @@ BIGQUERY_TABLE_FEATURES=engineered_features
 GCS_BUCKET=your-gcs-bucket
 ```
 
-Optional knobs (examples): `GCS_ENABLED`, `MAX_MEDIAN_APE_THRESHOLD`, `DATA_SOURCE`, `MODEL_PREFIX`, `MODEL_OUTPUT_DIR`, `DEBUG`.
+Optional knobs: `GCS_ENABLED`, `MAX_MEDIAN_APE_THRESHOLD`, `INGESTION_MIN_VALIDATION_RATE`, `DATA_SOURCE`, `BOOLI_TRAIN_DATA`. The `Settings` model lists every key; an unknown key in `.env` is an error.
 
 Signed Booli API credentials for ingestion runs:
 
@@ -50,7 +55,7 @@ BOOLI_API_PRIVATE_KEY=your-booli-private-key
 The signed API path writes the raw-listing JSONL schema consumed by processing and
 BigQuery upload. Authorized exports may provide the same schema directly.
 
-Precedence: environment -> `config/pipeline_config.yaml` -> code defaults.
+Precedence: environment -> `.env` -> the `Settings` defaults.
 
 BigQuery datasets:
 

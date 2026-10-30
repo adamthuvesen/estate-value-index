@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from typing import Any
 
 from estate_value_index.analytics.overall_statistics import (
     _amenity_effect,
@@ -140,7 +141,7 @@ def test_records_fastest_sale_requires_days_on_market_at_least_one():
 
 
 def test_records_biggest_bid_up_skips_implausible_premiums():
-    def row(address: str, listing: int, sold: int) -> dict:
+    def row(address: str, listing: int, sold: int) -> dict[str, Any]:
         return {
             "address": address,
             "area": "sodermalm",

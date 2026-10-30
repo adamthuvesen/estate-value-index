@@ -1,19 +1,15 @@
 """Simple unit tests for basic ML pipeline functionality."""
 
 import json
-import sys
 import tempfile
 from pathlib import Path
 
 import pandas as pd
 import pytest
 
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
-
-from src.estate_value_index.ml.data_loader import load_listings
-from src.estate_value_index.ml.preprocessing import filter_valid_listings
-from src.estate_value_index.ml.training import LGBMTrainer
+from estate_value_index.ml.data_loader import load_listings
+from estate_value_index.ml.preprocessing import filter_valid_listings
+from estate_value_index.ml.training import LGBMTrainer
 
 
 class TestBasicDataFlow:

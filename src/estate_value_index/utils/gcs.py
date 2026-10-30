@@ -2,14 +2,12 @@
 
 import hashlib
 import logging
-import os
 import posixpath
 from pathlib import Path
 from urllib.parse import urlparse
 
-from estate_value_index.exceptions import ConfigurationError
 from estate_value_index.utils.approval import require_approval
-from estate_value_index.utils.settings import is_gcs_enabled
+from estate_value_index.utils.settings import get_settings, is_gcs_enabled
 
 logger = logging.getLogger(__name__)
 
@@ -35,10 +33,15 @@ def write_sha256_sidecar(artefact_path: str | Path) -> Path:
 
 def get_gcs_bucket() -> str:
     """Return the configured GCS bucket name, raising if it is unset."""
-    bucket = os.getenv("GCS_BUCKET")
-    if not bucket:
-        raise ConfigurationError("GCS_BUCKET is not set; required when GCS is enabled.")
-    return bucket
+    return get_settings().require_gcs_bucket()
+
+
+def split_gcs_uri(uri: str) -> tuple[str, str]:
+    """Split ``gs://bucket/prefix`` into ``(bucket, prefix)``; reject anything else."""
+    parsed = urlparse(uri)
+    if parsed.scheme != "gs" or not parsed.netloc:
+        raise ValueError(f"Not a gs:// URI: {uri!r}")
+    return parsed.netloc, parsed.path.strip("/")
 
 
 class GCSClient:
@@ -121,39 +124,10 @@ def resolve_data_path(
     return client.download_file(gcs_path, default_local)
 
 
-def upload_blob(
-    bucket_name: str,
-    source_file_name: str,
-    destination_blob_name: str,
-    *,
-    approved: bool = False,
-) -> None:
-    """Upload a file to a GCS bucket using a fresh client."""
-    require_approval(f"upload {destination_blob_name} to GCS", approved)
-    from estate_value_index.utils.clients import get_storage_client
-
-    bucket = get_storage_client().bucket(bucket_name)
-    bucket.blob(destination_blob_name).upload_from_filename(source_file_name)
-
-
-def upload_html_to_gcs(
-    html_content: str,
-    bucket_name: str,
-    destination_blob_name: str,
-    *,
-    approved: bool = False,
-) -> None:
-    """Upload an HTML string to a GCS bucket as ``text/html``."""
-    require_approval(f"upload {destination_blob_name} to GCS", approved)
-    from estate_value_index.utils.clients import get_storage_client
-
-    bucket = get_storage_client().bucket(bucket_name)
-    bucket.blob(destination_blob_name).upload_from_string(html_content, content_type="text/html")
-
-
 def _resolve_model_artifact_destination(gcs_prefix: str) -> tuple[str | None, str]:
-    env_artifacts_uri = os.getenv("MODEL_ARTIFACTS_URI", "").strip()
-    env_artifacts_prefix = os.getenv("MODEL_ARTIFACTS_PREFIX", "").strip()
+    settings = get_settings()
+    env_artifacts_uri = (settings.model_artifacts_uri or "").strip()
+    env_artifacts_prefix = (settings.model_artifacts_prefix or "").strip()
 
     resolved_bucket: str | None = None
     resolved_prefix = gcs_prefix.strip("/")
@@ -271,3 +245,48 @@ def upload_model_artifacts(
     except Exception as e:
         logger.error("GCS upload failed: %s", e)
         raise RuntimeError("GCS model artifact upload failed") from e
+
+
+def download_model_artifacts(model_uri: str, local_dir: Path, filenames: tuple[str, ...]) -> Path:
+    """Download the named artifact files from ``model_uri`` into ``local_dir``.
+
+    Raises ``FileNotFoundError`` naming every missing file, so a partial run is loud.
+    """
+    from estate_value_index.utils.clients import get_storage_client
+
+    bucket_name, prefix = split_gcs_uri(model_uri)
+    bucket = get_storage_client().bucket(bucket_name)
+    blobs = {filename: bucket.blob(_destination_path(prefix, filename)) for filename in filenames}
+    missing = [filename for filename, blob in blobs.items() if not blob.exists()]
+    if missing:
+        raise FileNotFoundError(f"Missing model artifacts under {model_uri}: {', '.join(missing)}")
+
+    local_dir.mkdir(parents=True, exist_ok=True)
+    for filename, blob in blobs.items():
+        blob.download_to_filename(str(local_dir / filename))
+    logger.info("Downloaded %d model artifacts from %s to %s", len(blobs), model_uri, local_dir)
+    return local_dir
+
+
+def promote_model_artifacts(
+    model_uri: str,
+    filenames: tuple[str, ...],
+    *,
+    production_prefix: str = "models",
+    approved: bool = False,
+) -> list[str]:
+    """Copy validated artifacts from ``model_uri`` to the production prefix that serving reads."""
+    require_approval("promote model artifacts to the production GCS path", approved)
+    from estate_value_index.utils.clients import get_storage_client
+
+    bucket_name, prefix = split_gcs_uri(model_uri)
+    bucket = get_storage_client().bucket(bucket_name)
+    promoted = []
+    for filename in filenames:
+        destination = _destination_path(production_prefix, filename)
+        bucket.copy_blob(bucket.blob(_destination_path(prefix, filename)), bucket, destination)
+        promoted.append(f"gs://{bucket_name}/{destination}")
+    logger.info(
+        "Promoted %d model artifacts to gs://%s/%s", len(promoted), bucket_name, production_prefix
+    )
+    return promoted

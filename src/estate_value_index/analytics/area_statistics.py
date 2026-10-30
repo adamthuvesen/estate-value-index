@@ -13,14 +13,15 @@ import logging
 import statistics
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
-from estate_value_index.ingestion.processing import load_jsonl_file as load_jsonl
-from estate_value_index.ml.area_names import get_display_name
-from estate_value_index.ml.preprocessing import normalize_area_for_model
+from estate_value_index.analytics.web_json import AreaStatisticsData
+from estate_value_index.areas import get_display_name, normalize_area_for_model
 from estate_value_index.model_artifacts import NO_LIST_MODEL_ID, production_artifact_names
+from estate_value_index.utils.jsonl import load_jsonl_file
+from estate_value_index.utils.narrowing import number
 
 logger = logging.getLogger(__name__)
 
@@ -33,12 +34,12 @@ class AreaStatisticsPaths:
     output: Path
 
 
-def load_json(filepath: Path) -> dict:
+def load_json(filepath: Path) -> dict[str, Any]:
     with Path(filepath).open(encoding="utf-8") as f:
         return json.load(f)
 
 
-def _latest_sold_date(raw_listings: list[dict]) -> str | None:
+def _latest_sold_date(raw_listings: list[dict[str, Any]]) -> str | None:
     """Newest sold_date (YYYY-MM-DD) across the listings, or None if undated."""
     dates = [
         normalized
@@ -49,7 +50,9 @@ def _latest_sold_date(raw_listings: list[dict]) -> str | None:
 
 
 def resolve_generated_at(
-    raw_listings: list[dict], feature_context: dict, value_analysis: dict
+    raw_listings: list[dict[str, Any]],
+    feature_context: dict[str, Any],
+    value_analysis: dict[str, Any],
 ) -> str:
     """Resolve a best-effort "data as of" date for metadata.
 
@@ -76,20 +79,20 @@ def resolve_generated_at(
     return datetime.now(UTC).isoformat()
 
 
-def _normalize_sold_date(value: str | None) -> str | None:
+def _normalize_sold_date(value: object) -> str | None:
     """Normalize sold_date to YYYY-MM-DD when possible."""
     if not value:
         return None
     if isinstance(value, str):
         return value[:10]
-    if hasattr(value, "date"):
-        return value.date().isoformat()
-    if hasattr(value, "isoformat"):
+    if isinstance(value, date):
         return value.isoformat()[:10]
     return str(value)[:10]
 
 
-def load_raw_listings(data_source: str, raw_listings_path: Path) -> tuple[list[dict], str]:
+def load_raw_listings(
+    data_source: str, raw_listings_path: Path
+) -> tuple[list[dict[str, Any]], str]:
     """Load raw listings from BigQuery with a local-JSON fallback.
 
     An *empty* BigQuery result falls back to local JSON (intentional, for local
@@ -118,24 +121,24 @@ def load_raw_listings(data_source: str, raw_listings_path: Path) -> tuple[list[d
                 return records, "bigquery"
             logger.warning("BigQuery returned no rows, falling back to local JSON")
 
-    records = load_jsonl(raw_listings_path)
+    records = load_jsonl_file(raw_listings_path)
     logger.info("Loaded raw listings from local JSON: %s", raw_listings_path)
     return records, raw_listings_path.name
 
 
-def calculate_price_per_sqm_by_rooms(properties: list[dict]) -> dict[str, dict]:
+def calculate_price_per_sqm_by_rooms(properties: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     """Calculate price-per-sqm stats by room count.
 
     Returns a dict keyed by "1", "2", "3", "4+" with median/mean/min/max/count.
     """
-    room_groups = defaultdict(list)
+    room_groups: defaultdict[str, list[float]] = defaultdict(list)
 
     for prop in properties:
-        rooms = prop.get("rooms")
-        living_area = prop.get("living_area")
-        sold_price = prop.get("sold_price")
+        rooms = number(prop, "rooms")
+        living_area = number(prop, "living_area")
+        sold_price = number(prop, "sold_price")
 
-        if not all([rooms, living_area, sold_price]):
+        if not rooms or not living_area or not sold_price:
             continue
 
         price_per_sqm = sold_price / living_area
@@ -149,7 +152,7 @@ def calculate_price_per_sqm_by_rooms(properties: list[dict]) -> dict[str, dict]:
         elif rooms >= 4:
             room_groups["4+"].append(price_per_sqm)
 
-    result = {}
+    result: dict[str, dict[str, Any]] = {}
     for room_key, prices in room_groups.items():
         if prices:
             result[room_key] = {
@@ -163,7 +166,7 @@ def calculate_price_per_sqm_by_rooms(properties: list[dict]) -> dict[str, dict]:
     return result
 
 
-def calculate_amenity_prevalence(properties: list[dict]) -> dict[str, float]:
+def calculate_amenity_prevalence(properties: list[dict[str, Any]]) -> dict[str, float]:
     total = len(properties)
     if total == 0:
         return {}
@@ -192,7 +195,7 @@ _SIZE_BUCKETS: list[tuple[str, float, float]] = [
 ]
 
 
-def calculate_price_by_size(properties: list[dict]) -> list[dict]:
+def calculate_price_by_size(properties: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Median sold price per living-area bucket, for the size -> price histogram.
 
     Returns an ordered list of ``{bucket, median_price, count}`` for the buckets
@@ -201,8 +204,8 @@ def calculate_price_by_size(properties: list[dict]) -> list[dict]:
     bucket_prices: dict[str, list[float]] = {label: [] for label, _, _ in _SIZE_BUCKETS}
 
     for prop in properties:
-        living_area = prop.get("living_area")
-        sold_price = prop.get("sold_price")
+        living_area = number(prop, "living_area")
+        sold_price = number(prop, "sold_price")
         if not living_area or not sold_price:
             continue
         for label, low, high in _SIZE_BUCKETS:
@@ -221,11 +224,11 @@ def calculate_price_by_size(properties: list[dict]) -> list[dict]:
     ]
 
 
-def calculate_size_distribution(properties: list[dict]) -> dict[str, Any]:
-    living_areas = [p.get("living_area") for p in properties if p.get("living_area")]
-    rooms = [p.get("rooms") for p in properties if p.get("rooms")]
+def calculate_size_distribution(properties: list[dict[str, Any]]) -> dict[str, Any]:
+    living_areas = [v for p in properties if (v := number(p, "living_area"))]
+    rooms = [v for p in properties if (v := number(p, "rooms"))]
 
-    room_counts = defaultdict(int)
+    room_counts: defaultdict[str, int] = defaultdict(int)
     for r in rooms:
         bucket = _room_bucket(r)
         if bucket:
@@ -254,8 +257,8 @@ def _room_bucket(rooms: int | float | None) -> str | None:
     return None
 
 
-def calculate_value_tier_distribution(value_properties: list[dict]) -> dict[str, int]:
-    tier_counts = defaultdict(int)
+def calculate_value_tier_distribution(value_properties: list[dict[str, Any]]) -> dict[str, int]:
+    tier_counts: defaultdict[str, int] = defaultdict(int)
     for prop in value_properties:
         # Suppressed rows (missing core fields) carry a null tier; leave them out
         # of the distribution rather than bucketing them as "Unknown".
@@ -275,7 +278,7 @@ CONSTRUCTION_ERAS: tuple[str, ...] = (
 )
 
 
-def construction_era_bucket(year: int) -> str:
+def construction_era_bucket(year: float) -> str:
     """Map a construction year to its era label (see ``CONSTRUCTION_ERAS``)."""
     if year < 1900:
         return "Pre-1900"
@@ -288,11 +291,9 @@ def construction_era_bucket(year: int) -> str:
     return "2000+"
 
 
-def calculate_construction_era_distribution(properties: list[dict]) -> dict[str, Any]:
+def calculate_construction_era_distribution(properties: list[dict[str, Any]]) -> dict[str, Any]:
     """Bucket construction years into eras: Pre-1900, 1900-1950, 1950-1980, 1980-2000, 2000+."""
-    construction_years = [
-        p.get("construction_year") for p in properties if p.get("construction_year")
-    ]
+    construction_years = [v for p in properties if (v := number(p, "construction_year"))]
 
     if not construction_years:
         return {
@@ -305,7 +306,7 @@ def calculate_construction_era_distribution(properties: list[dict]) -> dict[str,
 
     current_year = datetime.now().year
 
-    era_counts = defaultdict(int)
+    era_counts: defaultdict[str, int] = defaultdict(int)
     for year in construction_years:
         era_counts[construction_era_bucket(year)] += 1
 
@@ -320,7 +321,9 @@ def calculate_construction_era_distribution(properties: list[dict]) -> dict[str,
     }
 
 
-def calculate_monthly_median_prices(properties: list[dict], months: int = 12) -> dict[str, Any]:
+def calculate_monthly_median_prices(
+    properties: list[dict[str, Any]], months: int = 12
+) -> dict[str, Any]:
     """Median sold price per month for the last N months. month_1 is the most recent."""
     from dateutil.relativedelta import relativedelta
 
@@ -337,7 +340,7 @@ def calculate_monthly_median_prices(properties: list[dict], months: int = 12) ->
 
     for prop in properties:
         sold_date_str = prop.get("sold_date")
-        sold_price = prop.get("sold_price")
+        sold_price = number(prop, "sold_price")
         if not sold_date_str or not sold_price:
             continue
         try:
@@ -354,7 +357,7 @@ def calculate_monthly_median_prices(properties: list[dict], months: int = 12) ->
     }
 
 
-def calculate_market_dynamics(properties: list[dict]) -> dict[str, Any]:
+def calculate_market_dynamics(properties: list[dict[str, Any]]) -> dict[str, Any]:
     """Compute days_on_market_median, price_change_mean, volatility (stdev of price/sqm), inventory."""
     days_on_market_values = _positive_days_on_market(properties)
     price_changes = _price_change_values(properties)
@@ -378,51 +381,53 @@ def calculate_market_dynamics(properties: list[dict]) -> dict[str, Any]:
     }
 
 
-def _positive_days_on_market(properties: list[dict]) -> list[float]:
+def _positive_days_on_market(properties: list[dict[str, Any]]) -> list[float]:
     return [
-        prop.get("days_on_market")
+        days
         for prop in properties
-        if prop.get("days_on_market") is not None and prop.get("days_on_market") > 0
+        if (days := number(prop, "days_on_market")) is not None and days > 0
     ]
 
 
-def _price_change_values(properties: list[dict]) -> list[float]:
-    values = []
+def _price_change_values(properties: list[dict[str, Any]]) -> list[float]:
+    values: list[float] = []
     for prop in properties:
-        price_change = prop.get("price_change")
+        price_change = number(prop, "price_change")
         if price_change is not None:
             values.append(price_change)
             continue
 
-        sold_price = prop.get("sold_price")
-        listing_price = prop.get("listing_price")
+        sold_price = number(prop, "sold_price")
+        listing_price = number(prop, "listing_price")
         if sold_price and listing_price:
             values.append(sold_price - listing_price)
     return values
 
 
-def _price_per_sqm_values(properties: list[dict]) -> list[float]:
-    values = []
+def _price_per_sqm_values(properties: list[dict[str, Any]]) -> list[float]:
+    values: list[float] = []
     for prop in properties:
-        value = _price_per_sqm_value(prop)
+        value = price_per_sqm_value(prop)
         if value is not None:
             values.append(value)
     return values
 
 
-def _price_per_sqm_value(prop: dict) -> float | None:
-    price_per_sqm = prop.get("price_per_sqm")
+def price_per_sqm_value(prop: dict[str, Any]) -> float | None:
+    price_per_sqm = number(prop, "price_per_sqm")
     if price_per_sqm is not None:
         return price_per_sqm
 
-    sold_price = prop.get("sold_price")
-    living_area = prop.get("living_area")
+    sold_price = number(prop, "sold_price")
+    living_area = number(prop, "living_area")
     if sold_price and living_area and living_area > 0:
         return sold_price / living_area
     return None
 
 
-def filter_properties_by_room_count(properties: list[dict], room_filter: str) -> list[dict]:
+def filter_properties_by_room_count(
+    properties: list[dict[str, Any]], room_filter: str
+) -> list[dict[str, Any]]:
     """Filter by room count: "all", "1", "2", "3", or "4+"."""
     if room_filter == "all":
         return properties
@@ -436,9 +441,9 @@ def filter_properties_by_room_count(properties: list[dict], room_filter: str) ->
 
 
 def _mean_price_or_feature_value(
-    properties: list[dict],
+    properties: list[dict[str, Any]],
     property_key: str,
-    feature_context: dict,
+    feature_context: dict[str, Any],
     feature_key: str,
     area_key: str,
 ) -> int:
@@ -447,7 +452,7 @@ def _mean_price_or_feature_value(
     return round(statistics.mean(prices) if prices else fallback)
 
 
-def _value_insights(value_properties: list[dict]) -> dict[str, Any]:
+def _value_insights(value_properties: list[dict[str, Any]]) -> dict[str, Any]:
     # Rows missing core fields are held out of the ranking: their value_score is
     # null and is_rankable is False. Score/rate stats cover ranked rows only so a
     # suppressed row can't drag an area's average toward the fill value.
@@ -469,9 +474,9 @@ def _value_insights(value_properties: list[dict]) -> dict[str, Any]:
 
 
 def _room_filtered_overview(
-    filtered_raw: list[dict],
+    filtered_raw: list[dict[str, Any]],
     market_dynamics: dict[str, Any],
-    feature_context: dict,
+    feature_context: dict[str, Any],
     area_key: str,
 ) -> dict[str, Any]:
     return {
@@ -492,7 +497,7 @@ def _room_filtered_overview(
 
 
 def _room_filtered_market_dynamics(
-    filtered_raw: list[dict],
+    filtered_raw: list[dict[str, Any]],
     market_dynamics: dict[str, Any],
 ) -> dict[str, Any]:
     return {
@@ -507,10 +512,10 @@ def _room_filtered_market_dynamics(
 
 
 def _context_price_or_mean(
-    feature_context: dict,
+    feature_context: dict[str, Any],
     feature_key: str,
     area_key: str,
-    properties: list[dict],
+    properties: list[dict[str, Any]],
     property_key: str,
 ) -> int:
     context_value = feature_context.get(feature_key, {}).get(area_key)
@@ -522,10 +527,10 @@ def _context_price_or_mean(
 
 
 def calculate_room_filtered_statistics(
-    raw_props: list[dict],
-    value_props: list[dict],
+    raw_props: list[dict[str, Any]],
+    value_props: list[dict[str, Any]],
     room_filter: str,
-    feature_context: dict,
+    feature_context: dict[str, Any],
     area_key: str,
 ) -> dict[str, Any] | None:
     """All statistics for a specific room-count filter; returns None if no properties match."""
@@ -550,7 +555,9 @@ def calculate_room_filtered_statistics(
     }
 
 
-def get_recent_properties(properties: list[dict], limit: int = 10) -> list[dict]:
+def get_recent_properties(
+    properties: list[dict[str, Any]], limit: int = 10
+) -> list[dict[str, Any]]:
     """Most recent properties, sorted by sold_date descending."""
     dated_props = [p for p in properties if p.get("sold_date")]
     sorted_props = sorted(dated_props, key=lambda x: x.get("sold_date", ""), reverse=True)
@@ -598,8 +605,8 @@ def _resolve_area_statistics_paths(
     )
 
 
-def _group_by_area(properties: list[dict]) -> defaultdict[str, list[dict]]:
-    grouped: defaultdict[str, list[dict]] = defaultdict(list)
+def group_by_area(properties: list[dict[str, Any]]) -> defaultdict[str, list[dict[str, Any]]]:
+    grouped: defaultdict[str, list[dict[str, Any]]] = defaultdict(list)
     for prop in properties:
         area_key = normalize_area_for_model(prop.get("area", ""))
         grouped[area_key].append(prop)
@@ -607,9 +614,9 @@ def _group_by_area(properties: list[dict]) -> defaultdict[str, list[dict]]:
 
 
 def _room_count_statistics(
-    raw_props: list[dict],
-    value_props: list[dict],
-    feature_context: dict,
+    raw_props: list[dict[str, Any]],
+    value_props: list[dict[str, Any]],
+    feature_context: dict[str, Any],
     area_key: str,
 ) -> dict[str, Any]:
     by_room_count = {}
@@ -624,8 +631,8 @@ def _room_count_statistics(
 
 def _area_overview(
     area_key: str,
-    raw_props: list[dict],
-    feature_context: dict,
+    raw_props: list[dict[str, Any]],
+    feature_context: dict[str, Any],
     market_dynamics: dict[str, Any],
     monthly_prices: dict[str, Any],
 ) -> dict[str, Any]:
@@ -648,7 +655,7 @@ def _area_overview(
 
 def _area_market_dynamics(
     area_key: str,
-    feature_context: dict,
+    feature_context: dict[str, Any],
     market_dynamics: dict[str, Any],
 ) -> dict[str, Any]:
     return {
@@ -667,9 +674,9 @@ def _area_market_dynamics(
 
 def _area_statistics_entry(
     area_key: str,
-    raw_props: list[dict],
-    value_props: list[dict],
-    feature_context: dict,
+    raw_props: list[dict[str, Any]],
+    value_props: list[dict[str, Any]],
+    feature_context: dict[str, Any],
 ) -> dict[str, Any]:
     market_dynamics = calculate_market_dynamics(raw_props)
     monthly_prices = calculate_monthly_median_prices(raw_props, months=12)
@@ -698,12 +705,12 @@ def _area_statistics_entry(
 
 
 def _build_area_statistics(
-    feature_context: dict,
-    raw_listings: list[dict],
-    value_properties: list[dict],
+    feature_context: dict[str, Any],
+    raw_listings: list[dict[str, Any]],
+    value_properties: list[dict[str, Any]],
 ) -> dict[str, Any]:
-    listings_by_area = _group_by_area(raw_listings)
-    value_props_by_area = _group_by_area(value_properties)
+    listings_by_area = group_by_area(raw_listings)
+    value_props_by_area = group_by_area(value_properties)
     area_stats = {}
     areas = set(listings_by_area) | set(value_props_by_area)
     for key in (
@@ -737,9 +744,9 @@ def _build_area_statistics(
 
 def _area_statistics_output(
     *,
-    feature_context: dict,
-    value_analysis: dict,
-    raw_listings: list[dict],
+    feature_context: dict[str, Any],
+    value_analysis: dict[str, Any],
+    raw_listings: list[dict[str, Any]],
     raw_listings_source: str,
     paths: AreaStatisticsPaths,
     area_stats: dict[str, Any],
@@ -760,6 +767,7 @@ def _area_statistics_output(
 
 
 def _write_area_statistics(output_data: dict[str, Any], output_path: Path) -> None:
+    AreaStatisticsData.model_validate(output_data)
     logger.info("Writing output to %s...", output_path)
     with Path(output_path).open("w", encoding="utf-8") as f:
         json.dump(output_data, f, indent=2, ensure_ascii=False)

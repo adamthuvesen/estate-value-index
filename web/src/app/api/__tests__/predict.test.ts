@@ -19,6 +19,7 @@ function mockFastApiPrediction(predictedPrice: number, modelId = 'no_list_price'
         model_type: 'price_tiered_ensemble',
         requires_listing_price: modelId === 'with_list_price',
         status: 'success',
+        input: { living_area: 55 },
       }),
       {
         status: 200,
@@ -53,25 +54,43 @@ describe('/api/predict', () => {
   })
 
   describe('POST /api/predict', () => {
-    it('rejects invalid numeric input before calling FastAPI', async () => {
-      const fetchSpy = jest.spyOn(global, 'fetch')
+    it('lets FastAPI validate and names the rejected fields', async () => {
+      jest.spyOn(global, 'fetch').mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            detail: [
+              { loc: ['body', 'living_area'], msg: 'Input should be greater than 0', type: 'greater_than' },
+              { loc: ['body', 'model'], msg: 'Input should be auto', type: 'literal_error' },
+            ],
+          }),
+          { status: 422, headers: { 'content-type': 'application/json' } }
+        )
+      )
 
-      const response = await POST(makeRequest({ living_area: -1 }))
+      const response = await POST(makeRequest({ living_area: -1, model: 'old_listing' }))
       const data = await response.json()
 
-      expect(response.status).toBe(400)
-      expect(data.error).toContain('living_area')
-      expect(fetchSpy).not.toHaveBeenCalled()
+      expect(response.status).toBe(422)
+      expect(data.error).toBe('Check these fields: living_area, model.')
     })
 
-    it('rejects unknown model ids before calling FastAPI', async () => {
+    it('forwards the form without blanks or the listing id', async () => {
+      mockFastApiPrediction(2_136_441)
+
+      await POST(
+        makeRequest({ listing_id: 'abc', living_area: ' 55 ', floor: '', elevator: null, rooms: '2' })
+      )
+
+      const sent = JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body)
+      expect(sent).toEqual({ living_area: '55', rooms: '2' })
+    })
+
+    it('rejects a body that is not a JSON object before calling FastAPI', async () => {
       const fetchSpy = jest.spyOn(global, 'fetch')
 
-      const response = await POST(makeRequest({ living_area: 55, model: 'old_listing' }))
-      const data = await response.json()
+      const response = await POST(makeRequest([1, 2]))
 
       expect(response.status).toBe(400)
-      expect(data.error).toContain('model')
       expect(fetchSpy).not.toHaveBeenCalled()
     })
 

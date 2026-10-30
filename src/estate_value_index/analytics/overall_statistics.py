@@ -19,6 +19,7 @@ import logging
 import re
 import statistics
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -27,18 +28,18 @@ import numpy as np
 
 from estate_value_index.analytics.area_statistics import (
     CONSTRUCTION_ERAS,
-    _group_by_area,
-    _price_per_sqm_value,
     calculate_price_by_size,
     calculate_price_per_sqm_by_rooms,
     calculate_size_distribution,
     construction_era_bucket,
+    group_by_area,
     load_json,
     load_raw_listings,
+    price_per_sqm_value,
     resolve_generated_at,
 )
-from estate_value_index.ml.area_names import get_display_name
-from estate_value_index.ml.preprocessing import normalize_area_for_model
+from estate_value_index.analytics.web_json import OverallStatisticsData
+from estate_value_index.areas import get_display_name, normalize_area_for_model
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +74,7 @@ class OverallStatisticsPaths:
 
 
 def build_histogram(
-    values: list[float],
+    values: Iterable[float | None],
     bins: int,
     clip_lo_pct: float,
     clip_hi_pct: float,
@@ -124,22 +125,22 @@ def _month_key(sold_date: str | None) -> str | None:
     return sold_date[:7]
 
 
-def _sold_prices(properties: list[dict]) -> list[float]:
+def _sold_prices(properties: list[dict[str, Any]]) -> list[float]:
     return [p["sold_price"] for p in properties if p.get("sold_price")]
 
 
-def _ppsqm_values(properties: list[dict]) -> list[float]:
-    return [v for p in properties if (v := _price_per_sqm_value(p)) is not None]
+def _ppsqm_values(properties: list[dict[str, Any]]) -> list[float]:
+    return [v for p in properties if (v := price_per_sqm_value(p)) is not None]
 
 
-def build_monthly_series(properties: list[dict]) -> list[dict]:
+def build_monthly_series(properties: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Median price/kr-m² and volume for every month present, chronological.
 
     Unlike the area helper (which truncates to the last 12 months), this covers
     the whole range. The latest month is flagged ``is_partial`` — collection is
     ongoing so it is always incomplete.
     """
-    by_month: dict[str, list[dict]] = defaultdict(list)
+    by_month: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for prop in properties:
         month = _month_key(prop.get("sold_date"))
         if month and prop.get("sold_price"):
@@ -166,7 +167,7 @@ def build_monthly_series(properties: list[dict]) -> list[dict]:
     return series
 
 
-def build_seasonality(properties: list[dict]) -> list[dict]:
+def build_seasonality(properties: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Per calendar-month (1..12) median kr-m² and mean sales per occurrence."""
     ppsqm_by_moy: dict[int, list[float]] = defaultdict(list)
     count_by_month: dict[str, int] = defaultdict(int)
@@ -177,7 +178,7 @@ def build_seasonality(properties: list[dict]) -> list[dict]:
             continue
         moy = int(month[5:7])
         count_by_month[month] += 1
-        value = _price_per_sqm_value(prop)
+        value = price_per_sqm_value(prop)
         if value is not None:
             ppsqm_by_moy[moy].append(value)
 
@@ -207,17 +208,17 @@ def build_seasonality(properties: list[dict]) -> list[dict]:
 # --------------------------------------------------------------------------- #
 
 
-def _has_listing_price(prop: dict) -> bool:
+def _has_listing_price(prop: dict[str, Any]) -> bool:
     listing_price = prop.get("listing_price")
     return listing_price is not None and listing_price > 0
 
 
-def _premium_pct(prop: dict) -> float:
+def _premium_pct(prop: dict[str, Any]) -> float:
     listing_price = prop["listing_price"]
     return (prop["sold_price"] - listing_price) / listing_price * 100
 
 
-def _bidding_rows(properties: list[dict]) -> list[dict]:
+def _bidding_rows(properties: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [p for p in properties if _has_listing_price(p) and p.get("sold_price")]
 
 
@@ -235,7 +236,7 @@ def _over_under_shares(premiums: list[float]) -> dict[str, float]:
     }
 
 
-def build_listing_vs_sold(bidding: list[dict]) -> dict[str, Any]:
+def build_listing_vs_sold(bidding: list[dict[str, Any]]) -> dict[str, Any]:
     listing_prices = [p["listing_price"] for p in bidding]
     sold_prices = [p["sold_price"] for p in bidding]
     premiums = [_premium_pct(p) for p in bidding]
@@ -249,7 +250,7 @@ def build_listing_vs_sold(bidding: list[dict]) -> dict[str, Any]:
     }
 
 
-def build_bidding_monthly(bidding: list[dict]) -> list[dict]:
+def build_bidding_monthly(bidding: list[dict[str, Any]]) -> list[dict[str, Any]]:
     by_month: dict[str, list[float]] = defaultdict(list)
     for prop in bidding:
         month = _month_key(prop.get("sold_date"))
@@ -276,7 +277,9 @@ def build_bidding_monthly(bidding: list[dict]) -> list[dict]:
     return result
 
 
-def _area_premiums(bidding: list[dict], published_areas: set[str]) -> list[dict]:
+def _area_premiums(
+    bidding: list[dict[str, Any]], published_areas: set[str]
+) -> list[dict[str, Any]]:
     by_area: dict[str, list[float]] = defaultdict(list)
     for prop in bidding:
         area_key = normalize_area_for_model(prop.get("area", ""))
@@ -299,7 +302,7 @@ def _area_premiums(bidding: list[dict], published_areas: set[str]) -> list[dict]
     return rows
 
 
-def build_bidding(bidding: list[dict], published_areas: set[str]) -> dict[str, Any]:
+def build_bidding(bidding: list[dict[str, Any]], published_areas: set[str]) -> dict[str, Any]:
     premiums = [_premium_pct(p) for p in bidding]
     area_rows = sorted(
         _area_premiums(bidding, published_areas),
@@ -320,8 +323,8 @@ def build_bidding(bidding: list[dict], published_areas: set[str]) -> dict[str, A
 # --------------------------------------------------------------------------- #
 
 
-def _undervalued_share_by_area(value_properties: list[dict]) -> dict[str, float]:
-    rankable_by_area: dict[str, list[dict]] = defaultdict(list)
+def _undervalued_share_by_area(value_properties: list[dict[str, Any]]) -> dict[str, float]:
+    rankable_by_area: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for prop in value_properties:
         if prop.get("is_rankable"):
             area_key = normalize_area_for_model(prop.get("area", ""))
@@ -335,7 +338,7 @@ def _undervalued_share_by_area(value_properties: list[dict]) -> dict[str, float]
 
 
 def build_geography(
-    listings_by_area: dict[str, list[dict]],
+    listings_by_area: dict[str, list[dict[str, Any]]],
     published_areas: list[str],
     undervalued_share: dict[str, float],
 ) -> dict[str, Any]:
@@ -379,11 +382,11 @@ _PPSQM_SIZE_BUCKETS: list[tuple[str, int, int | None]] = [
 ]
 
 
-def build_ppsqm_vs_size_curve(properties: list[dict]) -> list[dict]:
+def build_ppsqm_vs_size_curve(properties: list[dict[str, Any]]) -> list[dict[str, Any]]:
     bucket_values: dict[str, list[float]] = {label: [] for label, _, _ in _PPSQM_SIZE_BUCKETS}
     for prop in properties:
         living_area = prop.get("living_area")
-        value = _price_per_sqm_value(prop)
+        value = price_per_sqm_value(prop)
         if not living_area or value is None:
             continue
         for label, low, high in _PPSQM_SIZE_BUCKETS:
@@ -413,7 +416,7 @@ def build_ppsqm_vs_size_curve(properties: list[dict]) -> list[dict]:
 # --------------------------------------------------------------------------- #
 
 
-def build_construction_era(properties: list[dict]) -> list[dict]:
+def build_construction_era(properties: list[dict[str, Any]]) -> list[dict[str, Any]]:
     ppsqm_by_era: dict[str, list[float]] = defaultdict(list)
     counts: dict[str, int] = defaultdict(int)
     total = 0
@@ -424,7 +427,7 @@ def build_construction_era(properties: list[dict]) -> list[dict]:
         era = construction_era_bucket(year)
         counts[era] += 1
         total += 1
-        value = _price_per_sqm_value(prop)
+        value = price_per_sqm_value(prop)
         if value is not None:
             ppsqm_by_era[era].append(value)
 
@@ -444,7 +447,7 @@ def build_construction_era(properties: list[dict]) -> list[dict]:
     return result
 
 
-def _amenity_effect(properties: list[dict], flag: str) -> dict[str, Any]:
+def _amenity_effect(properties: list[dict[str, Any]], flag: str) -> dict[str, Any]:
     """Effect of an amenity (balcony/elevator) on kr-m².
 
     ``null`` means unknown and is excluded; only rows where the flag is truly
@@ -454,7 +457,7 @@ def _amenity_effect(properties: list[dict], flag: str) -> dict[str, Any]:
     """
     with_rows, without_rows = [], []
     for prop in properties:
-        value = _price_per_sqm_value(prop)
+        value = price_per_sqm_value(prop)
         if value is None:
             continue
         state = prop.get(flag)
@@ -483,11 +486,11 @@ def _amenity_effect(properties: list[dict], flag: str) -> dict[str, Any]:
     }
 
 
-def _within_area_amenity_diffs(properties: list[dict], flag: str) -> list[float]:
+def _within_area_amenity_diffs(properties: list[dict[str, Any]], flag: str) -> list[float]:
     """Per-area kr-m² diff (with vs without), for areas with both arms >= 20."""
     by_area: dict[str, dict[bool, list[float]]] = defaultdict(lambda: {True: [], False: []})
     for prop in properties:
-        value = _price_per_sqm_value(prop)
+        value = price_per_sqm_value(prop)
         state = prop.get(flag)
         if value is None or state not in (True, False):
             continue
@@ -516,11 +519,11 @@ _FLOOR_BUCKETS: list[tuple[str, int, int | None]] = [
 ]
 
 
-def build_by_floor(properties: list[dict]) -> list[dict]:
+def build_by_floor(properties: list[dict[str, Any]]) -> list[dict[str, Any]]:
     bucket_values: dict[str, list[float]] = {label: [] for label, _, _ in _FLOOR_BUCKETS}
     for prop in properties:
         floor = prop.get("floor")
-        value = _price_per_sqm_value(prop)
+        value = price_per_sqm_value(prop)
         if floor is None or value is None:
             continue
         for label, low, high in _FLOOR_BUCKETS:
@@ -552,9 +555,9 @@ _FEE_BUCKETS: list[tuple[str, float, float]] = [
 ]
 
 
-def build_monthly_fee(properties: list[dict]) -> dict[str, Any]:
+def build_monthly_fee(properties: list[dict[str, Any]]) -> dict[str, Any]:
     fee_per_sqm: list[float] = []
-    bucket_rows: dict[str, list[dict]] = {label: [] for label, _, _ in _FEE_BUCKETS}
+    bucket_rows: dict[str, list[dict[str, Any]]] = {label: [] for label, _, _ in _FEE_BUCKETS}
 
     for prop in properties:
         fee = prop.get("monthly_fee")
@@ -594,7 +597,7 @@ def build_monthly_fee(properties: list[dict]) -> dict[str, Any]:
 # --------------------------------------------------------------------------- #
 
 
-def _record_base(prop: dict) -> dict[str, Any]:
+def _record_base(prop: dict[str, Any]) -> dict[str, Any]:
     area_key = normalize_area_for_model(prop.get("area", ""))
     return {
         "address": prop.get("address"),
@@ -620,7 +623,7 @@ def _street_name(address: str) -> str:
     return _HOUSE_NUMBER_RE.sub("", address).strip()
 
 
-def build_top_streets(properties: list[dict]) -> list[dict]:
+def build_top_streets(properties: list[dict[str, Any]]) -> list[dict[str, Any]]:
     by_street: dict[str, list[float]] = defaultdict(list)
     for prop in properties:
         address = prop.get("address")
@@ -640,7 +643,7 @@ def build_top_streets(properties: list[dict]) -> list[dict]:
     ]
 
 
-def _best_value_record(value_properties: list[dict]) -> dict[str, Any] | None:
+def _best_value_record(value_properties: list[dict[str, Any]]) -> dict[str, Any] | None:
     rankable = [
         p for p in value_properties if p.get("is_rankable") and p.get("value_score") is not None
     ]
@@ -654,13 +657,15 @@ def _best_value_record(value_properties: list[dict]) -> dict[str, Any] | None:
     }
 
 
-def build_records(properties: list[dict], value_properties: list[dict]) -> dict[str, Any]:
+def build_records(
+    properties: list[dict[str, Any]], value_properties: list[dict[str, Any]]
+) -> dict[str, Any]:
     priced = [p for p in properties if p.get("sold_price")]
 
     most_expensive = max(priced, key=lambda p: p["sold_price"])
     cheapest = min(priced, key=lambda p: p["sold_price"])
 
-    ppsqm_rows = [(p, v) for p in properties if (v := _price_per_sqm_value(p)) is not None]
+    ppsqm_rows = [(p, v) for p in properties if (v := price_per_sqm_value(p)) is not None]
     highest_ppsqm_prop, highest_ppsqm = max(ppsqm_rows, key=lambda pv: pv[1])
 
     fast_rows = [
@@ -701,12 +706,12 @@ def build_records(properties: list[dict], value_properties: list[dict]) -> dict[
 # --------------------------------------------------------------------------- #
 
 
-def _published_areas(listings_by_area: dict[str, list[dict]]) -> list[str]:
+def _published_areas(listings_by_area: dict[str, list[dict[str, Any]]]) -> list[str]:
     """Areas the web publishes: >= 2 raw listings, same rule as area_statistics."""
     return sorted(key for key, rows in listings_by_area.items() if len(rows) >= 2)
 
 
-def _hero(properties: list[dict], published_areas: list[str]) -> dict[str, Any]:
+def _hero(properties: list[dict[str, Any]], published_areas: list[str]) -> dict[str, Any]:
     ppsqm = _ppsqm_values(properties)
     return {
         "total_sales": len(properties),
@@ -717,7 +722,7 @@ def _hero(properties: list[dict], published_areas: list[str]) -> dict[str, Any]:
     }
 
 
-def _prices(properties: list[dict], bidding: list[dict]) -> dict[str, Any]:
+def _prices(properties: list[dict[str, Any]], bidding: list[dict[str, Any]]) -> dict[str, Any]:
     return {
         "sold_price_histogram": build_histogram(_sold_prices(properties), 60, 1, 99, as_int=True),
         "price_per_sqm_histogram": build_histogram(
@@ -727,7 +732,7 @@ def _prices(properties: list[dict], bidding: list[dict]) -> dict[str, Any]:
     }
 
 
-def _date_range(properties: list[dict]) -> dict[str, str]:
+def _date_range(properties: list[dict[str, Any]]) -> dict[str, str]:
     dates = sorted(d[:10] for p in properties if (d := p.get("sold_date")))
     return {"start": dates[0], "end": dates[-1]}
 
@@ -748,13 +753,13 @@ def _resolve_paths(
 
 
 def _build_overall_statistics(
-    raw_listings: list[dict],
-    value_properties: list[dict],
-    value_analysis: dict,
+    raw_listings: list[dict[str, Any]],
+    value_properties: list[dict[str, Any]],
+    value_analysis: dict[str, Any],
     raw_listings_source: str,
     value_analysis_name: str,
 ) -> dict[str, Any]:
-    listings_by_area = _group_by_area(raw_listings)
+    listings_by_area = group_by_area(raw_listings)
     published_areas = _published_areas(listings_by_area)
     published_set = set(published_areas)
     bidding = _bidding_rows(raw_listings)
@@ -827,6 +832,7 @@ def generate_overall_statistics(
         paths.value_analysis.name,
     )
 
+    OverallStatisticsData.model_validate(output_data)
     logger.info("Writing overall statistics to %s...", paths.output)
     paths.output.parent.mkdir(parents=True, exist_ok=True)
     with Path(paths.output).open("w", encoding="utf-8") as f:

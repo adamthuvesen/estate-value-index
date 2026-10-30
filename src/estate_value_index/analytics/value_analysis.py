@@ -11,11 +11,14 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 import joblib
 import numpy as np
 import pandas as pd
 from scipy.stats import norm
+
+from estate_value_index.analytics.web_json import ValueAnalysisData
 
 # Import preprocessing functions to match training pipeline
 from estate_value_index.ml import drop_outliers_quantile, filter_valid_listings
@@ -81,7 +84,9 @@ def load_production_data(data_path: Path, apply_training_filters: bool = True) -
     return df_with_price
 
 
-def load_model(models_dir: Path, model_type: str, prefix: str = "price_prediction_model") -> tuple:
+def load_model(
+    models_dir: Path, model_type: str, prefix: str = "price_prediction_model"
+) -> tuple[Any, ...]:
     """Load trained model and its metrics."""
     model_path = models_dir / f"{prefix}_{model_type}.joblib"
     metrics_path = models_dir / f"{prefix}_{model_type}_metrics.json"
@@ -207,7 +212,7 @@ def calculate_value_metrics(
     return df
 
 
-def prepare_output_records(df: pd.DataFrame) -> list[dict]:
+def prepare_output_records(df: pd.DataFrame) -> list[dict[str, Any]]:
     """Prepare property records for JSON output."""
     # Select and order columns for output
     output_columns = [
@@ -259,9 +264,9 @@ def prepare_output_records(df: pd.DataFrame) -> list[dict]:
                 cleaned[key] = value
             elif pd.isna(value):
                 cleaned[key] = None
-            elif isinstance(value, (np.integer, np.int64)):
+            elif isinstance(value, np.integer):
                 cleaned[key] = int(value)
-            elif isinstance(value, (np.floating, np.float64)):
+            elif isinstance(value, np.floating):
                 cleaned[key] = round(float(value), 2)
             else:
                 cleaned[key] = value
@@ -270,7 +275,7 @@ def prepare_output_records(df: pd.DataFrame) -> list[dict]:
     return cleaned_records
 
 
-def generate_summary_statistics(df: pd.DataFrame, metrics: dict) -> dict:
+def generate_summary_statistics(df: pd.DataFrame, metrics: dict[str, Any]) -> dict[str, Any]:
     """Generate summary statistics for the analysis."""
     # Value statistics describe the ranked population only. Rows missing core
     # fields are held out of the ranking (value_score is NaN), so folding them
@@ -336,7 +341,7 @@ def generate_value_analysis(
     undervalue_threshold_abs: float = 200000,
     only_undervalued: bool = False,
     min_value_score: float | None = None,
-) -> dict:
+) -> dict[str, Any]:
     """Generate value analysis by running predictions on production data.
 
     Args:
@@ -406,6 +411,7 @@ def generate_value_analysis(
         "properties": properties_sorted,
     }
 
+    ValueAnalysisData.model_validate(output)
     output_file.parent.mkdir(parents=True, exist_ok=True)
     with Path(output_file).open("w", encoding="utf-8") as f:
         json.dump(output, f, indent=2, ensure_ascii=False)

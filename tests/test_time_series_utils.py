@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.estate_value_index.ml.time_series_utils import (
+from estate_value_index.ml.time_series_utils import (
     create_temporal_holdout_split,
     sort_by_temporal_order,
     validate_temporal_leakage,
@@ -60,7 +60,7 @@ def test_sort_by_temporal_order_wrong_dtype():
 
 
 def test_sort_by_temporal_order_missing_dates():
-    df = pd.DataFrame({"sold_date": pd.to_datetime(["2024-01-01", None, "2024-01-03"])})
+    df = pd.DataFrame({"sold_date": pd.DatetimeIndex(["2024-01-01", None, "2024-01-03"])})
 
     with pytest.raises(ValueError, match="Found 1 missing values"):
         sort_by_temporal_order(df, date_column="sold_date")

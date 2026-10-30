@@ -8,6 +8,7 @@ if area-based signals are redundant with the dominant listing_price feature.
 
 import sys
 from pathlib import Path
+from typing import Any
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -24,7 +25,7 @@ from estate_value_index.ml.features import create_optimized_features, get_featur
 _OUTPUT_DIR = Path("reports/correlation_analysis")
 
 
-def calculate_vif(df: pd.DataFrame, numeric_features: list) -> pd.DataFrame:
+def calculate_vif(df: pd.DataFrame, numeric_features: list[Any]) -> pd.DataFrame:
     """Calculate Variance Inflation Factor for numeric features."""
     vif_data = []
 
@@ -259,7 +260,7 @@ def _plot_mi_scores(mi_df: pd.DataFrame, area_features: list[str], output_dir: P
     ]
 
     plt.barh(range(len(top_features)), top_features["MI_score"], color=colors)
-    plt.yticks(range(len(top_features)), top_features["feature"])
+    plt.yticks(range(len(top_features)), top_features["feature"].tolist())
     plt.xlabel("Mutual Information Score", fontsize=12)
     plt.title(
         "Feature Importance by Mutual Information\n(Red=listing_price, Blue=area features)",

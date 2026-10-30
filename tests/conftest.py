@@ -1,28 +1,22 @@
 """Shared test fixtures and utilities for the Swedish real estate prediction system."""
 
-import os
-import sys
-from pathlib import Path
-
-# Fake project IDs so tests that build BigQuery queries run in a fresh clone.
-os.environ.setdefault("GCP_PROJECT_ID", "test-project")
-os.environ.setdefault("BIGQUERY_PROJECT_ID", "test-project")
-
-# Add project root to Python path
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
-
 import json
+import os
 import shutil
 import tempfile
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import pytest
 
-from src.estate_value_index.ml.features import FeatureEngineeringContext
-from src.estate_value_index.ml.preprocessing import FeatureSpec
+from estate_value_index.ml.features import FeatureEngineeringContext
+from estate_value_index.ml.preprocessing import FeatureSpec
+
+# Fake project IDs so tests that build BigQuery queries run in a fresh clone.
+os.environ.setdefault("GCP_PROJECT_ID", "test-project")
+os.environ.setdefault("BIGQUERY_PROJECT_ID", "test-project")
 
 
 @pytest.fixture

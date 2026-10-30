@@ -8,7 +8,7 @@ import pandas as pd
 """Classification helpers for engineered features."""
 
 
-def _classify_architectural_era(construction_year: Any) -> str:
+def classify_architectural_era(construction_year: Any) -> str:
     """Classify properties by Swedish architectural eras with market characteristics."""
     if pd.isna(construction_year):
         return "unknown"
@@ -33,7 +33,7 @@ def _classify_architectural_era(construction_year: Any) -> str:
         return "newest"  # Latest construction, highest standards
 
 
-def _get_construction_quality_score(era: str) -> int:
+def get_construction_quality_score(era: str) -> int:
     """Assign construction quality scores based on architectural era."""
     quality_map = {
         "pre_war": 7,  # High character, often well-maintained
@@ -49,7 +49,7 @@ def _get_construction_quality_score(era: str) -> int:
     return quality_map.get(era, 5)
 
 
-def _classify_renovation_likelihood(age: Any) -> str:
+def classify_renovation_likelihood(age: Any) -> str:
     """Classify renovation likelihood based on property age."""
     if pd.isna(age):
         return "low"
@@ -61,7 +61,7 @@ def _classify_renovation_likelihood(age: Any) -> str:
         return "low"
 
 
-def _extract_postal_code(address: Any) -> str | None:
+def extract_postal_code(address: Any) -> str | None:
     """Extract Swedish postal codes (5 digits) from address string."""
     if pd.isna(address) or not isinstance(address, str):
         return None
@@ -70,7 +70,7 @@ def _extract_postal_code(address: Any) -> str | None:
     return match.group(1).replace(" ", "") if match else None
 
 
-def _classify_stockholm_district(postal_code: Any) -> str:
+def classify_stockholm_district(postal_code: Any) -> str:
     """Classify Stockholm districts based on postal code ranges."""
     if not postal_code or len(postal_code) != 5:
         return "unknown"
@@ -92,7 +92,7 @@ def _classify_stockholm_district(postal_code: Any) -> str:
         return "unknown"
 
 
-def _classify_market_cycle(date_series: pd.Series) -> pd.Series:
+def classify_market_cycle(date_series: pd.Series) -> pd.Series:
     """Determine market cycle phase based on Swedish housing market patterns."""
     # Swedish housing market shows strong seasonality and multi-year cycles
     years = date_series.dt.year
@@ -108,7 +108,7 @@ def _classify_market_cycle(date_series: pd.Series) -> pd.Series:
     return market_cycle
 
 
-def _classify_swedish_season(month: int) -> str:
+def classify_swedish_season(month: int) -> str:
     """Get Swedish housing market seasons."""
     if month in [12, 1, 2]:
         return "winter_slow"  # Very slow market
@@ -122,7 +122,7 @@ def _classify_swedish_season(month: int) -> str:
         return "pre_winter"  # Market cooling
 
 
-def _classify_school_period(month: int) -> str:
+def classify_school_period(month: int) -> str:
     """Classify months by Swedish school calendar impact."""
     if month in [6, 7]:
         return "summer_vacation"  # School holidays, family moving season
@@ -136,7 +136,7 @@ def _classify_school_period(month: int) -> str:
         return "regular_period"
 
 
-def _classify_dom_momentum(days_on_market: Any) -> str:
+def classify_dom_momentum(days_on_market: Any) -> str:
     """Classify days on market momentum."""
     if pd.isna(days_on_market):
         return "normal"
@@ -150,7 +150,7 @@ def _classify_dom_momentum(days_on_market: Any) -> str:
         return "stagnant"
 
 
-def _classify_area_price_momentum(area_price_change_mean: Any) -> str:
+def classify_area_price_momentum(area_price_change_mean: Any) -> str:
     """Classify area price momentum based on typical price changes."""
     if pd.isna(area_price_change_mean):
         return "normal"

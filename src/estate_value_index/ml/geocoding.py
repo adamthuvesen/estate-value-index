@@ -1,7 +1,7 @@
 """Geocoding utilities for property address resolution.
 
-This module provides geocoding functionality using OpenStreetMap/Nominatim,
-with caching to avoid repeated API calls and rate limiting.
+Distance helpers and the local geocode cache. Nominatim lookups live in
+``ingestion/geocoding.py``.
 
 Dual cache strategy:
 - Local dev: CSV at data/cache/geocodes.csv
@@ -12,15 +12,11 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
 
 from estate_value_index.exceptions import DataLoadError, exception_context
-
-if TYPE_CHECKING:
-    from geopy.geocoders import Nominatim
 
 logger = logging.getLogger(__name__)
 
@@ -83,46 +79,6 @@ def haversine_distance_vectorized(
     c = 2 * np.arctan2(np.sqrt(a), np.sqrt(1 - a))
 
     return R * c
-
-
-def geocode_address(address: str, area: str, geolocator: Nominatim) -> tuple[float, float] | None:
-    """Geocode a Swedish address using OSM Nominatim.
-
-    Tries full address first, falls back to area only.
-
-    Args:
-        address: Street address (e.g., "Storgatan 1")
-        area: Area/neighborhood name (e.g., "Södermalm")
-        geolocator: Configured Nominatim geocoder instance
-
-    Returns:
-        (latitude, longitude) tuple or None if geocoding fails
-    """
-    if pd.isna(address) or not address:
-        return None
-
-    # Try with full address first. Broad catch is intentional: a single
-    # address failing (timeout, service error, malformed response) must not
-    # abort the whole batch — we fall back to area-only, then to None.
-    full_address = f"{address}, {area}, Stockholm, Sweden"
-    try:
-        location = geolocator.geocode(full_address, timeout=10)
-        if location:
-            return (location.latitude, location.longitude)
-    except Exception as e:
-        logger.debug(f"Full address geocoding failed for '{full_address}': {e}")
-
-    # Fallback to area only — same per-address best-effort rationale.
-    try:
-        area_address = f"{area}, Stockholm, Sweden"
-        location = geolocator.geocode(area_address, timeout=10)
-        if location:
-            logger.debug(f"Falling back to area-only geocoding for '{address}'")
-            return (location.latitude, location.longitude)
-    except Exception as e:
-        logger.debug(f"Area-only geocoding failed for '{area}': {e}")
-
-    return None
 
 
 def load_geocode_cache(cache_path: Path | str) -> dict[str, tuple[float, float]]:

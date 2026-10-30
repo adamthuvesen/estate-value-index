@@ -29,12 +29,14 @@ from estate_value_index.ml import (
     filter_valid_listings,
 )
 from estate_value_index.ml.ask_price import ASK_PRICE_SIGNAL_COLUMNS, mask_ask_price_signals
+from estate_value_index.ml.constants import TRAINING_RANDOM_STATE, TRAINING_TEST_SIZE
+from estate_value_index.ml.data_fingerprint import fingerprint_training_frame
 from estate_value_index.ml.estimate_range_factors import compute_estimate_range_factors
 from estate_value_index.ml.features.context import FeatureEngineeringContext
-from estate_value_index.ml.features.registry import NUMERIC_FEATURE_NAMES
+from estate_value_index.ml.features.registry import load_feature_subset
 from estate_value_index.ml.market_normalized_target import (
-    _market_index,
     blend_market_predictions,
+    build_market_index,
     denormalize_market_predictions,
     market_index_reference,
     normalize_prices_to_market_index,
@@ -42,13 +44,13 @@ from estate_value_index.ml.market_normalized_target import (
 )
 from estate_value_index.ml.residual_calibration import (
     CENTRAL_AREAS,
-    _feature_set_requires_listing_price,
-    _fit_residual_calibrator,
-    _prediction_metrics,
-    _resolve_features,
-    _train_lgbm,
     apply_calibration_correction,
     build_calibration_features,
+    feature_set_requires_listing_price,
+    fit_residual_calibrator,
+    prediction_metrics,
+    resolve_features,
+    train_lgbm,
 )
 from estate_value_index.ml.tiered_ensemble import (
     DEFAULT_INFERENCE_GATE_HIGH_MIN,
@@ -62,24 +64,22 @@ from estate_value_index.ml.tiered_ensemble import (
     MODEL_NAMES,
     REPORT_HIGH_END_MIN_PRICE,
     TierSpec,
-    _build_oof_training_data,
-    _prediction_frame,
-    _tier_mask,
-    _tier_specs,
     apply_gated_expert_blend,
+    build_oof_training_data,
+    build_tier_specs,
+    prediction_frame,
     prediction_tier_labels,
     select_best_expert_weights,
     select_gated_expert_weights,
+    tier_mask,
 )
 from estate_value_index.ml.training import LGBMTrainer
-from estate_value_index.ml.training_workflow.data import (
-    load_feature_subset,
-    load_training_dataframe,
-)
+from estate_value_index.ml.training_workflow.data import load_training_dataframe
 from estate_value_index.model_artifacts import (
     DEFAULT_MODEL_PREFIX,
     LISTING_MODEL_ID,
     NO_LIST_MODEL_ID,
+    installed_package_version,
     production_artifact_names,
 )
 from estate_value_index.utils.approval import require_approval
@@ -88,7 +88,6 @@ from estate_value_index.utils.gcs import (
     upload_model_artifacts,
     write_sha256_sidecar,
 )
-from estate_value_index.utils.settings import get_random_state, get_test_size
 
 logger = logging.getLogger(__name__)
 
@@ -96,7 +95,7 @@ DEFAULT_NO_LIST_FEATURE_SET = "no_list_price_v1"
 DEFAULT_LISTING_FEATURE_SET = "with_list_price_v1"
 
 
-def _json_safe(value):
+def _json_safe(value: Any) -> Any:
     if isinstance(value, dict):
         return {key: _json_safe(item) for key, item in value.items()}
     if isinstance(value, list):
@@ -106,7 +105,7 @@ def _json_safe(value):
     return value
 
 
-def _context_payload(context: FeatureEngineeringContext) -> dict[str, object]:
+def _context_payload(context: FeatureEngineeringContext) -> dict[str, Any]:
     payload = asdict(context)
     payload["reference_date"] = context.reference_date.isoformat()
     return {key: _json_safe(value) for key, value in payload.items()}
@@ -132,7 +131,7 @@ class ProductionModelSpec:
 @dataclass(frozen=True)
 class ProductionTrainingResult:
     model: TieredProductionModel
-    metrics: dict[str, object]
+    metrics: dict[str, Any]
     artifact_paths: dict[str, str]
 
 
@@ -176,7 +175,7 @@ class TieredProductionModel:
         )
 
         base_predictions = np.expm1(self.base_model.predict(X))
-        market_index = _market_index(engineered)
+        market_index = build_market_index(engineered)
         normalized_predictions = _predict_market_model(
             self.normalized_model,
             X,
@@ -203,7 +202,7 @@ class TieredProductionModel:
                     fallback_predictions=normalized_predictions,
                 )
 
-        expert_predictions = _prediction_frame(
+        expert_predictions = prediction_frame(
             global_predictions=global_predictions,
             tier_predictions=tier_predictions,
         )
@@ -265,9 +264,7 @@ def production_specs(
 
 def _validate_production_spec(spec: ProductionModelSpec) -> None:
     numeric_features, _ = load_feature_subset(spec.feature_set)
-    selected_numeric = (
-        set(NUMERIC_FEATURE_NAMES) if numeric_features is None else set(numeric_features)
-    )
+    selected_numeric = set(numeric_features)
     ask_price_features = selected_numeric.intersection(ASK_PRICE_SIGNAL_COLUMNS)
     if spec.requires_listing_price:
         if "listing_price" not in selected_numeric:
@@ -350,7 +347,7 @@ def train_and_persist_production_models(
         _validate_production_spec(spec)
 
     model_dir.mkdir(parents=True, exist_ok=True)
-    seed = get_random_state() if random_state is None else random_state
+    seed = TRAINING_RANDOM_STATE if random_state is None else random_state
     results: dict[str, ProductionTrainingResult] = {}
 
     for spec in resolved_specs:
@@ -362,7 +359,7 @@ def train_and_persist_production_models(
         )
         train_raw, test_raw = create_temporal_holdout_split(
             filtered,
-            test_size=get_test_size(),
+            test_size=TRAINING_TEST_SIZE,
             date_column="sold_date",
         )
         lgbm_params = (
@@ -380,7 +377,7 @@ def train_and_persist_production_models(
         eval_test = test_raw.reset_index(drop=True)
         y_test = eval_test["sold_price"]
         predictions = evaluation_model.predict(eval_test)
-        heldout_metrics = _prediction_metrics(y_test, predictions)
+        heldout_metrics = prediction_metrics(y_test, predictions)
         calibration = _calibration_report(evaluation_model, eval_test, y_test, served=predictions)
         estimate_range_factors = compute_estimate_range_factors(eval_test, predictions)
 
@@ -403,6 +400,7 @@ def train_and_persist_production_models(
             test_end=str(test_raw["sold_date"].max().date()),
             lgbm_params=lgbm_params,
             tuned=tune,
+            data_fingerprint=fingerprint_training_frame(filtered).model_dump(mode="json"),
         )
         artifact_paths = persist_production_model(
             production_model,
@@ -431,7 +429,7 @@ def tune_production_hyperparameters(
     raw = _prepare_raw_for_model(ordered, requires_listing_price=spec.requires_listing_price)
     engineered = create_optimized_features(raw)
     context = build_feature_context(engineered)
-    numeric_features, categorical_features = _resolve_features(engineered, spec.feature_set)
+    numeric_features, categorical_features = resolve_features(engineered, spec.feature_set)
     X = _feature_matrix(engineered, numeric_features, categorical_features, context)
     trainer = LGBMTrainer(random_state=random_state)
     return trainer.tune_parameters(X, np.log1p(engineered["sold_price"]))
@@ -448,7 +446,7 @@ def filter_training_rows(
         min_price=3_000_000,
         drop_na_features=False,
         require_listing_price=(
-            _feature_set_requires_listing_price(feature_set)
+            feature_set_requires_listing_price(feature_set)
             if requires_listing_price is None
             else requires_listing_price
         ),
@@ -483,18 +481,18 @@ def fit_tiered_production_model(
     raw = _prepare_raw_for_model(raw_frame, requires_listing_price=spec.requires_listing_price)
     engineered = create_optimized_features(raw)
     context = build_feature_context(engineered)
-    numeric_features, categorical_features = _resolve_features(engineered, spec.feature_set)
+    numeric_features, categorical_features = resolve_features(engineered, spec.feature_set)
     X = _feature_matrix(engineered, numeric_features, categorical_features, context)
     y = engineered["sold_price"].copy()
 
-    base_model = _train_lgbm(
+    base_model = train_lgbm(
         X,
         y,
         categorical_features,
         random_state,
         lgbm_params=lgbm_params,
     )
-    train_index = _market_index(engineered)
+    train_index = build_market_index(engineered)
     reference_index = market_index_reference(train_index)
     y_normalized = normalize_prices_to_market_index(
         y,
@@ -511,7 +509,7 @@ def fit_tiered_production_model(
     if valid_market.sum() < 100:
         raise ValueError("Not enough valid market-index rows to train production model")
 
-    normalized_model = _train_lgbm(
+    normalized_model = train_lgbm(
         X.loc[valid_market],
         y_normalized.loc[valid_market],
         categorical_features,
@@ -519,7 +517,7 @@ def fit_tiered_production_model(
         lgbm_params=lgbm_params,
     )
 
-    tier_specs = _tier_specs(
+    tier_specs = build_tier_specs(
         low_max_price=low_max_price,
         mid_min_price=mid_min_price,
         mid_max_price=mid_max_price,
@@ -588,7 +586,7 @@ def persist_production_model(
     *,
     model_dir: Path,
     model_prefix: str,
-    metrics: dict[str, object],
+    metrics: dict[str, Any],
     approved: bool = False,
 ) -> dict[str, str]:
     names = production_artifact_names(model.model_id, model_prefix)
@@ -684,11 +682,11 @@ def _fit_tier_models(
 ) -> dict[str, Any | None]:
     models: dict[str, Any | None] = {}
     for tier_spec in tier_specs:
-        valid_tier = valid_market & _tier_mask(y, tier_spec)
+        valid_tier = valid_market & tier_mask(y, tier_spec)
         if valid_tier.sum() < 100:
             models[tier_spec.name] = None
             continue
-        models[tier_spec.name] = _train_lgbm(
+        models[tier_spec.name] = train_lgbm(
             X.loc[valid_tier],
             y_normalized.loc[valid_tier],
             categorical_features,
@@ -710,8 +708,8 @@ def _select_blend(
     gate_high_min: float = DEFAULT_INFERENCE_GATE_HIGH_MIN,
     include_calibration_features: bool = False,
     lgbm_params: dict[str, Any] | None = None,
-) -> dict[str, object]:
-    oof = _build_oof_training_data(
+) -> dict[str, Any]:
+    oof = build_oof_training_data(
         raw_frame,
         feature_set=feature_set,
         n_splits=n_splits,
@@ -730,7 +728,7 @@ def _select_blend(
         oof["normalized_prediction"].to_numpy(),
         normalized_weight=global_selection["normalized_weight"],
     )
-    oof_predictions = _prediction_frame(
+    oof_predictions = prediction_frame(
         global_predictions=oof_global_blend,
         tier_predictions={
             tier_spec.name: oof[f"{tier_spec.name}_prediction"].to_numpy()
@@ -776,7 +774,7 @@ def _oof_final_blend(
         oof["normalized_prediction"].to_numpy(dtype=float),
         normalized_weight=model.market_blend_weight,
     )
-    expert_predictions = _prediction_frame(
+    expert_predictions = prediction_frame(
         global_predictions=global_blend,
         tier_predictions={
             spec.name: oof[f"{spec.name}_prediction"].to_numpy(dtype=float) for spec in tier_specs
@@ -805,15 +803,15 @@ def _fit_model_residual_calibrator(
     oof_final = _oof_final_blend(model, oof, tier_specs)
     features = build_calibration_features(oof, oof_final)
     features["residual"] = oof["actual_price"].to_numpy(dtype=float) - oof_final
-    return _fit_residual_calibrator(features, random_state=random_state)
+    return fit_residual_calibrator(features, random_state=random_state)
 
 
 def _metrics_payload(
     model: TieredProductionModel,
     *,
     heldout_metrics: dict[str, float],
-    calibration: dict[str, object],
-    estimate_range_factors: dict[str, object],
+    calibration: dict[str, Any],
+    estimate_range_factors: dict[str, Any],
     train_rows: int,
     test_rows: int,
     production_rows: int,
@@ -821,9 +819,12 @@ def _metrics_payload(
     test_end: str,
     lgbm_params: dict[str, Any],
     tuned: bool,
-) -> dict[str, object]:
+    data_fingerprint: dict[str, Any],
+) -> dict[str, Any]:
     return {
         "model_id": model.model_id,
+        "package_version": installed_package_version(),
+        "data_fingerprint": data_fingerprint,
         "model_type": model.model_type,
         "feature_set": model.feature_set,
         "requires_listing_price": model.requires_listing_price,
@@ -863,7 +864,7 @@ def _calibration_report(
     y_test: pd.Series,
     *,
     served: np.ndarray,
-) -> dict[str, object]:
+) -> dict[str, Any]:
     """Compare calibrated vs uncalibrated heldout predictions for the served model.
 
     Makes the served prediction explicit and records the acceptance-gate signals:
@@ -930,7 +931,7 @@ def _calibration_report(
 def _served_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, float] | None:
     if len(y_true) == 0:
         return None
-    metrics = _prediction_metrics(pd.Series(y_true), y_pred)
+    metrics = prediction_metrics(pd.Series(y_true), y_pred)
     return {
         "mae": metrics["mae"],
         "median_ape": metrics["median_ape"],
@@ -942,7 +943,7 @@ def _served_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, float] 
     }
 
 
-def _feature_importance_payload(model: TieredProductionModel) -> dict[str, object]:
+def _feature_importance_payload(model: TieredProductionModel) -> dict[str, Any]:
     features = model.numeric_features + model.categorical_features
 
     def importance(estimator: Any) -> dict[str, float]:

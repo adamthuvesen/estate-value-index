@@ -41,7 +41,7 @@ _BQ_TABLE_ID_PATTERN = re.compile(r"^[A-Za-z0-9_]{1,1024}$")
 _BQ_COLUMN_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,299}$")
 
 
-def _validate_bq_project_id(value: str) -> str:
+def validate_bq_project_id(value: str) -> str:
     """Return ``value`` if it matches the documented GCP project ID format.
 
     Args:
@@ -53,7 +53,7 @@ def _validate_bq_project_id(value: str) -> str:
     Raises:
         ValueError: If ``value`` is not a well-formed GCP project ID.
     """
-    if not isinstance(value, str):
+    if not isinstance(value, str):  # pyright: ignore[reportUnnecessaryIsInstance]  # untrusted input
         raise ValueError("invalid GCP project_id: must be a string")
     if _BQ_PROJECT_ID_PATTERN.fullmatch(value) is None:
         raise ValueError(f"invalid GCP project_id: {value!r}")
@@ -66,7 +66,7 @@ def _validate_bq_dataset_id(value: str) -> str:
     Raises:
         ValueError: If ``value`` is not a valid dataset identifier.
     """
-    if not isinstance(value, str):
+    if not isinstance(value, str):  # pyright: ignore[reportUnnecessaryIsInstance]  # untrusted input
         raise ValueError("invalid BigQuery dataset_id: must be a string")
     if _BQ_DATASET_ID_PATTERN.fullmatch(value) is None:
         raise ValueError(f"invalid BigQuery dataset_id: {value!r}")
@@ -79,7 +79,7 @@ def _validate_bq_table_id(value: str) -> str:
     Raises:
         ValueError: If ``value`` is not a valid table identifier.
     """
-    if not isinstance(value, str):
+    if not isinstance(value, str):  # pyright: ignore[reportUnnecessaryIsInstance]  # untrusted input
         raise ValueError("invalid BigQuery table_id: must be a string")
     if _BQ_TABLE_ID_PATTERN.fullmatch(value) is None:
         raise ValueError(f"invalid BigQuery table_id: {value!r}")
@@ -115,7 +115,7 @@ def safe_table_ref(
         ValueError: If any component is malformed.
     """
     ref = (
-        f"{_validate_bq_project_id(project_id)}"
+        f"{validate_bq_project_id(project_id)}"
         f".{_validate_bq_dataset_id(dataset_id)}"
         f".{_validate_bq_table_id(table_id)}"
     )
@@ -138,7 +138,7 @@ def quote_identifier(name: str) -> str:
     Raises:
         ValueError: If ``name`` is not a valid column identifier.
     """
-    if not isinstance(name, str):
+    if not isinstance(name, str):  # pyright: ignore[reportUnnecessaryIsInstance]  # untrusted input
         raise ValueError("invalid BigQuery identifier: must be a string")
     if _BQ_COLUMN_PATTERN.fullmatch(name) is None:
         raise ValueError(f"invalid BigQuery identifier: {name!r}")
@@ -205,7 +205,7 @@ def _bq_scalar_type(value: Any) -> str:
     raise ValueError(f"unsupported filter value type: {type(value).__name__}")
 
 
-def build_filter_clause(filters: Sequence[Filter]) -> tuple[str, list]:
+def build_filter_clause(filters: Sequence[Filter]) -> tuple[str, list[Any]]:
     """Build a parameterised ``WHERE`` clause from structured :class:`Filter`s.
 
     Args:
