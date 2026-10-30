@@ -11,6 +11,7 @@ from prefect import task
 from estate_value_index.exceptions import InfrastructureError
 from estate_value_index.pipelines.types import ProcessingResult, UploadResult
 from estate_value_index.pipelines.utils import get_bq_config, get_task_logger
+from estate_value_index.utils.approval import require_approval
 from estate_value_index.utils.bigquery_safety import quote_identifier, safe_table_ref
 from estate_value_index.utils.clients import get_bq_client
 
@@ -215,21 +216,15 @@ def _merge_temp_table(
         return inserted_rows, 0
 
 
-@task(
-    name="upload-to-bigquery",
-    description="Upload processed listings to BigQuery",
-    retries=3,
-    retry_delay_seconds=60,
-    timeout_seconds=900,
-)
-def upload_to_bigquery_task(
+def upload_to_bigquery(
     processed_file: Path,
     project_id: str | None = None,
     dataset_id: str | None = None,
     table_id: str | None = None,
     truncate: bool = False,
+    approved: bool = False,
 ) -> UploadResult:
-    """Upload processed listings to BigQuery.
+    """Upload processed listings to BigQuery (temp table load, then MERGE).
 
     Uses MERGE-based upsert with listing_id as primary key to prevent duplicates.
 
@@ -239,10 +234,13 @@ def upload_to_bigquery_task(
         dataset_id: BigQuery dataset (default: booli_raw)
         table_id: BigQuery table (default: listings)
         truncate: If True, truncate table before upload
+        approved: Required; this writes to the production table
 
     Returns:
         UploadResult with upload statistics
     """
+    require_approval("write listings to BigQuery", approved)
+
     logger = get_task_logger(__name__)
 
     # Check file exists FIRST (before any GCP operations that require credentials)
@@ -293,6 +291,34 @@ def upload_to_bigquery_task(
 
 
 @task(
+    name="upload-to-bigquery",
+    description="Upload processed listings to BigQuery",
+    retries=3,
+    retry_delay_seconds=60,
+    timeout_seconds=900,
+)
+def upload_to_bigquery_task(
+    processed_file: Path,
+    project_id: str | None = None,
+    dataset_id: str | None = None,
+    table_id: str | None = None,
+    truncate: bool = False,
+    approved: bool = False,
+) -> UploadResult:
+    return upload_to_bigquery(processed_file, project_id, dataset_id, table_id, truncate, approved)
+
+
+def insert_geocodes(project_id: str, rows: list[dict], approved: bool = False) -> None:
+    """Insert geocode rows into ``booli_raw.geocodes`` (BigQuery streaming insert)."""
+    require_approval("write geocodes to BigQuery", approved)
+
+    client = get_bq_client(project_id)
+    errors = client.insert_rows_json(safe_table_ref(project_id, "booli_raw", "geocodes"), rows)
+    if errors:
+        raise RuntimeError(f"BigQuery geocode insert errors: {errors[:3]}")
+
+
+@task(
     name="geocode-new-addresses",
     description="Geocode new addresses not yet in geocode cache",
     retries=1,
@@ -303,6 +329,7 @@ def geocode_new_addresses_task(
     project_id: str | None = None,
     batch_size: int = 100,
     rate_limit_delay: float = 1.1,
+    approved: bool = False,
 ) -> GeocodeResult:
     """Geocode addresses that are in listings but not in geocode cache.
 
@@ -315,10 +342,14 @@ def geocode_new_addresses_task(
         project_id: GCP project ID (default: from env)
         batch_size: Maximum addresses to geocode per run (for rate limiting)
         rate_limit_delay: Delay between geocoding requests (seconds)
+        approved: Required; the task ends with a BigQuery write. Checked first so
+            a refusal does not follow hours of rate-limited geocoding.
 
     Returns:
         GeocodeResult with geocoding statistics
     """
+    require_approval("write geocodes to BigQuery", approved)
+
     logger = get_task_logger(__name__)
 
     from google.cloud import bigquery
@@ -438,13 +469,8 @@ def geocode_new_addresses_task(
     if new_geocodes:
         logger.info(f"Uploading {len(new_geocodes)} geocodes to BigQuery...")
 
-        geocodes_table = safe_table_ref(project_id, "booli_raw", "geocodes")
-
-        errors = client.insert_rows_json(geocodes_table, new_geocodes)
-        if errors:
-            raise RuntimeError(f"BigQuery geocode insert errors: {errors[:3]}")
-        else:
-            logger.info(f"Uploaded {len(new_geocodes)} geocodes")
+        insert_geocodes(project_id, new_geocodes, approved=approved)
+        logger.info(f"Uploaded {len(new_geocodes)} geocodes")
 
     logger.info(f"Geocoding complete: {geocoded} successful, {failed} failed")
 

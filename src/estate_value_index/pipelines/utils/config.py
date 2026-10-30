@@ -98,6 +98,9 @@ class TrainingFlowConfig:
     # Dry run mode
     dry_run: bool = False
 
+    # Explicit approval for spend and production writes (Vertex, GCS, registry)
+    approved: bool = False
+
 
 @dataclass
 class DeploymentFlowConfig:
@@ -115,3 +118,6 @@ class DeploymentFlowConfig:
     validate: bool = True
     auto_rollback_on_failure: bool = False
     dry_run: bool = False
+
+    # Explicit approval for Cloud Run deploys and rollbacks
+    approved: bool = False

@@ -140,7 +140,9 @@ def validate_listings(file_path: Path, min_validation_rate: float | None = None)
 
 
 @task(name="upload-to-gcs", retries=3, retry_delay_seconds=30)
-def upload_to_gcs(file_path: Path, gcs_path: str = "raw/booli_listings_prod.json") -> str:
+def upload_to_gcs(
+    file_path: Path, gcs_path: str = "raw/booli_listings_prod.json", approved: bool = False
+) -> str:
     """Upload file to GCS, plus a timestamped archive copy."""
     logger = get_run_logger()
 
@@ -150,11 +152,11 @@ def upload_to_gcs(file_path: Path, gcs_path: str = "raw/booli_listings_prod.json
 
     gcs_client = GCSClient()
     logger.info(f"Uploading {file_path} to gs://{gcs_client.bucket_name}/{gcs_path}")
-    gcs_uri = gcs_client.upload_file(file_path, gcs_path)
+    gcs_uri = gcs_client.upload_file(file_path, gcs_path, approved=approved)
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     archive_path = f"raw/archive/booli_listings_{timestamp}.json"
-    gcs_client.upload_file(file_path, archive_path)
+    gcs_client.upload_file(file_path, archive_path, approved=approved)
 
     logger.info(f"Uploaded to {gcs_uri}; archived to gs://{gcs_client.bucket_name}/{archive_path}")
     return gcs_uri
@@ -165,6 +167,7 @@ def ingest_booli_flow(
     max_pages: int = 10,
     upload_to_cloud: bool = True,
     config_file: str | None = None,
+    approved: bool = False,
 ) -> dict:
     """Fetch Booli API listings, validate, and optionally upload to GCS."""
     logger = get_run_logger()
@@ -175,7 +178,7 @@ def ingest_booli_flow(
 
     gcs_uri = None
     if upload_to_cloud:
-        gcs_uri = upload_to_gcs(output_file)
+        gcs_uri = upload_to_gcs(output_file, approved=approved)
 
     results = {
         "output_file": str(output_file),
@@ -233,6 +236,7 @@ def _run_bigquery_upload_stage(
     process_result: dict,
     *,
     upload_to_bq: bool,
+    approved: bool = False,
 ) -> dict | None:
     if not upload_to_bq:
         return None
@@ -241,15 +245,18 @@ def _run_bigquery_upload_stage(
     return upload_to_bigquery_task(
         processed_file=Path(process_result["output_file"]),
         truncate=False,
+        approved=approved,
     )
 
 
-def _run_geocode_stage(logger, geocode_new_addresses_task, *, upload_to_bq: bool) -> dict | None:
+def _run_geocode_stage(
+    logger, geocode_new_addresses_task, *, upload_to_bq: bool, approved: bool = False
+) -> dict | None:
     if not upload_to_bq:
         return None
 
     logger.info("Stage 3.5: Geocoding new addresses")
-    geocode_result = geocode_new_addresses_task(batch_size=200)
+    geocode_result = geocode_new_addresses_task(batch_size=200, approved=approved)
     if geocode_result["new_addresses"] > 0:
         logger.info(
             f"   Geocoded {geocode_result['geocoded']}/{geocode_result['new_addresses']} new addresses"
@@ -284,12 +291,14 @@ def _run_sync_stage(
     return sync_result
 
 
-def _run_gcs_backup_stage(logger, process_result: dict, *, upload_to_cloud: bool) -> str | None:
+def _run_gcs_backup_stage(
+    logger, process_result: dict, *, upload_to_cloud: bool, approved: bool = False
+) -> str | None:
     if not upload_to_cloud:
         return None
 
     logger.info("Stage 6: Uploading to GCS (backup)")
-    return upload_to_gcs(Path(process_result["output_file"]))
+    return upload_to_gcs(Path(process_result["output_file"]), approved=approved)
 
 
 def _complete_ingestion_results(
@@ -342,6 +351,7 @@ def complete_ingestion_flow(
     upload_to_cloud: bool = True,
     sync_after_upload: bool = True,
     config_file: str | None = None,
+    approved: bool = False,
 ) -> dict:
     """Complete ingestion pipeline: Booli API → Process → BigQuery → Features → Sync.
 
@@ -357,6 +367,7 @@ def complete_ingestion_flow(
         upload_to_cloud: Upload to GCS
         sync_after_upload: Sync local file from BigQuery after upload
         config_file: Optional path to config file (e.g., ingestion/config/booli_all_locations.json)
+        approved: Required for the BigQuery and GCS writes
 
     Returns:
         Complete flow results dict
@@ -376,11 +387,13 @@ def complete_ingestion_flow(
         tasks["upload_to_bigquery"],
         process_result,
         upload_to_bq=upload_to_bq,
+        approved=approved,
     )
     geocode_result = _run_geocode_stage(
         logger,
         tasks["geocode_new_addresses"],
         upload_to_bq=upload_to_bq,
+        approved=approved,
     )
     sync_result = _run_sync_stage(
         logger,
@@ -389,7 +402,9 @@ def complete_ingestion_flow(
         sync_after_upload=sync_after_upload,
         upload_to_bq=upload_to_bq,
     )
-    gcs_uri = _run_gcs_backup_stage(logger, process_result, upload_to_cloud=upload_to_cloud)
+    gcs_uri = _run_gcs_backup_stage(
+        logger, process_result, upload_to_cloud=upload_to_cloud, approved=approved
+    )
 
     results = _complete_ingestion_results(
         output_file=output_file,

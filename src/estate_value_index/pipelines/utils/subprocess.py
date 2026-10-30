@@ -1,4 +1,7 @@
-"""Subprocess execution utilities for pipeline tasks."""
+"""The only module that runs external processes (gcloud, gsutil, shell scripts).
+
+Import-linter forbids ``subprocess`` everywhere else (see ``pyproject.toml``).
+"""
 
 import json
 import subprocess
@@ -6,6 +9,27 @@ from pathlib import Path
 from typing import Any
 
 from .logging import get_task_logger
+
+
+def run_process(
+    cmd: list[str],
+    *,
+    timeout: float,
+    cwd: Path | None = None,
+    env: dict[str, str] | None = None,
+    check: bool = False,
+    capture_output: bool = True,
+) -> subprocess.CompletedProcess:
+    """Run a command with text output and return the completed process."""
+    return subprocess.run(
+        cmd,
+        capture_output=capture_output,
+        text=True,
+        timeout=timeout,
+        cwd=cwd,
+        env=env,
+        check=check,
+    )
 
 
 def run_command(
@@ -35,13 +59,7 @@ def run_command(
     """
     logger = get_task_logger(__name__)
 
-    result = subprocess.run(
-        cmd,
-        capture_output=True,
-        text=True,
-        timeout=timeout,
-        cwd=cwd or Path.cwd(),
-    )
+    result = run_process(cmd, timeout=timeout, cwd=cwd or Path.cwd())
 
     if check and result.returncode != 0:
         logger.error(f"{description} failed: {result.stderr}")

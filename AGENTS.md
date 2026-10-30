@@ -1,8 +1,8 @@
 # AGENTS.md
 
 **estate-value-index** predicts Swedish real estate values: authorized listing
-ingestion -> BigQuery -> LightGBM -> Next.js + FastAPI. Python 3.11+ via
-**uv**; Node 20+ for `web/`; Next.js 16; Prefect 3.
+ingestion -> BigQuery -> LightGBM -> Next.js + FastAPI. Python 3.14 via
+**uv**; Node 20 for `web/`; Next.js 16; Prefect 3.
 
 This file is project facts only. Tone, principles, and git etiquette live in
 the user-level `~/.claude/CLAUDE.md` and `~/dotfiles/agents/AGENTS.md`.
@@ -25,7 +25,7 @@ writeups live in `docs/internal/experiments/`.
 ## Rules
 
 - Run Python via `uv run ...` after `uv sync --all-extras`. Never pip, never manual activate.
-- Run `uv run pytest` before commit; `cd web && npm test` for web changes.
+- Run `just check` before commit. CI runs the same recipe.
 - Never commit to `main` directly; branch and PR.
 - Never hand-edit `web/models/` (generated training output).
 - Never use `localStorage` / `sessionStorage` in web code.
@@ -34,13 +34,19 @@ writeups live in `docs/internal/experiments/`.
 - Respect `sold_date` chronology: temporal splits for evaluation, no future
   rows in aggregates. Check: `uv run pytest tests/ml/test_temporal_leakage.py`.
 - Use `--dry-run` on CLIs that support it when the outcome is uncertain.
+- Functions that spend money or write to production refuse unless the caller passes
+  `approved=True` ([src/estate_value_index/utils/approval.py](src/estate_value_index/utils/approval.py)).
+  Never approve a run yourself; the user approves it.
 - If a doc disagrees with code, fix the doc in the same change.
 
 ## Commands
 
 ```bash
-uv sync --all-extras             # create/update the .venv
-uv run pytest                    # tests
+uv sync --all-extras             # create/update the .venv (setup)
+npm ci --prefix web              # install web dependencies (setup)
+just check                       # lint, format check, tests; CI runs the same
+just fix                         # apply safe automatic fixes
+just slow                        # full suite with the coverage gate, plus the route check
 cd web && npm run dev            # app on localhost:3000
 ./scripts/deploy_cloud_run.sh    # deploy (see docs/api-web-deploy.md)
 ```

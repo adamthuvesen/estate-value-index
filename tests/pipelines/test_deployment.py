@@ -120,6 +120,7 @@ class TestCloudRunDeployCommand:
             model_artifacts_gcs_uri="gs://estate-value-index-data-production/models",
             enrichment_gcs_uri="gs://estate-value-index-data-production/derived",
             validate=False,
+            approved=True,
         )
 
         deploy_cmd = next(cmd for cmd in calls if cmd[:3] == ["gcloud", "run", "deploy"])
@@ -388,6 +389,7 @@ class TestValidateDeployment:
             model_artifacts_gcs_uri="gs://bucket/models",
             enrichment_gcs_uri="gs://bucket/derived",
             validate=True,
+            approved=True,
         )
 
         assert result["success"] is True

@@ -82,6 +82,7 @@ from estate_value_index.model_artifacts import (
     NO_LIST_MODEL_ID,
     production_artifact_names,
 )
+from estate_value_index.utils.approval import require_approval
 from estate_value_index.utils.gcs import (
     is_gcs_enabled,
     upload_model_artifacts,
@@ -290,6 +291,43 @@ def load_raw_training_frame(
     return load_training_dataframe(data_source=data_source, data_file=data_file)
 
 
+def _require_upload_approval(approved: bool) -> None:
+    if is_gcs_enabled():
+        require_approval("upload model artifacts to GCS", approved)
+
+
+def train_from_data_source(
+    *,
+    data_source: str,
+    data_file: str | Path | None,
+    model_dir: Path,
+    model_prefix: str = DEFAULT_MODEL_PREFIX,
+    no_list_feature_set: str = DEFAULT_NO_LIST_FEATURE_SET,
+    listing_feature_set: str = DEFAULT_LISTING_FEATURE_SET,
+    n_splits: int = 4,
+    random_state: int | None = None,
+    tune: bool = False,
+    approved: bool = False,
+) -> dict[str, ProductionTrainingResult]:
+    """Load training rows from ``data_source`` and train both production models."""
+    _require_upload_approval(approved)
+    specs = production_specs(
+        no_list_feature_set=no_list_feature_set,
+        listing_feature_set=listing_feature_set,
+    )
+    raw_frame = load_raw_training_frame(data_source=data_source, data_file=data_file)
+    return train_and_persist_production_models(
+        raw_frame=raw_frame,
+        model_dir=model_dir,
+        model_prefix=model_prefix,
+        specs=specs,
+        n_splits=n_splits,
+        random_state=random_state,
+        tune=tune,
+        approved=approved,
+    )
+
+
 def train_and_persist_production_models(
     *,
     raw_frame: pd.DataFrame,
@@ -299,8 +337,14 @@ def train_and_persist_production_models(
     n_splits: int = 4,
     random_state: int | None = None,
     tune: bool = False,
+    approved: bool = False,
 ) -> dict[str, ProductionTrainingResult]:
-    """Run temporal evaluation, refit on all rows, and persist both models."""
+    """Run temporal evaluation, refit on all rows, and persist both models.
+
+    With GCS enabled the artifacts are uploaded where serving reads them, so
+    ``approved`` must be true. The check runs first so training time is not wasted.
+    """
+    _require_upload_approval(approved)
     resolved_specs = specs or production_specs()
     for spec in resolved_specs:
         _validate_production_spec(spec)
@@ -365,6 +409,7 @@ def train_and_persist_production_models(
             model_dir=model_dir,
             model_prefix=model_prefix,
             metrics=metrics,
+            approved=approved,
         )
         results[spec.model_id] = ProductionTrainingResult(
             model=production_model,
@@ -544,6 +589,7 @@ def persist_production_model(
     model_dir: Path,
     model_prefix: str,
     metrics: dict[str, object],
+    approved: bool = False,
 ) -> dict[str, str]:
     names = production_artifact_names(model.model_id, model_prefix)
     model_path = model_dir / names.model
@@ -564,7 +610,7 @@ def persist_production_model(
     )
 
     if is_gcs_enabled():
-        upload_model_artifacts(model_dir, names.stem)
+        upload_model_artifacts(model_dir, names.stem, approved=approved)
 
     return {
         "model": str(model_path),

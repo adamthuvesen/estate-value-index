@@ -33,6 +33,11 @@ on:
         description: 'Commit SHA of trained model (leave empty for current commit)'
         required: false
         type: string
+      approved:
+        description: 'Approve the image push and the Cloud Run deploy'
+        required: true
+        default: false
+        type: boolean
 
 jobs:
   deploy:
@@ -50,8 +55,12 @@ jobs:
       id-token: write
 
     steps:
+      - name: Require approval
+        run: |
+          test "${{ inputs.approved }}" = "true" || { echo "Refused: deploy needs the approved input set to true"; exit 1; }
+
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Validate environment configuration
         run: |
@@ -61,13 +70,13 @@ jobs:
           test -n "${GCS_BUCKET}" || { echo "GCS_BUCKET environment variable is required"; exit 1; }
 
       - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v2
+        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2.1.13
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
       - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v2
+        uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f # v2.2.1
 
       # NOTE: Models are now loaded at container runtime from GCS (see scripts/startup.sh)
       # No need to download models during build - they're fetched when the container starts

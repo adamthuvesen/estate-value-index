@@ -7,7 +7,7 @@ from .config import (
     get_bq_config,
 )
 from .logging import get_task_logger
-from .subprocess import run_command
+from .subprocess import run_command, run_process
 
 __all__ = [
     "BigQueryConfig",
@@ -16,4 +16,5 @@ __all__ = [
     "get_bq_config",
     "get_task_logger",
     "run_command",
+    "run_process",
 ]

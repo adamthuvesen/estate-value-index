@@ -8,6 +8,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from estate_value_index.exceptions import ConfigurationError
+from estate_value_index.utils.approval import require_approval
 from estate_value_index.utils.settings import is_gcs_enabled
 
 logger = logging.getLogger(__name__)
@@ -66,12 +67,13 @@ class GCSClient:
             except Exception as exc:
                 raise RuntimeError(f"Failed to initialize GCS client: {exc}") from exc
 
-    def upload_file(self, local_path: str | Path, gcs_path: str) -> str:
+    def upload_file(self, local_path: str | Path, gcs_path: str, *, approved: bool = False) -> str:
         """Upload a local file to GCS. Returns the GCS URI (or the local path when disabled)."""
         local_path = Path(local_path)
         if not self.enabled:
             return str(local_path)
 
+        require_approval(f"upload {local_path.name} to GCS", approved)
         blob = self._bucket.blob(gcs_path)
         blob.upload_from_filename(str(local_path))
         gcs_uri = f"gs://{self.bucket_name}/{gcs_path}"
@@ -123,8 +125,11 @@ def upload_blob(
     bucket_name: str,
     source_file_name: str,
     destination_blob_name: str,
+    *,
+    approved: bool = False,
 ) -> None:
     """Upload a file to a GCS bucket using a fresh client."""
+    require_approval(f"upload {destination_blob_name} to GCS", approved)
     from estate_value_index.utils.clients import get_storage_client
 
     bucket = get_storage_client().bucket(bucket_name)
@@ -135,8 +140,11 @@ def upload_html_to_gcs(
     html_content: str,
     bucket_name: str,
     destination_blob_name: str,
+    *,
+    approved: bool = False,
 ) -> None:
     """Upload an HTML string to a GCS bucket as ``text/html``."""
+    require_approval(f"upload {destination_blob_name} to GCS", approved)
     from estate_value_index.utils.clients import get_storage_client
 
     bucket = get_storage_client().bucket(bucket_name)
@@ -186,6 +194,7 @@ def _upload_joblib_with_sidecar(
     key: str,
     resolved_prefix: str,
     artifacts: dict[str, str],
+    approved: bool,
 ) -> None:
     sidecar_path = write_sha256_sidecar(local_file)
     sidecar_dest = _destination_path(resolved_prefix, sidecar_path.name)
@@ -193,8 +202,8 @@ def _upload_joblib_with_sidecar(
 
     uploaded_artefact_uri: str | None = None
     try:
-        uploaded_artefact_uri = client.upload_file(local_file, artefact_dest)
-        client.upload_file(sidecar_path, sidecar_dest)
+        uploaded_artefact_uri = client.upload_file(local_file, artefact_dest, approved=approved)
+        client.upload_file(sidecar_path, sidecar_dest, approved=approved)
     except Exception:
         if uploaded_artefact_uri is not None:
             _rollback_partial_upload(client, artefact_dest)
@@ -210,6 +219,7 @@ def _upload_json_model_artifacts(
     model_prefix: str,
     resolved_prefix: str,
     artifacts: dict[str, str],
+    approved: bool,
 ) -> None:
     for key, suffix in (
         ("context", "_feature_context.json"),
@@ -218,11 +228,17 @@ def _upload_json_model_artifacts(
     ):
         path = model_dir / f"{model_prefix}{suffix}"
         if path.exists():
-            artifacts[key] = client.upload_file(path, _destination_path(resolved_prefix, path.name))
+            artifacts[key] = client.upload_file(
+                path, _destination_path(resolved_prefix, path.name), approved=approved
+            )
 
 
 def upload_model_artifacts(
-    model_dir: str | Path, model_prefix: str, gcs_prefix: str = "models"
+    model_dir: str | Path,
+    model_prefix: str,
+    gcs_prefix: str = "models",
+    *,
+    approved: bool = False,
 ) -> dict[str, str]:
     """Upload model artifacts to GCS, returning a map of ``{kind: gs:// URI}``."""
     model_dir = Path(model_dir)
@@ -230,6 +246,8 @@ def upload_model_artifacts(
     if not is_gcs_enabled():
         logger.info("GCS disabled, skipping upload")
         return {}
+
+    require_approval("upload model artifacts to GCS", approved)
 
     resolved_bucket, resolved_prefix = _resolve_model_artifact_destination(gcs_prefix)
 
@@ -241,8 +259,12 @@ def upload_model_artifacts(
         if not model_file.exists():
             raise FileNotFoundError(f"Model artifact not found: {model_file}")
 
-        _upload_joblib_with_sidecar(client, model_file, "model", resolved_prefix, artifacts)
-        _upload_json_model_artifacts(client, model_dir, model_prefix, resolved_prefix, artifacts)
+        _upload_joblib_with_sidecar(
+            client, model_file, "model", resolved_prefix, artifacts, approved
+        )
+        _upload_json_model_artifacts(
+            client, model_dir, model_prefix, resolved_prefix, artifacts, approved
+        )
 
         return artifacts
 

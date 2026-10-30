@@ -35,6 +35,7 @@ def test_data_collection_stage_uses_empty_config_and_dry_run_flags(monkeypatch):
         "upload_to_cloud": False,
         "sync_after_upload": False,
         "config_file": "",
+        "approved": False,
     }
     assert results["stages"]["data_collection"]["processing"]["total_listings"] == 10
 
@@ -122,6 +123,7 @@ def test_deployment_stage_uses_training_uri_or_bucket_fallback(monkeypatch):
         "model_artifacts_gcs_uri": "gs://model-bucket/models/",
         "enrichment_gcs_uri": "gs://model-bucket/derived/",
         "validate": False,
+        "approved": False,
     }
     assert results["stages"]["deployment"] == {
         "success": True,

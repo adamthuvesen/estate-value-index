@@ -1,8 +1,10 @@
 from types import SimpleNamespace
 
 import pandas as pd
+import pytest
 
 from estate_value_index.cli import train_production_models
+from estate_value_index.ml import production_models
 from estate_value_index.model_artifacts import LISTING_MODEL_ID, NO_LIST_MODEL_ID
 
 
@@ -11,7 +13,7 @@ def test_local_training_cli_requests_both_production_models(monkeypatch, tmp_pat
     captured = {}
 
     monkeypatch.setattr(
-        train_production_models,
+        production_models,
         "load_raw_training_frame",
         lambda **kwargs: raw_frame,
     )
@@ -25,7 +27,7 @@ def test_local_training_cli_requests_both_production_models(monkeypatch, tmp_pat
         return {NO_LIST_MODEL_ID: result, LISTING_MODEL_ID: result}
 
     monkeypatch.setattr(
-        train_production_models,
+        production_models,
         "train_and_persist_production_models",
         fake_train,
     )
@@ -46,4 +48,20 @@ def test_local_training_cli_requests_both_production_models(monkeypatch, tmp_pat
     assert captured["raw_frame"] is raw_frame
     assert captured["model_dir"] == tmp_path
     assert captured["tune"] is True
+    assert captured["approved"] is False
     assert [spec.model_id for spec in captured["specs"]] == [NO_LIST_MODEL_ID, LISTING_MODEL_ID]
+
+
+def test_approved_flag_is_forwarded_to_training(monkeypatch, tmp_path) -> None:
+    captured = {}
+
+    def fake_train(**kwargs):
+        captured.update(kwargs)
+        raise SystemExit(0)
+
+    monkeypatch.setattr(train_production_models, "train_from_data_source", fake_train)
+
+    with pytest.raises(SystemExit):
+        train_production_models.main(["--model-dir", str(tmp_path), "--approved"])
+
+    assert captured["approved"] is True

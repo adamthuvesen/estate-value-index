@@ -7,9 +7,79 @@ on:
     branches: [main, develop]
 
 jobs:
+  check:
+    name: check
+    runs-on: ubuntu-latest
+    # Skip CI if commit message contains [skip ci], [ci skip], or [no ci]
+    if: "!contains(github.event.head_commit.message, '[skip ci]') && !contains(github.event.head_commit.message, '[ci skip]') && !contains(github.event.head_commit.message, '[no ci]')"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          version: "0.13.7"
+          enable-cache: true
+
+      - name: Install just
+        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0
+        with:
+          just-version: "1.59.0"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: web/.nvmrc
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install web dependencies
+        run: npm ci --prefix web
+
+      - name: Check
+        run: just check
+
+  slow:
+    name: slow
+    runs-on: ubuntu-latest
+    needs: check
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          version: "0.13.7"
+          enable-cache: true
+
+      - name: Install just
+        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0
+        with:
+          just-version: "1.59.0"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: web/.nvmrc
+
+      - name: Slow checks
+        run: just slow
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: coverage-report
+          path: htmlcov/
+
   changes:
     name: Detect changed paths
     runs-on: ubuntu-latest
+    needs: check
     permissions:
       contents: read
       pull-requests: read
@@ -17,8 +87,8 @@ jobs:
       web_docker: ${{ steps.filter.outputs.web_docker }}
       trainer_docker: ${{ steps.filter.outputs.trainer_docker }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: dorny/paths-filter@0e4a8c6effa4802afeda77dc8d303f8176d7dfad # v3.0.4
         id: filter
         with:
           filters: |
@@ -38,104 +108,22 @@ jobs:
               - 'src/**'
               - '.github/workflows/ci.yml'
 
-  python-tests:
-    name: Python Tests & Linting
-    runs-on: ubuntu-latest
-    # Skip CI if commit message contains [skip ci], [ci skip], or [no ci]
-    if: "!contains(github.event.head_commit.message, '[skip ci]') && !contains(github.event.head_commit.message, '[ci skip]') && !contains(github.event.head_commit.message, '[no ci]')"
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v8.1.0
-        with:
-          enable-cache: true
-
-      - name: Install dependencies
-        run: uv sync --all-extras
-
-      - name: Ruff check
-        run: uv run ruff check .
-
-      - name: Ruff format
-        run: uv run ruff format --check .
-
-      - name: Run tests with coverage
-        run: |
-          uv run pytest tests/ -v \
-            --cov=estate_value_index \
-            --cov-report=term-missing \
-            --cov-report=html
-        env:
-          GCS_ENABLED: "false"
-          GCP_PROJECT_ID: "test-project"
-          BIGQUERY_PROJECT_ID: "test-project"
-
-      - name: Upload coverage report
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: coverage-report
-          path: htmlcov/
-
-  typescript-tests:
-    name: TypeScript Tests & Linting
-    runs-on: ubuntu-latest
-    # Skip CI if commit message contains [skip ci], [ci skip], or [no ci]
-    if: "!contains(github.event.head_commit.message, '[skip ci]') && !contains(github.event.head_commit.message, '[ci skip]') && !contains(github.event.head_commit.message, '[no ci]')"
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js 20
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: web/package-lock.json
-
-      - name: Install dependencies
-        working-directory: web
-        run: npm ci
-
-      - name: Run linter
-        working-directory: web
-        run: npm run lint
-
-      - name: Run tests
-        working-directory: web
-        run: npm test
-        env:
-          CI: true
-
-      - name: Type check
-        working-directory: web
-        run: npx tsc --noEmit
-
   web-dockerfile-validation:
     name: Build Web App Dockerfile
     runs-on: ubuntu-latest
-    needs: changes
+    needs: [check, changes]
     # Skip when no web image-relevant files changed, or when the commit message asks to skip CI.
     if: "needs.changes.outputs.web_docker == 'true' && !contains(github.event.head_commit.message, '[skip ci]') && !contains(github.event.head_commit.message, '[ci skip]') && !contains(github.event.head_commit.message, '[no ci]')"
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
       - name: Build Web App Dockerfile
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5.4.0
         with:
           context: .
           file: ./Dockerfile
@@ -147,19 +135,19 @@ jobs:
   trainer-dockerfile-validation:
     name: Build Training Container Dockerfile
     runs-on: ubuntu-latest
-    needs: changes
+    needs: [check, changes]
     # Skip when no training image-relevant files changed, or when the commit message asks to skip CI.
     if: "needs.changes.outputs.trainer_docker == 'true' && !contains(github.event.head_commit.message, '[skip ci]') && !contains(github.event.head_commit.message, '[ci skip]') && !contains(github.event.head_commit.message, '[no ci]')"
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
       - name: Build Training Container Dockerfile
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5.4.0
         with:
           context: .
           file: ./vertex_ai/Dockerfile

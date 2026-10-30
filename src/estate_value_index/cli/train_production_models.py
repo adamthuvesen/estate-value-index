@@ -10,9 +10,7 @@ from estate_value_index.ml.production_models import (
     DEFAULT_LISTING_FEATURE_SET,
     DEFAULT_MODEL_PREFIX,
     DEFAULT_NO_LIST_FEATURE_SET,
-    load_raw_training_frame,
-    production_specs,
-    train_and_persist_production_models,
+    train_from_data_source,
 )
 
 
@@ -37,21 +35,24 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--random-state", type=int, default=None)
     parser.add_argument("--summary", type=Path, default=None)
+    parser.add_argument(
+        "--approved",
+        action="store_true",
+        help="Allow the GCS model-artifact upload that production serving reads.",
+    )
     args = parser.parse_args(argv)
 
-    specs = production_specs(
-        no_list_feature_set=args.no_list_feature_set,
-        listing_feature_set=args.listing_feature_set,
-    )
-    raw_frame = load_raw_training_frame(data_source=args.data_source, data_file=args.data_file)
-    results = train_and_persist_production_models(
-        raw_frame=raw_frame,
+    results = train_from_data_source(
+        data_source=args.data_source,
+        data_file=args.data_file,
         model_dir=args.model_dir,
         model_prefix=args.model_prefix,
-        specs=specs,
+        no_list_feature_set=args.no_list_feature_set,
+        listing_feature_set=args.listing_feature_set,
         n_splits=args.n_splits,
         random_state=args.random_state,
         tune=args.tune,
+        approved=args.approved,
     )
 
     summary = {

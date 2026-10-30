@@ -58,6 +58,11 @@ on:
         required: false
         default: false
         type: boolean
+      approved:
+        description: 'Approve spend and production writes (BigQuery, Vertex AI, GCS, Cloud Run); a local run without deploy does not need it'
+        required: true
+        default: false
+        type: boolean
 jobs:
   ml-pipeline:
     name: Run ML Pipeline
@@ -85,17 +90,27 @@ jobs:
       id-token: write
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Require approval
+        run: |
+          spends=false
+          if [ "${{ inputs.mode }}" != "local" ] || [ "${{ inputs.deploy }}" = "true" ]; then spends=true; fi
+          if [ "$spends" = "true" ] && [ "${{ inputs.approved }}" != "true" ]; then
+            echo "Refused: this run spends money or writes to production and needs the approved input set to true"
+            exit 1
+          fi
 
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
-          python-version: '3.11'
+          python-version-file: .python-version
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v8.1.0
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
+          version: "0.13.7"
           enable-cache: true
 
       - name: Install dependencies
@@ -113,13 +128,13 @@ jobs:
           fi
 
       - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v2
+        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2.1.13
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
       - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v2
+        uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f # v2.2.1
 
       - name: Validate BigQuery access
         run: |
@@ -141,6 +156,7 @@ jobs:
           TUNE="${{ inputs.tune }}"
           REBUILD="${{ inputs.rebuild_container }}"
           DEPLOY="${{ inputs.deploy }}"
+          APPROVED="${{ inputs.approved }}"
           MAX_PAGES="${{ inputs.max_pages }}"
           CONFIG_FILE="${{ inputs.config_file }}"
 
@@ -148,6 +164,7 @@ jobs:
           echo "tune=$TUNE" >> $GITHUB_OUTPUT
           echo "rebuild=$REBUILD" >> $GITHUB_OUTPUT
           echo "deploy=$DEPLOY" >> $GITHUB_OUTPUT
+          echo "approved=$APPROVED" >> $GITHUB_OUTPUT
           echo "max_pages=$MAX_PAGES" >> $GITHUB_OUTPUT
           echo "config_file=$CONFIG_FILE" >> $GITHUB_OUTPUT
 
@@ -172,6 +189,7 @@ jobs:
           tune = '${{ steps.params.outputs.tune }}'.lower() == 'true'
           rebuild = '${{ steps.params.outputs.rebuild }}'.lower() == 'true'
           deploy = '${{ steps.params.outputs.deploy }}'.lower() == 'true'
+          approved = '${{ steps.params.outputs.approved }}'.lower() == 'true'
           max_pages = int('${{ steps.params.outputs.max_pages }}')
           config_file = '${{ steps.params.outputs.config_file }}'
 
@@ -205,7 +223,7 @@ jobs:
               rebuild_container=rebuild,
               deploy_to_prod=deploy,
               validate_deployment=True,
-              dry_run=False
+              approved=approved
           )
 
           # Check results
@@ -248,7 +266,7 @@ jobs:
 
       - name: Upload pipeline logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: pipeline-logs-${{ github.run_number }}
           path: |
@@ -259,7 +277,7 @@ jobs:
 
       - name: Upload model artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: model-artifacts-${{ github.sha }}
           path: |

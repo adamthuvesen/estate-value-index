@@ -322,7 +322,9 @@ class TestPromoteModelToProduction:
             side_effect=lambda cmd, *a, **k: copied.append(cmd),
         )
 
-        promote_model_to_production_task.fn("gs://test-bucket/vertex-ai/models/20260706-160501")
+        promote_model_to_production_task.fn(
+            "gs://test-bucket/vertex-ai/models/20260706-160501", approved=True
+        )
 
         dests = [cmd[-1] for cmd in copied if "cp" in cmd]
         assert any(d.endswith(production_artifact_names(NO_LIST_MODEL_ID).model) for d in dests)

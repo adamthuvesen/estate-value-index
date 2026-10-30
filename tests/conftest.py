@@ -1,7 +1,12 @@
 """Shared test fixtures and utilities for the Swedish real estate prediction system."""
 
+import os
 import sys
 from pathlib import Path
+
+# Fake project IDs so tests that build BigQuery queries run in a fresh clone.
+os.environ.setdefault("GCP_PROJECT_ID", "test-project")
+os.environ.setdefault("BIGQUERY_PROJECT_ID", "test-project")
 
 # Add project root to Python path
 project_root = Path(__file__).parent.parent
@@ -320,12 +325,12 @@ def temp_data_dir_with_files():
 
     # Single JSON file
     json_file = temp_path / "test_listings.json"
-    with open(json_file, "w") as f:
+    with Path(json_file).open("w") as f:
         json.dump(sample_data, f)
 
     # JSONL file (one JSON per line)
     jsonl_file = temp_path / "test_listings.jsonl"
-    with open(jsonl_file, "w") as f:
+    with Path(jsonl_file).open("w") as f:
         for record in sample_data:
             f.write(json.dumps(record) + "\n")
 

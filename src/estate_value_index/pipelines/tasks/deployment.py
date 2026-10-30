@@ -2,7 +2,6 @@
 
 import json
 import os
-import subprocess
 import time
 from datetime import datetime
 from logging import Logger
@@ -17,7 +16,8 @@ from estate_value_index.model_artifacts import (
     production_artifact_names,
 )
 from estate_value_index.pipelines.types import DeploymentResult, HealthCheckResult
-from estate_value_index.pipelines.utils import get_task_logger
+from estate_value_index.pipelines.utils import get_task_logger, run_process
+from estate_value_index.utils.approval import require_approval
 from estate_value_index.utils.clients import get_bq_client, get_storage_client
 from estate_value_index.utils.gcs import get_gcs_bucket
 
@@ -77,12 +77,7 @@ def _describe_service(
         ]
         if project_id:
             cmd.extend(["--project", project_id])
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
+        result = run_process(cmd, timeout=30)
     except Exception:
         return None
     if result.returncode != 0:
@@ -186,7 +181,7 @@ def _validate_deployment(
 
 
 def _assert_runtime_service_account_exists(runtime_service_account: str) -> None:
-    result = subprocess.run(
+    result = run_process(
         [
             "gcloud",
             "iam",
@@ -194,8 +189,6 @@ def _assert_runtime_service_account_exists(runtime_service_account: str) -> None
             "describe",
             runtime_service_account,
         ],
-        capture_output=True,
-        text=True,
         timeout=30,
     )
     if result.returncode != 0:
@@ -206,25 +199,19 @@ def _assert_runtime_service_account_exists(runtime_service_account: str) -> None
         )
 
 
-# --- Tasks ---
+# --- Deploy and rollback ---
 
 
-@task(
-    name="deploy-to-cloud-run",
-    description="Deploy to Cloud Run",
-    retries=2,
-    retry_delay_seconds=30,
-    timeout_seconds=1800,
-)
-def deploy_to_cloud_run_task(
+def deploy_to_cloud_run(
     model_artifacts_gcs_uri: str,
     enrichment_gcs_uri: str,
     service_name: str | None = None,
     region: str | None = None,
     validate: bool = True,
     dry_run: bool = False,
+    approved: bool = False,
 ) -> DeploymentResult:
-    """Deploy new model to Cloud Run.
+    """Deploy to Cloud Run (``gcloud run deploy``).
 
     Args:
         model_artifacts_gcs_uri: GCS URI for model artifacts
@@ -232,11 +219,15 @@ def deploy_to_cloud_run_task(
         service_name: Cloud Run service name
         region: GCP region
         validate: Run health check after deployment
-        dry_run: Simulate without actual deployment
+        dry_run: Return a placeholder result without deploying; needs no approval
+        approved: Required for a real deploy
 
     Returns:
         DeploymentResult with deployment status
     """
+    if not dry_run:
+        require_approval("deploy to Cloud Run", approved)
+
     logger = get_task_logger(__name__)
 
     service_name = service_name or os.getenv("CLOUD_RUN_SERVICE_NAME", "estate-value-index-app")
@@ -295,13 +286,7 @@ def deploy_to_cloud_run_task(
         "--quiet",
     ]
 
-    result = subprocess.run(
-        deploy_cmd,
-        capture_output=True,
-        text=True,
-        timeout=1800,
-        cwd=Path.cwd(),
-    )
+    result = run_process(deploy_cmd, timeout=1800, cwd=Path.cwd())
 
     if result.returncode != 0:
         logger.error(f"Deployment failed: {result.stderr}")
@@ -329,27 +314,51 @@ def deploy_to_cloud_run_task(
 
 
 @task(
-    name="rollback-deployment",
-    description="Rollback to previous Cloud Run revision",
-    retries=1,
-    retry_delay_seconds=10,
-    timeout_seconds=120,
+    name="deploy-to-cloud-run",
+    description="Deploy to Cloud Run",
+    retries=2,
+    retry_delay_seconds=30,
+    timeout_seconds=1800,
 )
-def rollback_deployment_task(
+def deploy_to_cloud_run_task(
+    model_artifacts_gcs_uri: str,
+    enrichment_gcs_uri: str,
+    service_name: str | None = None,
+    region: str | None = None,
+    validate: bool = True,
+    dry_run: bool = False,
+    approved: bool = False,
+) -> DeploymentResult:
+    return deploy_to_cloud_run(
+        model_artifacts_gcs_uri,
+        enrichment_gcs_uri,
+        service_name,
+        region,
+        validate,
+        dry_run,
+        approved,
+    )
+
+
+def rollback_deployment(
     previous_revision: str,
     service_name: str | None = None,
     region: str | None = None,
+    approved: bool = False,
 ) -> dict:
-    """Rollback to previous Cloud Run revision.
+    """Move all Cloud Run traffic back to ``previous_revision``.
 
     Args:
         previous_revision: Previous revision identifier
         service_name: Cloud Run service name
         region: GCP region
+        approved: Required
 
     Returns:
         Rollback result
     """
+    require_approval("roll back Cloud Run traffic", approved)
+
     logger = get_task_logger(__name__)
 
     service_name = service_name or os.getenv("CLOUD_RUN_SERVICE_NAME", "estate-value-index-app")
@@ -360,7 +369,7 @@ def rollback_deployment_task(
 
     current_revision = _get_current_revision(service_name, region, project_id)
 
-    result = subprocess.run(
+    result = run_process(
         [
             "gcloud",
             "run",
@@ -375,8 +384,6 @@ def rollback_deployment_task(
             project_id,
             "--quiet",
         ],
-        capture_output=True,
-        text=True,
         timeout=60,
     )
 
@@ -394,6 +401,25 @@ def rollback_deployment_task(
         "active_revision": active_revision,
         "timestamp": datetime.now().isoformat(),
     }
+
+
+@task(
+    name="rollback-deployment",
+    description="Rollback to previous Cloud Run revision",
+    retries=1,
+    retry_delay_seconds=10,
+    timeout_seconds=120,
+)
+def rollback_deployment_task(
+    previous_revision: str,
+    service_name: str | None = None,
+    region: str | None = None,
+    approved: bool = False,
+) -> dict:
+    return rollback_deployment(previous_revision, service_name, region, approved)
+
+
+# --- Tasks ---
 
 
 @task(

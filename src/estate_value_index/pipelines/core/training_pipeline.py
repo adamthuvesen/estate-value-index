@@ -10,10 +10,8 @@ This flow manages the complete ML pipeline using Vertex AI Custom Training Jobs:
 6. (Optional) Register to Vertex AI Model Registry
 """
 
-import io
 import json
 import sys
-from contextlib import redirect_stdout
 from dataclasses import dataclass, field
 from datetime import datetime
 from logging import Logger
@@ -21,7 +19,7 @@ from pathlib import Path
 
 from prefect import flow, get_run_logger
 
-from estate_value_index.cli.train_production_models import main as train_production_models_main
+from estate_value_index.ml.production_models import train_from_data_source
 from estate_value_index.model_artifacts import (
     DEFAULT_MODEL_PREFIX,
     NO_LIST_MODEL_ID,
@@ -91,23 +89,14 @@ def _run_local_training(config: TrainingFlowConfig, results: dict, logger: Logge
     logger.info("Using local data file: %s", data_file)
 
     try:
-        stdout_capture = io.StringIO()
-        with redirect_stdout(stdout_capture):
-            training_args = [
-                "--data-source",
-                "json",
-                "--data-file",
-                str(data_file),
-                "--model-dir",
-                config.local_model_dir,
-                "--model-prefix",
-                config.model_prefix,
-            ]
-            if config.tune:
-                training_args.append("--tune")
-            exit_code = train_production_models_main(training_args)
-        if exit_code != 0:
-            raise RuntimeError(f"train-production-models exited with code {exit_code}")
+        train_from_data_source(
+            data_source="json",
+            data_file=data_file,
+            model_dir=Path(config.local_model_dir),
+            model_prefix=config.model_prefix,
+            tune=config.tune,
+            approved=config.approved,
+        )
 
         logger.info("Production model training completed")
         training_results = {"success": True, "method": "local_production_cli"}
@@ -158,7 +147,7 @@ def _rebuild_container_stage(config: TrainingFlowConfig, results: dict, logger: 
         logger.info("-" * 80)
 
         if not config.dry_run:
-            build_results = rebuild_container_task(dry_run=config.dry_run)
+            build_results = rebuild_container_task(dry_run=config.dry_run, approved=config.approved)
             results["steps"]["rebuild_container"] = build_results
 
             if build_results.get("image_uri"):
@@ -191,6 +180,7 @@ def _submit_training_job_stage(
         image_uri=(results.get("steps", {}).get("rebuild_container", {}).get("image_uri")),
         tune=config.tune,
         dry_run=config.dry_run,
+        approved=config.approved,
     )
     results["steps"]["submit_job"] = submission_results
 
@@ -425,6 +415,7 @@ def _validate_and_promote_stage(
             try:
                 promotion_results = promote_model_to_production_task(
                     model_uri=state.model_uri,
+                    approved=config.approved,
                 )
                 results["steps"]["promotion"] = promotion_results
                 logger.info(f"Promoted to: {promotion_results['production_path']}")
@@ -512,6 +503,7 @@ def _generate_enrichment_stage(config: TrainingFlowConfig, results: dict, logger
             local_dir=Path("data/derived"),
             gcs_bucket=get_gcs_bucket(),
             gcs_prefix="derived/",
+            approved=config.approved,
         )
         results["steps"]["enrichment_upload"] = enrichment_upload_result
         logger.info(
@@ -532,7 +524,10 @@ def _register_model_stage(
         logger.info("-" * 80)
 
         registry_results = register_model_to_vertex_task(
-            model_uri=state.model_uri, display_name=f"lgbm-{state.run_id}", region="europe-north1"
+            model_uri=state.model_uri,
+            display_name=f"lgbm-{state.run_id}",
+            region="europe-north1",
+            approved=config.approved,
         )
         results["steps"]["register_model"] = registry_results
 
@@ -649,7 +644,7 @@ def vertex_training_flow(config: TrainingFlowConfig | None = None) -> dict:
 
 
 @flow(name="Estate Value Index Vertex AI Training - Quick Run")
-def quick_vertex_training_flow(tune: bool = False) -> dict:
+def quick_vertex_training_flow(tune: bool = False, approved: bool = False) -> dict:
     """
     Simplified flow for quick training runs.
 
@@ -672,6 +667,7 @@ def quick_vertex_training_flow(tune: bool = False) -> dict:
         register_to_vertex=False,
         stream_logs=True,
         use_vertex=True,
+        approved=approved,
     )
     return vertex_training_flow(config)
 
@@ -681,6 +677,7 @@ def production_vertex_training_flow(
     rebuild: bool = False,
     register: bool = True,
     tune: bool = False,
+    approved: bool = False,
 ) -> dict:
     """
     Production flow with full validation and registration.
@@ -708,6 +705,7 @@ def production_vertex_training_flow(
         stream_logs=True,
         use_vertex=True,
         max_median_ape=DEFAULT_MEDIAN_APE_THRESHOLD,
+        approved=approved,
     )
     return vertex_training_flow(config)
 
@@ -716,23 +714,26 @@ if __name__ == "__main__":
     import sys
 
     # Simple CLI for testing
+    approved = "--approved" in sys.argv[1:]
     if len(sys.argv) > 1 and sys.argv[1] == "--dry-run":
         print("Running in DRY RUN mode...")
         config = TrainingFlowConfig(tune=False, dry_run=True, use_vertex=True)
         result = vertex_training_flow(config)
     elif len(sys.argv) > 1 and sys.argv[1] == "--local":
         print("Running LOCAL training...")
-        config = TrainingFlowConfig(tune=False, use_vertex=False)
+        config = TrainingFlowConfig(tune=False, use_vertex=False, approved=approved)
         result = vertex_training_flow(config)
     elif len(sys.argv) > 1 and sys.argv[1] == "--quick":
         print("Running QUICK Vertex AI training...")
-        result = quick_vertex_training_flow(tune=False)
+        result = quick_vertex_training_flow(tune=False, approved=approved)
     elif len(sys.argv) > 1 and sys.argv[1] == "--production":
         print("Running PRODUCTION Vertex AI training...")
-        result = production_vertex_training_flow(rebuild=False, register=False)
+        result = production_vertex_training_flow(rebuild=False, register=False, approved=approved)
     else:
         print("Running STANDARD Vertex AI training...")
-        config = TrainingFlowConfig(tune=False, machine_type="n1-standard-4", use_vertex=True)
+        config = TrainingFlowConfig(
+            tune=False, machine_type="n1-standard-4", use_vertex=True, approved=approved
+        )
         result = vertex_training_flow(config)
 
     # Print results

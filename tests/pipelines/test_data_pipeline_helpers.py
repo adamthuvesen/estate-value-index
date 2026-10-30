@@ -48,7 +48,7 @@ def test_geocode_stage_is_skipped_without_bigquery_upload():
 
 
 def test_geocode_stage_raises_failure():
-    def fail_geocode(batch_size):
+    def fail_geocode(batch_size, approved):
         raise RuntimeError(f"nope at {batch_size}")
 
     with pytest.raises(RuntimeError, match="nope at 200"):

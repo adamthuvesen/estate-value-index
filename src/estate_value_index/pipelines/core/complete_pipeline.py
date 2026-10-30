@@ -88,6 +88,7 @@ def _run_data_collection_stage(
     skip_ingestion: bool,
     config_file: str | None,
     dry_run: bool,
+    approved: bool = False,
 ) -> None:
     if skip_ingestion:
         logger.info("Stage 1: Skipped (using existing data)")
@@ -106,13 +107,16 @@ def _run_data_collection_stage(
         upload_to_cloud=False,
         sync_after_upload=False,
         config_file=config_path,
+        approved=approved,
     )
 
     results["stages"]["data_collection"] = ingestion_result
     _log_data_collection_summary(logger, ingestion_result)
 
 
-def _run_sync_stage(logger: Any, results: dict[str, Any], *, dry_run: bool) -> None:
+def _run_sync_stage(
+    logger: Any, results: dict[str, Any], *, dry_run: bool, approved: bool = False
+) -> None:
     if dry_run:
         logger.info("Sync: Skipped (dry_run)")
         results["stages"]["sync"] = {"skipped": True, "reason": "dry_run=True"}
@@ -126,7 +130,7 @@ def _run_sync_stage(logger: Any, results: dict[str, Any], *, dry_run: bool) -> N
         verify_result = verify_sync_task()
         results["stages"]["sync"]["verification"] = verify_result
 
-        gcs_result = sync_local_to_gcs_task()
+        gcs_result = sync_local_to_gcs_task(approved=approved)
         results["stages"]["sync"]["gcs_backup"] = gcs_result
 
         logger.info(
@@ -147,6 +151,7 @@ def _training_config(
     machine_type: str,
     rebuild_container: bool,
     dry_run: bool,
+    approved: bool = False,
 ) -> TrainingFlowConfig:
     if use_vertex:
         return TrainingFlowConfig(
@@ -157,11 +162,13 @@ def _training_config(
             stream_logs=True,
             dry_run=dry_run,
             use_vertex=True,
+            approved=approved,
         )
 
     return TrainingFlowConfig(
         tune=tune,
         use_vertex=False,
+        approved=approved,
     )
 
 
@@ -174,6 +181,7 @@ def _run_training_stage(
     machine_type: str,
     rebuild_container: bool,
     dry_run: bool,
+    approved: bool = False,
 ) -> dict[str, Any]:
     logger.info(f"Stage 2: Training ({'vertex' if use_vertex else 'local'}, tune={tune})")
     config = _training_config(
@@ -182,6 +190,7 @@ def _run_training_stage(
         machine_type=machine_type,
         rebuild_container=rebuild_container,
         dry_run=dry_run,
+        approved=approved,
     )
     training_result = vertex_training_flow(config=config)
     results["stages"]["training"] = training_result
@@ -251,6 +260,7 @@ def _run_deployment_stage(
     validation_passed: bool,
     dry_run: bool,
     validate_deployment: bool,
+    approved: bool = False,
 ) -> None:
     if not (deploy_to_prod and validation_passed and not dry_run):
         reasons = _deployment_skip_reasons(
@@ -273,6 +283,7 @@ def _run_deployment_stage(
             model_artifacts_gcs_uri=model_gcs_uri or f"gs://{gcs_bucket}/models/",
             enrichment_gcs_uri=f"gs://{gcs_bucket}/derived/",
             validate=validate_deployment,
+            approved=approved,
         )
         results["stages"]["deployment"] = deploy_result
         logger.info(
@@ -356,6 +367,8 @@ def complete_pipeline_flow(
     validate_deployment: bool = True,
     # Advanced options
     dry_run: bool = False,
+    # Approval for spend and production writes (BigQuery, Vertex, GCS, Cloud Run)
+    approved: bool = False,
 ) -> dict:
     """End-to-end ML pipeline: data collection → training → enrichment → deployment."""
     logger = get_run_logger()
@@ -388,8 +401,9 @@ def complete_pipeline_flow(
             skip_ingestion=skip_ingestion,
             config_file=config_file,
             dry_run=dry_run,
+            approved=approved,
         )
-        _run_sync_stage(logger, results, dry_run=dry_run)
+        _run_sync_stage(logger, results, dry_run=dry_run, approved=approved)
 
         training_result = _run_training_stage(
             logger,
@@ -399,6 +413,7 @@ def complete_pipeline_flow(
             machine_type=machine_type,
             rebuild_container=rebuild_container,
             dry_run=dry_run,
+            approved=approved,
         )
         if not training_result.get("success", False):
             return _abort_failed_training(logger, results)
@@ -413,6 +428,7 @@ def complete_pipeline_flow(
             validation_passed=validation_passed,
             dry_run=dry_run,
             validate_deployment=validate_deployment,
+            approved=approved,
         )
 
         results["stages"]["notification"] = {"skipped": True, "reason": "notifications_disabled"}
@@ -432,10 +448,10 @@ def complete_pipeline_flow(
 
 
 @flow(name="Estate Value Index Quick Pipeline - Testing")
-def quick_pipeline_flow(max_pages: int = 5) -> dict:
+def quick_pipeline_flow(max_pages: int = 5, approved: bool = False) -> dict:
     """Quick pipeline for testing without deployment."""
     return complete_pipeline_flow(
-        max_pages=max_pages, tune=False, deploy_to_prod=False, dry_run=False
+        max_pages=max_pages, tune=False, deploy_to_prod=False, approved=approved
     )
 
 
@@ -444,6 +460,7 @@ def production_pipeline_flow(
     max_pages: int = 5,
     deploy: bool = True,
     tune: bool = False,
+    approved: bool = False,
 ) -> dict:
     """Full production pipeline with optional parameter tuning."""
     return complete_pipeline_flow(
@@ -453,15 +470,19 @@ def production_pipeline_flow(
         machine_type="n1-standard-4",
         deploy_to_prod=deploy,
         validate_deployment=True,
-        dry_run=False,
+        approved=approved,
     )
 
 
 @flow(name="Estate Value Index Retrain Pipeline - No Ingestion")
-def retrain_pipeline_flow(tune: bool = False, deploy: bool = False) -> dict:
+def retrain_pipeline_flow(tune: bool = False, deploy: bool = False, approved: bool = False) -> dict:
     """Retrain model using existing data (no ingestion)."""
     return complete_pipeline_flow(
-        skip_ingestion=True, tune=tune, use_vertex=True, deploy_to_prod=deploy, dry_run=False
+        skip_ingestion=True,
+        tune=tune,
+        use_vertex=True,
+        deploy_to_prod=deploy,
+        approved=approved,
     )
 
 
@@ -524,19 +545,26 @@ if __name__ == "__main__":
     )
     parser.add_argument("--deploy", action="store_true", help="Deploy to Cloud Run after training")
     parser.add_argument("--dry-run", action="store_true", help="Simulate without execution")
+    parser.add_argument(
+        "--approved",
+        action="store_true",
+        help="Allow spend and production writes (BigQuery, Vertex AI, GCS, Cloud Run)",
+    )
 
     args = parser.parse_args()
 
     # Run appropriate flow
     if args.quick:
         print("Running QUICK pipeline...")
-        result = quick_pipeline_flow(max_pages=5)
+        result = quick_pipeline_flow(max_pages=5, approved=args.approved)
     elif args.production:
         print("Running PRODUCTION pipeline...")
-        result = production_pipeline_flow(max_pages=5, deploy=True, tune=args.tune)
+        result = production_pipeline_flow(
+            max_pages=5, deploy=True, tune=args.tune, approved=args.approved
+        )
     elif args.retrain:
         print("Running RETRAIN pipeline...")
-        result = retrain_pipeline_flow(tune=args.tune, deploy=args.deploy)
+        result = retrain_pipeline_flow(tune=args.tune, deploy=args.deploy, approved=args.approved)
     else:
         print("Running end-to-end pipeline...")
         result = complete_pipeline_flow(
@@ -548,6 +576,7 @@ if __name__ == "__main__":
             rebuild_container=args.rebuild_container,
             deploy_to_prod=args.deploy,
             dry_run=args.dry_run,
+            approved=args.approved,
         )
 
     # Print summary

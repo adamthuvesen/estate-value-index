@@ -29,7 +29,9 @@ def test_geocode_new_addresses_query_uses_bq_parameter_for_batch_size() -> None:
         "estate_value_index.pipelines.tasks.ingestion.get_bq_client",
         return_value=mock_client,
     ):
-        geocode_new_addresses_task.fn(project_id="estate-value-index", batch_size=4242)
+        geocode_new_addresses_task.fn(
+            project_id="estate-value-index", batch_size=4242, approved=True
+        )
 
     q = captured["query"]
     assert "@batch_size" in q

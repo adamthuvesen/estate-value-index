@@ -57,7 +57,7 @@ class _FakeGCSClient:
         self._base = base_dir
         self._bucket = _FakeBucket(base_dir)
 
-    def upload_file(self, local_path, gcs_path: str) -> str:
+    def upload_file(self, local_path, gcs_path: str, *, approved: bool = False) -> str:
         local_path = Path(local_path)
         blob = self._bucket.blob(gcs_path)
         blob.upload_from_filename(str(local_path))
@@ -93,7 +93,7 @@ def test_upload_writes_sidecar_alongside_joblib(
     monkeypatch.setattr(gcs_module, "GCSClient", lambda *a, **kw: fake_client)
 
     artefacts = gcs_module.upload_model_artifacts(
-        fake_model_dir, "price_prediction_model_no_list_price"
+        fake_model_dir, "price_prediction_model_no_list_price", approved=True
     )
 
     # Both artefact and sidecar end up in the fake bucket layout.
@@ -125,10 +125,10 @@ def test_sidecar_upload_failure_rolls_back_artefact(
 
     real_upload = fake_client.upload_file
 
-    def upload_with_sidecar_failure(local_path, gcs_path: str) -> str:
+    def upload_with_sidecar_failure(local_path, gcs_path: str, *, approved: bool = False) -> str:
         if gcs_path.endswith(".sha256"):
             raise RuntimeError("simulated sidecar upload failure")
-        return real_upload(local_path, gcs_path)
+        return real_upload(local_path, gcs_path, approved=approved)
 
     fake_client.upload_file = upload_with_sidecar_failure  # type: ignore[assignment]
 
@@ -136,7 +136,9 @@ def test_sidecar_upload_failure_rolls_back_artefact(
     monkeypatch.setattr(gcs_module, "GCSClient", lambda *a, **kw: fake_client)
 
     with pytest.raises(RuntimeError, match="GCS model artifact upload failed"):
-        gcs_module.upload_model_artifacts(fake_model_dir, "price_prediction_model_no_list_price")
+        gcs_module.upload_model_artifacts(
+            fake_model_dir, "price_prediction_model_no_list_price", approved=True
+        )
 
     uploaded_joblib = bucket_dir / "models" / "price_prediction_model_no_list_price.joblib"
     uploaded_sidecar = bucket_dir / "models" / "price_prediction_model_no_list_price.joblib.sha256"
@@ -157,7 +159,9 @@ def test_upload_missing_model_raises(tmp_path: Path, monkeypatch) -> None:
     )
 
     with pytest.raises(RuntimeError, match="GCS model artifact upload failed"):
-        gcs_module.upload_model_artifacts(model_dir, "price_prediction_model_no_list_price")
+        gcs_module.upload_model_artifacts(
+            model_dir, "price_prediction_model_no_list_price", approved=True
+        )
 
 
 def test_resolve_data_path_does_not_fallback_to_local_when_gcs_enabled(

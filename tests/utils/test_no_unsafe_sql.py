@@ -36,7 +36,7 @@ REVIEWED_DYNAMIC_SQL: dict[str, str] = {
         "`table_ref` is BigQueryConfig.full_table_id, which is validated via "
         "safe_table_ref() in the property."
     ),
-    "estate_value_index.pipelines.tasks.ingestion:upload_to_bigquery_task": (
+    "estate_value_index.pipelines.tasks.ingestion:upload_to_bigquery": (
         "TRUNCATE interpolates the validated BigQueryConfig.full_table_id."
     ),
     "estate_value_index.pipelines.tasks.ingestion:_merge_query": (

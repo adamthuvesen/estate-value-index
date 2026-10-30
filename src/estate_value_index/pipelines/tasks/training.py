@@ -4,7 +4,6 @@ import json
 import logging
 import os
 import re
-import subprocess
 import threading
 import time
 from datetime import datetime
@@ -19,7 +18,8 @@ from estate_value_index.model_artifacts import (
 )
 from estate_value_index.pipelines.constants import DEFAULT_MEDIAN_APE_THRESHOLD
 from estate_value_index.pipelines.types import ValidationResult, VertexJobResult
-from estate_value_index.pipelines.utils import get_task_logger, run_command
+from estate_value_index.pipelines.utils import get_task_logger, run_command, run_process
+from estate_value_index.utils.approval import require_approval
 from estate_value_index.utils.gcs import get_gcs_bucket
 
 # Vertex AI job state strings that mean "done, stop polling". Mirrors
@@ -108,7 +108,7 @@ def _parse_vertex_job_output(stdout: str, stderr: str) -> VertexJobResult:
 
 def _get_job_state(job_id: str, region: str) -> str:
     """Get current state of a Vertex AI job."""
-    result = subprocess.run(
+    result = run_process(
         [
             "gcloud",
             "ai",
@@ -120,8 +120,6 @@ def _get_job_state(job_id: str, region: str) -> str:
             "--format",
             "value(state)",
         ],
-        capture_output=True,
-        text=True,
         timeout=30,
         check=True,
     )
@@ -132,11 +130,10 @@ def _stream_logs_background(job_id: str, region: str, stop_event: threading.Even
     """Stream job logs in background thread."""
     log = logging.getLogger(__name__)
     try:
-        subprocess.run(
+        run_process(
             ["gcloud", "ai", "custom-jobs", "stream-logs", job_id, "--region", region],
             capture_output=False,
             timeout=3600,
-            check=False,
         )
     except Exception as exc:
         log.warning("Vertex log stream ended early for %s: %s", job_id, exc)
@@ -147,22 +144,19 @@ def _stream_logs_background(job_id: str, region: str, stop_event: threading.Even
 # --- Tasks ---
 
 
-@task(name="rebuild-container", retries=1, retry_delay_seconds=60, timeout_seconds=900)
-def rebuild_container_task(
+def rebuild_container(
     image_name: str = "lgbm-trainer",
     image_tag: str = "latest",
     dry_run: bool = False,
+    approved: bool = False,
 ) -> dict:
-    """Rebuild and push training container to Artifact Registry.
+    """Rebuild and push the training container to Artifact Registry (Cloud Build spend).
 
-    Args:
-        image_name: Container image name
-        image_tag: Container tag
-        dry_run: If True, only show command without executing
-
-    Returns:
-        Dict with image URI and build info
+    A dry run only prints the build command and needs no approval.
     """
+    if not dry_run:
+        require_approval("rebuild and push the Vertex training container", approved)
+
     logger = get_task_logger(__name__)
     logger.info(f"Rebuilding container: {image_name}:{image_tag}")
 
@@ -195,25 +189,32 @@ def rebuild_container_task(
     }
 
 
-@task(name="submit-vertex-training-job", retries=2, retry_delay_seconds=60, timeout_seconds=120)
-def submit_vertex_training_job_task(
+@task(name="rebuild-container", retries=1, retry_delay_seconds=60, timeout_seconds=900)
+def rebuild_container_task(
+    image_name: str = "lgbm-trainer",
+    image_tag: str = "latest",
+    dry_run: bool = False,
+    approved: bool = False,
+) -> dict:
+    return rebuild_container(image_name, image_tag, dry_run, approved)
+
+
+def submit_vertex_training_job(
     machine_type: str = "n1-standard-4",
     display_name: str | None = None,
     image_uri: str | None = None,
     tune: bool = False,
     dry_run: bool = False,
+    approved: bool = False,
 ) -> VertexJobResult:
-    """Submit training job to Vertex AI.
+    """Submit a training job to Vertex AI (``gcloud ai custom-jobs create``).
 
-    Args:
-        machine_type: GCP machine type
-        display_name: Custom job display name
-        tune: Tune one LightGBM parameter set per production model
-        dry_run: If True, only show command without submitting
-
-    Returns:
-        VertexJobResult with job_id, run_id, model_uri
+    A dry run only prints the job spec and needs no approval. An approved job
+    passes ``--approved`` to the container, which uploads model artifacts to GCS.
     """
+    if not dry_run:
+        require_approval("submit a Vertex AI training job", approved)
+
     logger = get_task_logger(__name__)
     logger.info("Submitting Vertex AI production training job (machine=%s)", machine_type)
 
@@ -224,21 +225,18 @@ def submit_vertex_training_job_task(
         cmd.extend(["--display-name", display_name])
     if dry_run:
         cmd.append("--dry-run")
+    container_args = []
+    if approved and not dry_run:
+        container_args.append("--approved")
     if tune:
-        cmd.extend(["--", "--tune"])
+        container_args.append("--tune")
+    if container_args:
+        cmd.extend(["--", *container_args])
 
     env = os.environ.copy()
     env["GCP_REGION"] = "europe-north1"
 
-    result = subprocess.run(
-        cmd,
-        cwd=Path.cwd(),
-        capture_output=True,
-        text=True,
-        timeout=120,
-        check=False,
-        env=env,
-    )
+    result = run_process(cmd, cwd=Path.cwd(), timeout=120, env=env)
 
     if result.returncode != 0:
         logger.error(f"Job submission failed: {result.stderr}")
@@ -248,6 +246,20 @@ def submit_vertex_training_job_task(
     logger.info(f"Job submitted: {job_result['job_id']}")
 
     return job_result
+
+
+@task(name="submit-vertex-training-job", retries=2, retry_delay_seconds=60, timeout_seconds=120)
+def submit_vertex_training_job_task(
+    machine_type: str = "n1-standard-4",
+    display_name: str | None = None,
+    image_uri: str | None = None,
+    tune: bool = False,
+    dry_run: bool = False,
+    approved: bool = False,
+) -> VertexJobResult:
+    return submit_vertex_training_job(
+        machine_type, display_name, image_uri, tune, dry_run, approved
+    )
 
 
 @task(name="poll-vertex-job-status", retries=0, timeout_seconds=3600)
@@ -299,7 +311,7 @@ def poll_vertex_job_status_task(
         time.sleep(60)
 
     # Get final job info
-    result = subprocess.run(
+    result = run_process(
         [
             "gcloud",
             "ai",
@@ -311,8 +323,6 @@ def poll_vertex_job_status_task(
             "--format",
             "json",
         ],
-        capture_output=True,
-        text=True,
         timeout=60,
         check=True,
     )
@@ -457,11 +467,11 @@ def validate_model_performance_task(
     )
 
 
-@task(name="promote-model-to-production", retries=2, retry_delay_seconds=30, timeout_seconds=300)
-def promote_model_to_production_task(
+def promote_model_to_production(
     model_uri: str,
     gcs_bucket: str | None = None,
     production_prefix: str = DEFAULT_MODEL_PREFIX,
+    approved: bool = False,
 ) -> dict:
     """Promote validated model artifacts to production names in GCS.
 
@@ -473,6 +483,8 @@ def promote_model_to_production_task(
     Returns:
         Dict with promotion status and production URIs
     """
+    require_approval("promote model artifacts to the production GCS path", approved)
+
     logger = get_task_logger(__name__)
     logger.info(f"Promoting model to production: {model_uri}")
 
@@ -508,12 +520,22 @@ def promote_model_to_production_task(
     }
 
 
-@task(name="register-model-to-vertex", retries=2, retry_delay_seconds=60, timeout_seconds=300)
-def register_model_to_vertex_task(
+@task(name="promote-model-to-production", retries=2, retry_delay_seconds=30, timeout_seconds=300)
+def promote_model_to_production_task(
+    model_uri: str,
+    gcs_bucket: str | None = None,
+    production_prefix: str = DEFAULT_MODEL_PREFIX,
+    approved: bool = False,
+) -> dict:
+    return promote_model_to_production(model_uri, gcs_bucket, production_prefix, approved)
+
+
+def register_model_to_vertex(
     model_uri: str,
     display_name: str = "lgbm-vertex",
     container_image_uri: str | None = None,
     region: str = "europe-north1",
+    approved: bool = False,
 ) -> dict:
     """Register model to Vertex AI Model Registry.
 
@@ -526,6 +548,8 @@ def register_model_to_vertex_task(
     Returns:
         Dict with model resource name and info
     """
+    require_approval("register a model in the Vertex AI Model Registry", approved)
+
     logger = get_task_logger(__name__)
     logger.info(f"Registering model to Vertex AI: {display_name}")
 
@@ -561,3 +585,14 @@ def register_model_to_vertex_task(
         "display_name": display_name,
         "timestamp": datetime.now().isoformat(),
     }
+
+
+@task(name="register-model-to-vertex", retries=2, retry_delay_seconds=60, timeout_seconds=300)
+def register_model_to_vertex_task(
+    model_uri: str,
+    display_name: str = "lgbm-vertex",
+    container_image_uri: str | None = None,
+    region: str = "europe-north1",
+    approved: bool = False,
+) -> dict:
+    return register_model_to_vertex(model_uri, display_name, container_image_uri, region, approved)

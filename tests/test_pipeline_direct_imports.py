@@ -33,7 +33,7 @@ class TestValueAnalysisTask:
 class TestLocalTrainingTask:
     def test_local_training_no_subprocess(self):
         source = Path("src/estate_value_index/pipelines/core/training_pipeline.py").read_text()
-        assert "from estate_value_index.cli.train_production_models import" in source
+        assert "train_from_data_source" in source
         assert "train_model.py" not in source
 
 
@@ -75,7 +75,9 @@ class TestImportStructure:
 
     def test_training_pipeline_imports_training_workflow(self):
         source = Path("src/estate_value_index/pipelines/core/training_pipeline.py").read_text()
-        assert "from estate_value_index.cli.train_production_models import" in source
+        assert (
+            "from estate_value_index.ml.production_models import train_from_data_source" in source
+        )
 
 
 class TestUnifiedCliSubcommands:

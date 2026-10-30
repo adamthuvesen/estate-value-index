@@ -41,6 +41,7 @@ def deployment_pipeline_flow(config: DeploymentFlowConfig | None = None) -> dict
         region=config.region,
         validate=config.validate,
         dry_run=config.dry_run,
+        approved=config.approved,
     )
 
     # A dry run returns success=True without deploying anything; never report it as deployed.
@@ -59,6 +60,7 @@ def deployment_pipeline_flow(config: DeploymentFlowConfig | None = None) -> dict
                     previous_revision=previous_revision,
                     service_name=config.service_name,
                     region=config.region,
+                    approved=config.approved,
                 )
                 deployment_result["rollback"] = rollback_result
                 deployment_result["auto_rolled_back"] = True
@@ -86,9 +88,11 @@ def deployment_pipeline_flow(config: DeploymentFlowConfig | None = None) -> dict
 
 
 @flow(name="Estate Value Index Quick Deploy")
-def quick_deploy_flow(dry_run: bool = False) -> dict:
+def quick_deploy_flow(dry_run: bool = False, approved: bool = False) -> dict:
     """Quick deployment with sensible defaults."""
-    config = DeploymentFlowConfig(validate=True, auto_rollback_on_failure=False, dry_run=dry_run)
+    config = DeploymentFlowConfig(
+        validate=True, auto_rollback_on_failure=False, dry_run=dry_run, approved=approved
+    )
     return deployment_pipeline_flow(config)
 
 
@@ -102,13 +106,16 @@ if __name__ == "__main__":
     parser.add_argument(
         "--auto-rollback", action="store_true", help="Auto-rollback on health check failure"
     )
+    parser.add_argument("--approved", action="store_true", help="Allow the Cloud Run deploy")
     args = parser.parse_args()
 
     if args.quick:
-        result = quick_deploy_flow(dry_run=args.dry_run)
+        result = quick_deploy_flow(dry_run=args.dry_run, approved=args.approved)
     else:
         config = DeploymentFlowConfig(
-            auto_rollback_on_failure=args.auto_rollback, dry_run=args.dry_run
+            auto_rollback_on_failure=args.auto_rollback,
+            dry_run=args.dry_run,
+            approved=args.approved,
         )
         result = deployment_pipeline_flow(config)
 

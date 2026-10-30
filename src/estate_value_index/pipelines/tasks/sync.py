@@ -169,12 +169,14 @@ def sync_bigquery_to_local_task(
 def sync_local_to_gcs_task(
     local_file: Path | None = None,
     gcs_path: str = "raw/booli_listings_prod.json",
+    approved: bool = False,
 ) -> SyncResult:
     """Upload local file to GCS as backup.
 
     Args:
         local_file: Local file to upload
         gcs_path: GCS destination path
+        approved: Required when GCS is enabled
 
     Returns:
         SyncResult with upload statistics
@@ -203,12 +205,12 @@ def sync_local_to_gcs_task(
         )
 
     gcs_client = GCSClient()
-    gcs_uri = gcs_client.upload_file(local_file, gcs_path)
+    gcs_uri = gcs_client.upload_file(local_file, gcs_path, approved=approved)
 
     # Also create timestamped archive
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     archive_path = f"raw/archive/booli_listings_{timestamp}.json"
-    gcs_client.upload_file(local_file, archive_path)
+    gcs_client.upload_file(local_file, archive_path, approved=approved)
 
     # Count records for result
     with Path(local_file).open(encoding="utf-8") as f:

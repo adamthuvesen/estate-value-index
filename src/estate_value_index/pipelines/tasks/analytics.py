@@ -8,6 +8,7 @@ from prefect import task
 
 from estate_value_index.pipelines.types import AnalyticsResult
 from estate_value_index.pipelines.utils import get_task_logger
+from estate_value_index.utils.approval import require_approval
 from estate_value_index.utils.clients import get_storage_client
 
 
@@ -204,17 +205,21 @@ def upload_enrichment_to_gcs_task(
     local_dir: Path,
     gcs_bucket: str,
     gcs_prefix: str = "derived/",
+    approved: bool = False,
 ) -> dict:
-    """Upload enrichment data to GCS.
+    """Upload enrichment data to GCS, where the Cloud Run app reads it.
 
     Args:
         local_dir: Local directory containing enrichment files
         gcs_bucket: GCS bucket name
         gcs_prefix: GCS prefix/path
+        approved: Required
 
     Returns:
         Upload statistics
     """
+    require_approval("upload enrichment data to GCS", approved)
+
     logger = get_task_logger(__name__)
 
     logger.info(f"Uploading enrichment from {local_dir} to gs://{gcs_bucket}/{gcs_prefix}")

@@ -225,7 +225,9 @@ class TestUploadEnrichmentToGcsTask:
 
         mocker.patch("estate_value_index.pipelines.tasks.analytics.get_storage_client")
 
-        result = upload_enrichment_to_gcs_task.fn(local_dir=empty_dir, gcs_bucket="test-bucket")
+        result = upload_enrichment_to_gcs_task.fn(
+            local_dir=empty_dir, gcs_bucket="test-bucket", approved=True
+        )
 
         assert result["success"] is True
         assert result["uploaded_files"] == 0
@@ -239,7 +241,9 @@ class TestUploadEnrichmentToGcsTask:
 
         mock_bucket = _mock_gcs_storage(mocker)
 
-        result = upload_enrichment_to_gcs_task.fn(local_dir=tmp_path, gcs_bucket="test-bucket")
+        result = upload_enrichment_to_gcs_task.fn(
+            local_dir=tmp_path, gcs_bucket="test-bucket", approved=True
+        )
 
         assert result["success"] is True
         assert result["uploaded_files"] == 2
@@ -254,6 +258,7 @@ class TestUploadEnrichmentToGcsTask:
             local_dir=tmp_path,
             gcs_bucket="test-bucket",
             gcs_prefix="custom/prefix/",
+            approved=True,
         )
 
         assert "custom/prefix/" in mock_bucket.blob.call_args[0][0]
@@ -267,6 +272,7 @@ class TestUploadEnrichmentToGcsTask:
             local_dir=tmp_path,
             gcs_bucket="my-bucket",
             gcs_prefix="data/",
+            approved=True,
         )
 
         assert len(result["files"]) == 1
@@ -281,7 +287,9 @@ class TestUploadEnrichmentToGcsTask:
         (tmp_path / "file.json").write_text("{}")
         _mock_gcs_storage(mocker)
 
-        result = upload_enrichment_to_gcs_task.fn(local_dir=tmp_path, gcs_bucket="test-bucket")
+        result = upload_enrichment_to_gcs_task.fn(
+            local_dir=tmp_path, gcs_bucket="test-bucket", approved=True
+        )
 
         for field in ["success", "uploaded_files", "files", "bucket", "prefix", "timestamp"]:
             assert field in result

@@ -94,7 +94,7 @@ class TestUploadToBigqueryTask:
         non_existent = tmp_path / "missing.json"
 
         with pytest.raises(FileNotFoundError):
-            upload_to_bigquery_task.fn(processed_file=non_existent)
+            upload_to_bigquery_task.fn(processed_file=non_existent, approved=True)
 
     @pytest.mark.unit
     def test_deduplicates_listings_in_memory(self, tmp_path: Path, mocker: Any) -> None:
@@ -144,7 +144,7 @@ class TestUploadToBigqueryTask:
             side_effect=lambda x: x,
         )
 
-        result = upload_to_bigquery_task.fn(processed_file=processed_file)
+        result = upload_to_bigquery_task.fn(processed_file=processed_file, approved=True)
 
         loaded_data = mock_client.load_table_from_json.call_args[0][0]
         assert len(loaded_data) == 2
@@ -167,7 +167,7 @@ class TestUploadToBigqueryTask:
         )
 
         with pytest.raises(ValueError, match="listing_id"):
-            upload_to_bigquery_task.fn(processed_file=processed_file)
+            upload_to_bigquery_task.fn(processed_file=processed_file, approved=True)
 
 
 class TestGeocodeNewAddressesTask:
@@ -189,4 +189,4 @@ class TestGeocodeNewAddressesTask:
         mocker.patch("estate_value_index.ml.geocoding.geocode_address", return_value=(59.3, 18.0))
 
         with pytest.raises(RuntimeError, match="geocode insert errors"):
-            geocode_new_addresses_task.fn(rate_limit_delay=0)
+            geocode_new_addresses_task.fn(rate_limit_delay=0, approved=True)

@@ -1,6 +1,6 @@
 # Estate Value Index
 
-![License](https://img.shields.io/github/license/adamthuvesen/estate-value-index) ![Python](https://img.shields.io/badge/python-3.11%2B-blue)
+![License](https://img.shields.io/github/license/adamthuvesen/estate-value-index) ![Python](https://img.shields.io/badge/python-3.14%2B-blue)
 
 ![Value Finder — every recent sale scored against the model's estimate](docs/assets/value-finder.png)
 
@@ -29,7 +29,7 @@ BigQuery, GCS, and `.env` for production-like runs.
 | Web | Next.js 16, React 19 |
 | Orchestration | Prefect 3 |
 | Deploy | Docker, Cloud Run, GCS |
-| Tooling | Python 3.11+, Node 20+, uv, pytest, Jest |
+| Tooling | Python 3.14+, Node 20, uv, just, pytest, Jest |
 
 ## How it fits together
 
@@ -45,7 +45,7 @@ deploy. Each stage also runs on its own (`data_pipeline.py`,
 
 ## Setup
 
-Prerequisites: Python 3.11+, Node 20+, `uv`. GCP/BigQuery/GCS access is needed for data and
+Prerequisites: Python 3.14+ (`uv` installs it), Node 20 (see `web/.nvmrc`), `uv`, and `just`. GCP/BigQuery/GCS access is needed for data and
 production-like runs, not for the test suite.
 
 ```bash
@@ -54,7 +54,7 @@ cd estate-value-index
 
 uv sync --all-extras
 
-cd web && npm install && cd ..
+npm ci --prefix web
 
 cp .env.example .env   # then fill in GCP/BigQuery/GCS values
 ```
@@ -112,14 +112,21 @@ fixtures are synthetic and are the only data meant for public redistribution.
 ## Common tasks
 
 ```bash
-# Test (Python coverage gate is 59%)
-uv run pytest
-cd web && npm test && cd ..
+# Lint, format check, and tests for Python and web (the CI `check` job)
+just check
+
+# Apply safe automatic fixes
+just fix
+
+# Full Python suite with the 59% coverage gate, plus the web route check
+just slow
 
 # Train production models locally
 uv run python -m estate_value_index.cli train-production-models --data-source bigquery
 
-# Run the pipeline (see --help for all flags)
+# Run the pipeline (see --help for all flags). Any step that spends money or writes to
+# production (BigQuery, Vertex AI, GCS model upload, Cloud Run) refuses unless you approve it;
+# --dry-run and local runs need no approval.
 uv run python -m estate_value_index.pipelines.core.complete_pipeline --quick      # fast local run
 uv run python -m estate_value_index.pipelines.core.complete_pipeline --dry-run    # preview, no cloud work
 uv run python -m estate_value_index.pipelines.core.complete_pipeline --retrain    # retrain existing data
