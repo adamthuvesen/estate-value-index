@@ -61,7 +61,7 @@ def load_yaml_config(path: str | None = None) -> dict[str, Any]:
     config_path = Path(path)
     if not config_path.exists():
         return {}
-    with open(config_path) as f:
+    with Path(config_path).open() as f:
         return yaml.safe_load(f) or {}
 
 
@@ -134,26 +134,6 @@ def is_verbose_logging() -> bool:
 
 def is_gcs_enabled() -> bool:
     return os.getenv("GCS_ENABLED", "false").lower() in _TRUTHY
-
-
-def get_data_source() -> str:
-    return os.getenv("DATA_SOURCE", "bigquery")
-
-
-def get_model_prefix() -> str:
-    return os.getenv("MODEL_PREFIX", "price_prediction_model")
-
-
-def get_model_output_dir() -> Path:
-    return Path(os.getenv("MODEL_OUTPUT_DIR", "web/models"))
-
-
-def get_cloud_run_service_name() -> str:
-    return os.getenv("CLOUD_RUN_SERVICE_NAME", "estate-value-index-app")
-
-
-def get_cloud_run_region() -> str:
-    return os.getenv("CLOUD_RUN_REGION", "europe-north1")
 
 
 def print_config_summary():

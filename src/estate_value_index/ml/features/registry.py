@@ -206,7 +206,7 @@ def handle_missing_values(
             # Handle Int64 (nullable integer) dtype - must use integer fill value
             col_dtype = X_train[col].dtype
             if pd.api.types.is_integer_dtype(col_dtype):
-                fill_val = int(round(fill_val))
+                fill_val = round(fill_val)
 
             numeric_fill_values[col] = fill_val
             X_train.loc[:, col] = X_train[col].fillna(fill_val)
@@ -235,8 +235,6 @@ def get_categorical_indices(X: pd.DataFrame, categorical_features: Sequence[str]
     """Get indices of categorical features in the feature matrix."""
     categorical_indices: list[int] = []
     for i, col in enumerate(X.columns):
-        if col in categorical_features:
-            categorical_indices.append(i)
-        elif isinstance(X[col].dtype, pd.CategoricalDtype):
+        if col in categorical_features or isinstance(X[col].dtype, pd.CategoricalDtype):
             categorical_indices.append(i)
     return categorical_indices

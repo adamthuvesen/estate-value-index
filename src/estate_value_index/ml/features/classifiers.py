@@ -88,7 +88,7 @@ def _classify_stockholm_district(postal_code: Any) -> str:
             return "outer_stockholm"  # Suburbs and outer areas
         else:
             return "other_sweden"
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return "unknown"
 
 

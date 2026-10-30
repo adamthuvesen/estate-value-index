@@ -15,7 +15,6 @@ def test_data_collection_stage_uses_empty_config_and_dry_run_flags(monkeypatch):
             "ingestion": {"validation": {"valid_listings": 12}},
             "processing": {"total_listings": 10},
             "bigquery": {},
-            "features": {},
         }
 
     monkeypatch.setattr(pipeline, "complete_ingestion_flow", fake_complete_ingestion_flow)
@@ -33,7 +32,6 @@ def test_data_collection_stage_uses_empty_config_and_dry_run_flags(monkeypatch):
     assert calls == {
         "max_pages": 3,
         "upload_to_bq": False,
-        "materialize_features": False,
         "upload_to_cloud": False,
         "sync_after_upload": False,
         "config_file": "",
@@ -64,7 +62,6 @@ def test_training_config_matches_vertex_and_local_modes():
         use_vertex=True,
         machine_type="n1-highmem-8",
         rebuild_container=True,
-        skip_ingestion=False,
         dry_run=True,
     )
 
@@ -72,7 +69,6 @@ def test_training_config_matches_vertex_and_local_modes():
     assert vertex_config.use_vertex is True
     assert vertex_config.machine_type == "n1-highmem-8"
     assert vertex_config.rebuild_container is True
-    assert vertex_config.skip_materialization is True
     assert vertex_config.register_to_vertex is False
     assert vertex_config.stream_logs is True
     assert vertex_config.dry_run is True
@@ -82,13 +78,11 @@ def test_training_config_matches_vertex_and_local_modes():
         use_vertex=False,
         machine_type="ignored",
         rebuild_container=True,
-        skip_ingestion=True,
         dry_run=True,
     )
 
     assert local_config.tune is True
     assert local_config.use_vertex is False
-    assert local_config.skip_materialization is False
     assert local_config.dry_run is False
 
 

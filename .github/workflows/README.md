@@ -1,13 +1,12 @@
 # GitHub Actions workflows
 
-Four workflows are defined for tests, deployment, model training, and drift checks.
+Three workflows are defined for tests, deployment, and model training.
 
 | Workflow | Trigger | Purpose |
 | --- | --- | --- |
 | `ci.yml` | Push to `main`, `develop`, or `ml-production-time`; pull request to `main` or `develop` | Python and web checks, plus affected Docker builds |
 | `deploy.yml` | Manual | Cloud Run deployment |
 | `ml-pipeline.yml` | Manual | Ingestion, local or Vertex AI training, model promotion, and optional deployment |
-| `ml-monitoring.yml` | Manual | Drift detection against recent predictions |
 
 ## CI
 
@@ -73,16 +72,6 @@ service account is attached to the service.
 ```bash
 gh workflow run deploy.yml -f environment=staging
 gh workflow run deploy.yml -f environment=production
-```
-
-## Drift monitoring
-
-`ml-monitoring.yml` exports recent predictions, reads the drift baseline from
-GCS, runs drift detection, uploads the report, and may open a GitHub issue when
-drift is found.
-
-```bash
-gh workflow run ml-monitoring.yml -f environment=production
 ```
 
 ## Required cloud configuration

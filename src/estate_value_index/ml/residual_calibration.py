@@ -11,7 +11,6 @@ from lightgbm import LGBMRegressor
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import HistGradientBoostingRegressor
 from sklearn.impute import SimpleImputer
-from sklearn.model_selection import TimeSeriesSplit
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder
 
@@ -98,18 +97,6 @@ def build_calibration_features(
             features[column] = "unknown"
 
     return features[CALIBRATION_NUMERIC_FEATURES + CALIBRATION_CATEGORICAL_FEATURES]
-
-
-def apply_residual_calibration(
-    base_predictions: np.ndarray,
-    residual_adjustment: np.ndarray,
-) -> np.ndarray:
-    """Apply residual SEK adjustments and keep predictions non-negative."""
-    return np.clip(
-        np.asarray(base_predictions, dtype=float) + np.asarray(residual_adjustment, dtype=float),
-        0,
-        None,
-    )
 
 
 def apply_calibration_correction(
@@ -242,39 +229,6 @@ def _train_lgbm(
         categorical_indices=categorical_indices,
         parameters=lgbm_params,
     )
-
-
-def _build_oof_residual_training_data(
-    train_raw: pd.DataFrame,
-    *,
-    feature_set: str,
-    n_splits: int,
-    random_state: int,
-) -> pd.DataFrame:
-    sorted_train = train_raw.sort_values("sold_date").reset_index(drop=True)
-    splitter = TimeSeriesSplit(n_splits=n_splits)
-    rows = []
-
-    for fold, (fold_train_idx, fold_valid_idx) in enumerate(splitter.split(sorted_train), start=1):
-        fold_train_raw = sorted_train.iloc[fold_train_idx].reset_index(drop=True)
-        fold_valid_raw = sorted_train.iloc[fold_valid_idx].reset_index(drop=True)
-        prepared = _prepare_model_data(fold_train_raw, fold_valid_raw, feature_set)
-        fit = _fit_base_model(prepared, random_state)
-        fold_features = build_calibration_features(
-            fit.test_frame,
-            fit.predictions,
-        )
-        fold_features["residual"] = (
-            prepared.test_engineered["sold_price"].reset_index(drop=True).to_numpy()
-            - fit.predictions
-        )
-        fold_features["actual_price"] = prepared.test_engineered["sold_price"].reset_index(
-            drop=True
-        )
-        fold_features["fold"] = fold
-        rows.append(fold_features)
-
-    return pd.concat(rows, ignore_index=True)
 
 
 def _fit_residual_calibrator(oof: pd.DataFrame, *, random_state: int) -> Pipeline:

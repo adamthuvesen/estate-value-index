@@ -60,7 +60,7 @@ def _parse_listing_line(line: str, logger) -> dict[str, Any] | None:
 
 def _load_listing_records(file_path: Path, logger) -> list[dict[str, Any]]:
     data: list[dict[str, Any]] = []
-    with open(file_path) as f:
+    with Path(file_path).open() as f:
         for line in f:
             item = _parse_listing_line(line, logger)
             if item is not None:
@@ -191,7 +191,6 @@ def ingest_booli_flow(
 def _pipeline_tasks() -> dict[str, Any]:
     from estate_value_index.pipelines.tasks import (
         geocode_new_addresses_task,
-        materialize_features_task,
         process_listings_task,
         sync_bigquery_to_local_task,
         upload_to_bigquery_task,
@@ -200,7 +199,6 @@ def _pipeline_tasks() -> dict[str, Any]:
 
     return {
         "geocode_new_addresses": geocode_new_addresses_task,
-        "materialize_features": materialize_features_task,
         "process_listings": process_listings_task,
         "sync_bigquery_to_local": sync_bigquery_to_local_task,
         "upload_to_bigquery": upload_to_bigquery_task,
@@ -261,20 +259,6 @@ def _run_geocode_stage(logger, geocode_new_addresses_task, *, upload_to_bq: bool
     return geocode_result
 
 
-def _run_feature_materialization_stage(
-    logger,
-    materialize_features_task,
-    *,
-    materialize_features: bool,
-    upload_to_bq: bool,
-) -> dict | None:
-    if not (materialize_features and upload_to_bq):
-        return None
-
-    logger.info("Stage 4: Materializing features in BigQuery")
-    return materialize_features_task(truncate=True)
-
-
 def _run_sync_stage(
     logger,
     sync_bigquery_to_local_task,
@@ -315,7 +299,6 @@ def _complete_ingestion_results(
     process_result: dict,
     bq_result: dict | None,
     geocode_result: dict | None,
-    feature_result: dict | None,
     sync_result: dict | None,
     gcs_uri: str | None,
 ) -> dict:
@@ -324,7 +307,6 @@ def _complete_ingestion_results(
         "processing": process_result,
         "bigquery": bq_result,
         "geocoding": geocode_result,
-        "features": feature_result,
         "sync": sync_result,
         "gcs": {"uri": gcs_uri},
         "timestamp": datetime.now().isoformat(),
@@ -338,7 +320,6 @@ def _log_complete_ingestion_summary(
     process_result: dict,
     bq_result: dict | None,
     geocode_result: dict | None,
-    feature_result: dict | None,
     sync_result: dict | None,
 ) -> None:
     logger.info("Complete ingestion pipeline finished")
@@ -348,8 +329,6 @@ def _log_complete_ingestion_summary(
         logger.info(f"   BigQuery: {bq_result.get('rows_uploaded', 0)} rows uploaded")
     if geocode_result and geocode_result.get("success"):
         logger.info(f"   Geocoded: {geocode_result.get('geocoded', 0)} new addresses")
-    if feature_result:
-        logger.info(f"   Features: {feature_result.get('row_count', 0)} rows materialized")
     if sync_result and sync_result.get("success"):
         logger.info(f"   Synced: {sync_result.get('records_synced', 0)} listings to local file")
         if sync_result.get("verification"):
@@ -360,7 +339,6 @@ def _log_complete_ingestion_summary(
 def complete_ingestion_flow(
     max_pages: int = 10,
     upload_to_bq: bool = True,
-    materialize_features: bool = True,
     upload_to_cloud: bool = True,
     sync_after_upload: bool = True,
     config_file: str | None = None,
@@ -370,14 +348,12 @@ def complete_ingestion_flow(
     This flow extends the basic API ingestion flow with:
     - Processing (merge, clean, impute)
     - BigQuery upload
-    - Feature materialization
     - Local file sync (BigQuery → local)
     - GCS backup
 
     Args:
         max_pages: Maximum API result pages to fetch
         upload_to_bq: Upload to BigQuery after processing
-        materialize_features: Materialize features in BigQuery
         upload_to_cloud: Upload to GCS
         sync_after_upload: Sync local file from BigQuery after upload
         config_file: Optional path to config file (e.g., ingestion/config/booli_all_locations.json)
@@ -406,12 +382,6 @@ def complete_ingestion_flow(
         tasks["geocode_new_addresses"],
         upload_to_bq=upload_to_bq,
     )
-    feature_result = _run_feature_materialization_stage(
-        logger,
-        tasks["materialize_features"],
-        materialize_features=materialize_features,
-        upload_to_bq=upload_to_bq,
-    )
     sync_result = _run_sync_stage(
         logger,
         tasks["sync_bigquery_to_local"],
@@ -427,7 +397,6 @@ def complete_ingestion_flow(
         process_result=process_result,
         bq_result=bq_result,
         geocode_result=geocode_result,
-        feature_result=feature_result,
         sync_result=sync_result,
         gcs_uri=gcs_uri,
     )
@@ -437,7 +406,6 @@ def complete_ingestion_flow(
         process_result=process_result,
         bq_result=bq_result,
         geocode_result=geocode_result,
-        feature_result=feature_result,
         sync_result=sync_result,
     )
 

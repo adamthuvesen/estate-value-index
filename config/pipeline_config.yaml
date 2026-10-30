@@ -2,8 +2,7 @@
 # Central configuration for Estate Value Index ML pipeline.
 #
 # Every key below is read by src/estate_value_index/utils/settings.py.
-# Deployment sizing lives in scripts/deploy_cloud_run.sh; drift thresholds live
-# in src/estate_value_index/monitoring/drift_detection.py; ingestion filters
+# Deployment sizing lives in scripts/deploy_cloud_run.sh; ingestion filters
 # live in the per-run JSON configs under src/estate_value_index/ingestion/config/.
 # If you add a new setting here, wire it up in settings.py in the same change —
 # an unread config key is a silent no-op, not a documented intent.

@@ -71,7 +71,7 @@ def test_verify_integrity_empty_sidecar_raises(tmp_path: Path) -> None:
     sidecar = artefact.with_suffix(artefact.suffix + ".sha256")
     sidecar.write_text("", encoding="utf-8")
 
-    with pytest.raises(RuntimeError, match="empty sidecar|missing sidecar"):
+    with pytest.raises(RuntimeError, match=r"empty sidecar|missing sidecar"):
         api_server._verify_model_integrity(artefact)
 
 
@@ -104,7 +104,7 @@ def _build_model_dir_with_two_artifacts(tmp_path: Path) -> tuple[Path, Path, Pat
 
 
 def test_load_all_models_skips_mismatched_artifact(tmp_path: Path) -> None:
-    models_dir, valid, bad = _build_model_dir_with_two_artifacts(tmp_path)
+    models_dir, valid, _bad = _build_model_dir_with_two_artifacts(tmp_path)
 
     cache = api_server.load_all_models(models_dir)
 

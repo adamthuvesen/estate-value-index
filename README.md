@@ -38,8 +38,8 @@ Authorized listing source -> BigQuery raw listings -> engineered features -> Lig
   -> FastAPI /predict + Next.js API routes (one Cloud Run container)
 ```
 
-The composed path is `pipelines/core/complete_pipeline.py`, which chains ingestion, feature
-materialization, training, and deploy. Each stage also runs on its own (`data_pipeline.py`,
+The composed path is `pipelines/core/complete_pipeline.py`, which chains ingestion, training, and
+deploy. Each stage also runs on its own (`data_pipeline.py`,
 `training_pipeline.py`, `deployment_pipeline.py`). Start with
 [docs/architecture.md](docs/architecture.md) for the full map.
 
@@ -159,7 +159,6 @@ Why the system is built the way it is, and the failure mode each choice guards a
 | `src/estate_value_index/ingestion/` | Listing ingestion, parsing, BigQuery load |
 | `src/estate_value_index/pipelines/` | Prefect flows and tasks |
 | `src/estate_value_index/ml/` | Feature engineering, data loading, training |
-| `src/estate_value_index/monitoring/` | Model and data drift checks |
 | `src/estate_value_index/utils/` | Settings, GCP clients, GCS, BigQuery safety |
 | `web/src/app/` | Next.js pages and API routes |
 | `config/`, `schemas/` | Pipeline/feature config and BigQuery schemas |

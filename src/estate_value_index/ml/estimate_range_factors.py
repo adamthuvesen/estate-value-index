@@ -9,6 +9,8 @@ value window the web app shows in place of the raw point estimate.
 
 from __future__ import annotations
 
+import itertools
+
 import numpy as np
 import pandas as pd
 
@@ -75,7 +77,7 @@ def compute_estimate_range_factors(
     pooled_upper = round(float(np.percentile(ratio, UPPER_PERCENTILE)), 4)
 
     buckets: list[dict[str, object]] = []
-    for lower_edge, upper_edge in zip(BUCKET_EDGES[:-1], BUCKET_EDGES[1:], strict=True):
+    for lower_edge, upper_edge in itertools.pairwise(BUCKET_EDGES):
         mask = (predicted >= lower_edge) & (predicted < upper_edge)
         n = int(mask.sum())
         if n >= MIN_BUCKET_SAMPLES:

@@ -24,7 +24,7 @@ RUN npm run build
 # ============================================================================
 # Stage 2: Python dependencies
 # ============================================================================
-FROM python:3.11-slim AS python-deps
+FROM python:3.14-slim AS python-deps
 
 WORKDIR /app
 
@@ -52,7 +52,7 @@ RUN uv export --frozen --no-dev --no-hashes --extra ml --extra geo --no-emit-pro
 # ============================================================================
 # Stage 3: Final production image
 # ============================================================================
-FROM python:3.11-slim
+FROM python:3.14-slim
 
 WORKDIR /app
 
@@ -76,7 +76,7 @@ RUN apt-get update && apt-get install -y \
 RUN useradd --create-home --shell /usr/sbin/nologin appuser
 
 # Copy Python dependencies from stage 2
-COPY --from=python-deps /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=python-deps /usr/local/lib/python3.14/site-packages /usr/local/lib/python3.14/site-packages
 COPY --from=python-deps /usr/local/bin /usr/local/bin
 
 # Copy web build from stage 1

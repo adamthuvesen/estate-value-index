@@ -20,7 +20,6 @@ from src.estate_value_index.ml.features import (
     handle_missing_values,
 )
 from src.estate_value_index.ml.features.heuristics import (
-    _estimate_energy_efficiency,
     _estimate_energy_efficiency_series,
 )
 from src.estate_value_index.ml.training_workflow.data import load_feature_subset
@@ -484,24 +483,6 @@ class TestFeatureContext:
         assert result.loc[0, "market_ppsqm_index"] == pytest.approx(112912)
 
     @pytest.mark.unit
-    def test_energy_efficiency_vectorised_matches_scalar(self):
-        # Permutation of every (year-bin, area-bin) bucket the function reasons about,
-        # plus NaNs on each axis. The vectorised version must match the scalar
-        # version row-by-row — this is the safety net for the `df.apply(axis=1)`
-        # → `np.select` rewrite.
-        years = [2020, 2005, 1995, 1985, 1975, 1960, np.nan, 2020]
-        areas = [30.0, 50.0, 70.0, 90.0, 30.0, 70.0, 50.0, np.nan]
-        s_year = pd.Series(years)
-        s_area = pd.Series(areas)
-
-        scalar = pd.Series(
-            [_estimate_energy_efficiency(y, a) for y, a in zip(years, areas, strict=True)]
-        )
-        vector = _estimate_energy_efficiency_series(s_year, s_area)
-
-        pd.testing.assert_series_equal(scalar, vector, check_names=False, check_dtype=False)
-
-    @pytest.mark.unit
     def test_energy_efficiency_handles_nullable_extension_dtypes(self):
         # BigQuery's to_dataframe() returns integer columns as pandas nullable
         # Int64. Comparisons on nullable dtypes return a `boolean` extension
@@ -515,11 +496,11 @@ class TestFeatureContext:
 
         expected = pd.Series(
             [
-                _estimate_energy_efficiency(2020, 30.0),
-                _estimate_energy_efficiency(2005, 50.0),
+                10.0,  # 2010+ bin (9.0) plus small-unit bonus (+1.0)
+                8.0,  # 2000s bin (7.5) plus mid-size bonus (+0.5)
                 5.0,  # NaN year → default
                 5.0,  # NaN area → default
-                _estimate_energy_efficiency(1960, 90.0),
+                5.5,  # pre-1970 bin (6.0) minus large-unit penalty (-0.5)
             ]
         )
         pd.testing.assert_series_equal(result, expected, check_names=False, check_dtype=False)

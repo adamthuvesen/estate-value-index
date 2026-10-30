@@ -30,7 +30,7 @@ def load_jsonl_file(file_path: Path) -> list[dict]:
     if not file_path.exists():
         return listings
 
-    with open(file_path, encoding="utf-8") as f:
+    with Path(file_path).open(encoding="utf-8") as f:
         content = f.read().strip()
 
         # Try JSON array format first
@@ -82,11 +82,11 @@ def _pick_newer(existing: dict, new: dict) -> dict:
         existing_scraped = datetime.fromisoformat(str(existing.get("scraped_at"))).replace(
             tzinfo=None
         )
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return existing
     try:
         new_scraped = datetime.fromisoformat(str(new.get("scraped_at"))).replace(tzinfo=None)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return existing
 
     return new if new_scraped > existing_scraped else existing
@@ -523,7 +523,7 @@ def process_pipeline(
         logger.info("Dry run: would write %d listings to %s", len(final_listings), output_file)
     else:
         logger.info("Writing %d listings to %s", len(final_listings), output_file)
-        with open(output_file, "w", encoding="utf-8") as f:
+        with Path(output_file).open("w", encoding="utf-8") as f:
             for listing in final_listings:
                 f.write(json.dumps(listing, ensure_ascii=False) + "\n")
         logger.info("Successfully wrote %d listings", len(final_listings))

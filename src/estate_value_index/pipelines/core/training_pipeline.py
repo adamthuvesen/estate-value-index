@@ -2,13 +2,12 @@
 """Prefect flow for Vertex AI training orchestration.
 
 This flow manages the complete ML pipeline using Vertex AI Custom Training Jobs:
-1. Materialize features in BigQuery
-2. (Optional) Rebuild training container
-3. Submit training job to Vertex AI
-4. Monitor job completion
-5. Download model artifacts
-6. Validate model performance
-7. (Optional) Register to Vertex AI Model Registry
+1. (Optional) Rebuild training container
+2. Submit training job to Vertex AI
+3. Monitor job completion
+4. Download model artifacts
+5. Validate model performance
+6. (Optional) Register to Vertex AI Model Registry
 """
 
 import io
@@ -34,7 +33,6 @@ from estate_value_index.pipelines.constants import DEFAULT_MEDIAN_APE_THRESHOLD
 # Import training tasks from new focused modules
 from estate_value_index.pipelines.tasks import (
     download_model_artifacts_task,
-    materialize_features_task,
     poll_vertex_job_status_task,
     promote_model_to_production_task,
     rebuild_container_task,
@@ -75,7 +73,6 @@ def _log_flow_configuration(config: TrainingFlowConfig, logger: Logger) -> None:
     logger.info(f"  Hyperparameter tuning: {config.tune}")
     logger.info(f"  Machine type: {config.machine_type}")
     logger.info(f"  Rebuild container: {config.rebuild_container}")
-    logger.info(f"  Skip materialization: {config.skip_materialization}")
     logger.info(f"  Register to Vertex: {config.register_to_vertex}")
     logger.info(f"  Dry run: {config.dry_run}")
     logger.info("=" * 80)
@@ -152,26 +149,6 @@ def _run_local_training(config: TrainingFlowConfig, results: dict, logger: Logge
     logger.info("Local training flow completed")
     logger.info("=" * 80)
     return results
-
-
-def _materialize_features_stage(config: TrainingFlowConfig, results: dict, logger: Logger) -> None:
-    """Stage 1: materialize engineered features in BigQuery."""
-    if not config.skip_materialization:
-        logger.info("STEP 1: Materializing features in BigQuery")
-        logger.info("-" * 80)
-
-        if not config.dry_run:
-            materialization_results = materialize_features_task(truncate=True)
-            results["steps"]["materialize_features"] = materialization_results
-
-            if materialization_results.get("row_count"):
-                logger.info(f"Materialized {materialization_results['row_count']} rows")
-        else:
-            logger.info("DRY RUN: Skipping feature materialization")
-            results["steps"]["materialize_features"] = {"skipped": True, "reason": "dry_run"}
-    else:
-        logger.info("STEP 1: Skipping feature materialization (skip_materialization=True)")
-        results["steps"]["materialize_features"] = {"skipped": True, "reason": "user_skip"}
 
 
 def _rebuild_container_stage(config: TrainingFlowConfig, results: dict, logger: Logger) -> None:
@@ -608,7 +585,6 @@ def vertex_training_flow(config: TrainingFlowConfig | None = None) -> dict:
     Complete ML training pipeline with Vertex AI integration.
 
     This flow orchestrates:
-    - Feature materialization in BigQuery
     - Optional container rebuilding
     - Vertex AI training job submission and monitoring
     - Model artifact download and validation
@@ -643,7 +619,6 @@ def vertex_training_flow(config: TrainingFlowConfig | None = None) -> dict:
         if not config.use_vertex:
             return _run_local_training(config, results, logger)
 
-        _materialize_features_stage(config, results, logger)
         _rebuild_container_stage(config, results, logger)
 
         state, should_return = _submit_training_job_stage(config, results, logger)
@@ -694,7 +669,6 @@ def quick_vertex_training_flow(tune: bool = False) -> dict:
         tune=tune,
         machine_type="n1-standard-4",
         rebuild_container=False,
-        skip_materialization=False,
         register_to_vertex=False,
         stream_logs=True,
         use_vertex=True,
@@ -730,7 +704,6 @@ def production_vertex_training_flow(
         tune=tune,
         machine_type="n1-standard-4",
         rebuild_container=rebuild,
-        skip_materialization=False,
         register_to_vertex=register,
         stream_logs=True,
         use_vertex=True,

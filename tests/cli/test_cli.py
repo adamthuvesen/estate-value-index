@@ -18,7 +18,7 @@ def test_cli_help():
 
 def test_cli_subcommands_help():
     """Verify each subcommand shows help."""
-    subcommands = ["backfill", "process", "features"]
+    subcommands = ["backfill", "process", "areas"]
     for cmd in subcommands:
         result = subprocess.run(
             [sys.executable, "-m", "estate_value_index.cli", cmd, "--help"],

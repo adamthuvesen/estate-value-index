@@ -11,9 +11,9 @@ import pytest
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from src.estate_value_index.ml.data_loader import load_listings  # noqa: E402
-from src.estate_value_index.ml.preprocessing import filter_valid_listings  # noqa: E402
-from src.estate_value_index.ml.training import LGBMTrainer  # noqa: E402
+from src.estate_value_index.ml.data_loader import load_listings
+from src.estate_value_index.ml.preprocessing import filter_valid_listings
+from src.estate_value_index.ml.training import LGBMTrainer
 
 
 class TestBasicDataFlow:

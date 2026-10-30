@@ -1,5 +1,5 @@
 # Vertex AI training container for LightGBM model
-FROM python:3.11-slim
+FROM python:3.14-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -28,7 +28,7 @@ COPY config/ config/
 COPY data/reference/ data/reference/
 
 # Install exact locked versions from uv.lock.
-RUN uv export --frozen --no-dev --no-hashes --extra ml --extra monitoring --extra vertex --extra geo --no-emit-project \
+RUN uv export --frozen --no-dev --no-hashes --extra ml --extra analysis --extra geo --no-emit-project \
         --format requirements-txt -o /tmp/requirements.txt \
     && uv pip install --system -r /tmp/requirements.txt \
     && uv pip install --system --no-deps .

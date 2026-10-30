@@ -26,7 +26,7 @@ def _listing_id_checksum(listing_ids: list[str]) -> str:
 
 def _local_sync_summary(local_file: Path) -> dict[str, Any]:
     listings: list[dict[str, Any]] = []
-    with open(local_file, encoding="utf-8") as f:
+    with Path(local_file).open(encoding="utf-8") as f:
         for line in f:
             if not line.strip():
                 continue
@@ -64,7 +64,7 @@ def _bigquery_sync_summary(client, table_ref: str) -> dict[str, Any]:
         AS max_record_date
     FROM `{table_ref}`
     """
-    row = list(client.query(query).result())[0]
+    row = next(iter(client.query(query).result()))
     keys = ("count", "listing_id_count", "listing_id_checksum", "max_record_date")
     return {key: _normalize_scalar(row[key]) for key in keys}
 
@@ -134,12 +134,12 @@ def sync_bigquery_to_local_task(
         output_file.rename(backup_file)
 
     # Write JSONL
-    with open(output_file, "w", encoding="utf-8") as f:
+    with Path(output_file).open("w", encoding="utf-8") as f:
         for listing in listings:
             f.write(json.dumps(listing, ensure_ascii=False, default=_json_default) + "\n")
 
     # Verify
-    with open(output_file, encoding="utf-8") as f:
+    with Path(output_file).open(encoding="utf-8") as f:
         verify_count = sum(1 for line in f if line.strip())
 
     if verify_count != len(listings):
@@ -211,7 +211,7 @@ def sync_local_to_gcs_task(
     gcs_client.upload_file(local_file, archive_path)
 
     # Count records for result
-    with open(local_file, encoding="utf-8") as f:
+    with Path(local_file).open(encoding="utf-8") as f:
         record_count = sum(1 for line in f if line.strip())
 
     logger.info(f"Upload complete: {gcs_uri}")

@@ -82,7 +82,7 @@ class TestSyncBigqueryToLocalTask:
         output_file = tmp_path / "output.jsonl"
         sync_bigquery_to_local_task.fn(output_file=output_file)
 
-        with open(output_file, encoding="utf-8") as f:
+        with Path(output_file).open(encoding="utf-8") as f:
             lines = [line.strip() for line in f if line.strip()]
 
         assert len(lines) == 1
@@ -112,7 +112,7 @@ class TestSyncBigqueryToLocalTask:
         output_file = tmp_path / "output.jsonl"
         sync_bigquery_to_local_task.fn(output_file=output_file)
 
-        with open(output_file, encoding="utf-8") as f:
+        with Path(output_file).open(encoding="utf-8") as f:
             data = json.loads(f.readline())
 
         assert data["sold_date"] == "2024-01-15T10:30:00"
@@ -137,7 +137,7 @@ class TestSyncBigqueryToLocalTask:
 
         sync_bigquery_to_local_task.fn(output_file=output_file, backup_existing=True)
 
-        with open(output_file, encoding="utf-8") as f:
+        with Path(output_file).open(encoding="utf-8") as f:
             data = json.loads(f.readline())
         assert data["listing_id"] == "new"
 

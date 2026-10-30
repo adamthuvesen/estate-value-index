@@ -12,7 +12,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from estate_value_index.ml.geocoding import haversine_distance, haversine_distance_vectorized
+from estate_value_index.ml.geocoding import haversine_distance_vectorized
 
 logger = logging.getLogger(__name__)
 
@@ -25,22 +25,6 @@ STOCKHOLM_CENTER = (STOCKHOLM_CENTER_LAT, STOCKHOLM_CENTER_LON)
 GEO_DATA_DIR = Path("data/reference/geo")
 METRO_STATIONS_PATH = GEO_DATA_DIR / "stockholm_metro_stations.csv"
 TRAIN_STATIONS_PATH = GEO_DATA_DIR / "stockholm_train_stations.csv"
-
-
-def compute_distance_to_city_center(lat: float, lon: float) -> float:
-    """Calculate distance from a point to Stockholm city center.
-
-    Args:
-        lat: Property latitude (degrees)
-        lon: Property longitude (degrees)
-
-    Returns:
-        Distance in meters to Sergels Torg (59.3326, 18.0649).
-        Returns np.nan if lat or lon is missing.
-    """
-    if pd.isna(lat) or pd.isna(lon):
-        return np.nan
-    return haversine_distance(lat, lon, STOCKHOLM_CENTER_LAT, STOCKHOLM_CENTER_LON)
 
 
 def compute_distance_to_city_center_series(

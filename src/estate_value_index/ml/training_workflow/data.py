@@ -10,7 +10,7 @@ from pathlib import Path
 import pandas as pd
 import yaml
 
-from estate_value_index.ml.data_loader import load_features_from_bigquery, load_from_bigquery
+from estate_value_index.ml.data_loader import load_from_bigquery
 from estate_value_index.ml.features.registry import (
     CATEGORICAL_FEATURE_NAMES,
     NUMERIC_FEATURE_NAMES,
@@ -77,23 +77,15 @@ def load_feature_subset(feature_set: str | None) -> tuple[list[str] | None, list
 
 def load_training_dataframe(
     *,
-    use_materialized_features: bool,
     data_source: str,
     data_file: str | Path | None,
-) -> tuple[pd.DataFrame, bool]:
-    """Load training data and whether feature engineering can be skipped."""
-    if use_materialized_features:
-        logger.info("Loading pre-computed features from BigQuery...")
-        df = load_features_from_bigquery()
-        logger.info("Loaded %d rows with pre-computed features", len(df))
-        logger.info("Skipped feature engineering step (features already materialized)")
-        return df, True
-
+) -> pd.DataFrame:
+    """Load raw listings for training from BigQuery or a local file."""
     if data_source.lower() == "bigquery":
         logger.info("Loading data from BigQuery...")
         df = load_from_bigquery()
         logger.info("Loaded %d listings from BigQuery", len(df))
-        return df, False
+        return df
 
     default_data_file = Path(
         data_file or os.getenv("BOOLI_TRAIN_DATA") or "data/raw/booli/booli_listings_prod.json"
@@ -113,11 +105,11 @@ def load_training_dataframe(
         raise FileNotFoundError(f"Data file not found: {resolved_data_file}")
 
     try:
-        with open(resolved_data_file) as f:
+        with Path(resolved_data_file).open() as f:
             raw_data = json.load(f)
     except json.JSONDecodeError:
         raw_data = []
-        with open(resolved_data_file) as f:
+        with Path(resolved_data_file).open() as f:
             for line in f:
                 line = line.strip()
                 if line:
@@ -125,4 +117,4 @@ def load_training_dataframe(
 
     df = pd.DataFrame(raw_data)
     logger.info("Loaded %d listings", len(df))
-    return df, False
+    return df

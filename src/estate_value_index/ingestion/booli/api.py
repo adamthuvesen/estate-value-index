@@ -146,7 +146,7 @@ def booli_api_record_to_listing(record: Mapping[str, Any], *, source: str) -> di
 
     price_per_sqm = to_int(_first_value(record, "soldSqmPrice", "sqmPrice", "pricePerSqm"))
     if price_per_sqm is None and sold_price is not None and living_area:
-        price_per_sqm = int(round(sold_price / living_area))
+        price_per_sqm = round(sold_price / living_area)
 
     url = clean_text(_first_value(record, "url", "soldUrl", "listingUrl"))
     if url and url.startswith("/"):

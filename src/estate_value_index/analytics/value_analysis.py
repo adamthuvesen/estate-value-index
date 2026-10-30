@@ -41,7 +41,7 @@ def load_production_data(data_path: Path, apply_training_filters: bool = True) -
     # Support both a JSON array (single- or multi-line) and JSONL. Sniff the
     # first non-whitespace char: a single-line array parses as one "line", so
     # trying JSONL first would silently wrap the whole array in one row.
-    with open(data_path, encoding="utf-8") as f:
+    with Path(data_path).open(encoding="utf-8") as f:
         content = f.read()
     if content.lstrip().startswith("["):
         data = json.loads(content)
@@ -96,7 +96,7 @@ def load_model(models_dir: Path, model_type: str, prefix: str = "price_predictio
 
     metrics = {}
     if metrics_path.exists():
-        with open(metrics_path, encoding="utf-8") as f:
+        with Path(metrics_path).open(encoding="utf-8") as f:
             metrics = json.load(f)
         logger.info("Model MAE: %s SEK", f"{metrics.get('mae', 'N/A'):,.0f}")
         logger.info("Model RMSE: %s SEK", f"{metrics.get('rmse', 'N/A'):,.0f}")
@@ -407,7 +407,7 @@ def generate_value_analysis(
     }
 
     output_file.parent.mkdir(parents=True, exist_ok=True)
-    with open(output_file, "w", encoding="utf-8") as f:
+    with Path(output_file).open("w", encoding="utf-8") as f:
         json.dump(output, f, indent=2, ensure_ascii=False)
 
     return output

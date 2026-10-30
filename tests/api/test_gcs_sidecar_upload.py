@@ -25,7 +25,7 @@ class _FakeBlob:
         self._path.parent.mkdir(parents=True, exist_ok=True)
         self._path.write_bytes(Path(source).read_bytes())
 
-    def upload_from_string(self, contents, content_type=None) -> None:  # noqa: ARG002
+    def upload_from_string(self, contents, content_type=None) -> None:
         self._path.parent.mkdir(parents=True, exist_ok=True)
         if isinstance(contents, str):
             self._path.write_text(contents, encoding="utf-8")

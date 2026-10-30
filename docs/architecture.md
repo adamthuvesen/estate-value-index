@@ -27,16 +27,16 @@ your own lawful data source, BigQuery, GCS, or local environment.
 ## Main path and entry points
 
 The composed end-to-end path is `pipelines/core/complete_pipeline.py`, which chains
-ingestion, feature materialization, training, and deployment. The four flows under
+ingestion, training, and deployment. The four flows under
 `pipelines/core/` are each independently runnable:
 
 | Entry point | What it runs |
 | ----------- | ------------ |
 | `pipelines/core/complete_pipeline.py` | The full ingest -> features -> train -> deploy path (composes the others) |
 | `pipelines/core/data_pipeline.py` | Ingest + process + load to BigQuery |
-| `pipelines/core/training_pipeline.py` | Feature materialization + Vertex AI training |
+| `pipelines/core/training_pipeline.py` | Vertex AI training |
 | `pipelines/core/deployment_pipeline.py` | Cloud Run deployment of the prediction service |
-| `uv run python -m estate_value_index.cli <cmd>` | Unified CLI dispatcher (`cli/__main__.py`): `backfill`, `process`, `features`, `areas`, `overall-stats`, `value-analysis`, `area-metrics`, `train-production-models` |
+| `uv run python -m estate_value_index.cli <cmd>` | Unified CLI dispatcher (`cli/__main__.py`): `backfill`, `process`, `areas`, `overall-stats`, `value-analysis`, `train-production-models` |
 | `api_server.py` | FastAPI prediction service |
 
 ## System boundaries
@@ -47,7 +47,6 @@ ingestion, feature materialization, training, and deployment. The four flows und
 | Pipeline orchestration | `src/estate_value_index/pipelines/core/` (flows), `pipelines/tasks/` (Prefect tasks) |
 | Feature engineering and training | `src/estate_value_index/ml/` (incl. `ml/features/`, `ml/training_workflow/`, `ml/production_models.py` and its model stack: `market_normalized_target`, `residual_calibration`, `tiered_ensemble`) |
 | Analytics generation | `src/estate_value_index/analytics/` (web-JSON generators: area statistics, value analysis, overall statistics) |
-| Monitoring | `src/estate_value_index/monitoring/` (drift detection) |
 | Shared utilities | `src/estate_value_index/utils/` (settings, GCP client factory, GCS, BigQuery safety) |
 | Prediction API | `api_server.py` |
 | Web app and Next API routes | `web/src/app/`, `web/src/app/api/` |
@@ -60,7 +59,7 @@ Imports flow one way, top to bottom. Keep it that way:
 
 ```text
 cli / pipelines        (entry points, orchestration)
-   -> analytics / ml / ingestion / monitoring   (domain logic)
+   -> analytics / ml / ingestion   (domain logic)
       -> utils         (settings, clients, gcs, bigquery_safety; no domain imports)
 ```
 

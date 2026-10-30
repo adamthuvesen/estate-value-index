@@ -10,8 +10,8 @@ from .gcs import (
 
 __all__ = [
     "GCSClient",
-    "is_gcs_enabled",
     "get_gcs_bucket",
+    "is_gcs_enabled",
     "resolve_data_path",
     "upload_model_artifacts",
 ]

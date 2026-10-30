@@ -80,7 +80,6 @@ class TrainingFlowConfig:
 
     # Pipeline toggles
     rebuild_container: bool = False
-    skip_materialization: bool = False
     register_to_vertex: bool = False
     stream_logs: bool = True
 

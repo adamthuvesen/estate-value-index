@@ -172,7 +172,7 @@ def _vif_report(df_eng: pd.DataFrame, area_features: list[str]) -> pd.DataFrame:
     print("VARIANCE INFLATION FACTOR (Multicollinearity Detection)")
     print("-" * 80)
 
-    vif_features = ["listing_price"] + area_features[:15]
+    vif_features = ["listing_price", *area_features[:15]]
     vif_df = calculate_vif(df_eng, vif_features)
     if vif_df.empty:
         return vif_df
@@ -359,7 +359,7 @@ def _save_results(
     }
 
     results_path = output_dir / "correlation_analysis_results.json"
-    with open(results_path, "w") as f:
+    with Path(results_path).open("w") as f:
         json.dump(results, f, indent=2)
     print(f"Results saved to: {results_path}")
 

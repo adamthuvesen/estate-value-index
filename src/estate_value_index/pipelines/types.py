@@ -34,12 +34,6 @@ class SyncResult(TaskResult):
     records_synced: int
 
 
-class MaterializationResult(TaskResult):
-    """Result from feature materialization."""
-
-    row_count: int | None
-
-
 class ValidationResult(TaskResult):
     """Result from model validation tasks."""
 

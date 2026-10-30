@@ -363,7 +363,7 @@ def _weight_grid(
     if not 0.0 < weight_step <= 1.0:
         raise ValueError("weight_step must be between 0 and 1")
     units_float = 1.0 / weight_step
-    units = int(round(units_float))
+    units = round(units_float)
     if not np.isclose(units_float, units):
         raise ValueError("weight_step must divide 1.0 evenly")
 

@@ -1,4 +1,4 @@
-"""Tasks for ML training: feature materialization, Vertex AI jobs, model management."""
+"""Tasks for ML training: Vertex AI jobs and model management."""
 
 import json
 import logging
@@ -18,11 +18,7 @@ from estate_value_index.model_artifacts import (
     required_production_artifact_files,
 )
 from estate_value_index.pipelines.constants import DEFAULT_MEDIAN_APE_THRESHOLD
-from estate_value_index.pipelines.types import (
-    MaterializationResult,
-    ValidationResult,
-    VertexJobResult,
-)
+from estate_value_index.pipelines.types import ValidationResult, VertexJobResult
 from estate_value_index.pipelines.utils import get_task_logger, run_command
 from estate_value_index.utils.gcs import get_gcs_bucket
 
@@ -149,38 +145,6 @@ def _stream_logs_background(job_id: str, region: str, stop_event: threading.Even
 
 
 # --- Tasks ---
-
-
-@task(name="materialize-features", retries=2, retry_delay_seconds=30)
-def materialize_features_task(truncate: bool = True) -> MaterializationResult:
-    """Materialize engineered features in BigQuery."""
-    logger = get_task_logger(__name__)
-    logger.info("Materializing features in BigQuery")
-
-    from estate_value_index.ml.feature_materialization import materialize_features
-
-    result = materialize_features(
-        project_id=None,
-        dry_run=False,
-        truncate=truncate,
-        batch_size=None,
-    )
-
-    if result:
-        row_count = result.get("row_count")
-        if result.get("dry_run", False):
-            logger.info(f"Features computed (dry_run): {row_count} rows prepared")
-        else:
-            logger.info(f"Features materialized: {row_count} rows")
-    else:
-        row_count = None
-        logger.warning("Feature materialization returned no result")
-
-    return MaterializationResult(
-        success=True,
-        timestamp=datetime.now().isoformat(),
-        row_count=row_count,
-    )
 
 
 @task(name="rebuild-container", retries=1, retry_delay_seconds=60, timeout_seconds=900)
@@ -404,7 +368,7 @@ def download_model_artifacts_task(
     is_macos = platform.system() == "Darwin"
     gsutil_opts = ["-o", "GSUtil:parallel_process_count=1"] if is_macos else []
 
-    cmd = ["gsutil"] + gsutil_opts + ["-m", "cp", "-r", f"{model_uri}/*", str(local_dir)]
+    cmd = ["gsutil", *gsutil_opts, "-m", "cp", "-r", f"{model_uri}/*", str(local_dir)]
     run_command(cmd, "GCS download", timeout=300)
 
     artifacts = {}
@@ -452,7 +416,7 @@ def validate_model_performance_task(
     logger = get_task_logger(__name__)
     logger.info(f"Validating model performance from {metrics_path}")
 
-    with open(metrics_path) as f:
+    with Path(metrics_path).open() as f:
         metrics = json.load(f)
 
     median_ape = metrics.get("median_ape")
@@ -529,7 +493,7 @@ def promote_model_to_production_task(
         source = f"{model_uri.rstrip('/')}/{filename}"
         dest = f"{production_path}/{filename}"
 
-        cmd = ["gsutil"] + gsutil_opts + ["cp", source, dest]
+        cmd = ["gsutil", *gsutil_opts, "cp", source, dest]
         run_command(cmd, f"Copy {filename}", timeout=60)
         promoted_files.append(dest)
         logger.info(f"Promoted: {filename}")

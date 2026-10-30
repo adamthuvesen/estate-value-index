@@ -102,7 +102,7 @@ def process_listings_task(
     # Count results
     total_listings = 0
     if output_file.exists():
-        with open(output_file, encoding="utf-8") as f:
+        with Path(output_file).open(encoding="utf-8") as f:
             total_listings = sum(1 for line in f if line.strip())
 
     logger.info(f"Processing complete: {total_listings} listings")
@@ -121,7 +121,7 @@ def _load_unique_bq_rows(processed_file: Path, prepare_bq_row) -> list[dict]:
     listings = []
     seen_ids: set[str] = set()
 
-    with open(processed_file, encoding="utf-8") as f:
+    with Path(processed_file).open(encoding="utf-8") as f:
         for line in f:
             line = line.strip()
             if not line:

@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 import time
 from collections.abc import Mapping, Sequence
-from typing import Any
+from typing import Any, ClassVar
 
 import numpy as np
 import pandas as pd
@@ -41,7 +41,7 @@ class LGBMTrainer:
     """
 
     # Default parameters from historical best model (2025-10-05, 238K MAE)
-    DEFAULT_PARAMS: dict[str, Any] = {
+    DEFAULT_PARAMS: ClassVar[dict[str, Any]] = {
         "num_leaves": 20,
         "learning_rate": 0.14512245277319302,
         "n_estimators": 1333,
@@ -220,7 +220,3 @@ class LGBMTrainer:
         if self.model is None:
             raise ValueError("Model not trained. Call train() first.")
         return self.model.predict(X)
-
-    def get_best_params(self) -> dict[str, Any]:
-        """Get best parameters found during training."""
-        return self.best_params.copy() if self.best_params else {}

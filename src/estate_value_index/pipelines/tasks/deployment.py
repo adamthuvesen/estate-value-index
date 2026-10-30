@@ -519,7 +519,7 @@ def log_metrics_task(
     local_dir.mkdir(parents=True, exist_ok=True)
     local_path = local_dir / filename
 
-    with open(local_path, "w", encoding="utf-8") as f:
+    with local_path.open("w", encoding="utf-8") as f:
         json.dump(metrics, f, indent=2, ensure_ascii=False)
 
     logger.info(f"Metrics logged to {local_path}")

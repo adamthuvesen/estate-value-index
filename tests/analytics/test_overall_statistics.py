@@ -16,7 +16,7 @@ from estate_value_index.analytics.overall_statistics import (
 def test_build_histogram_clips_to_percentile_window_but_percentiles_are_unclipped():
     # 0..100 plus two extreme outliers. p1..p99 come from the full set; the
     # outliers are trimmed before binning so they don't stretch the axis.
-    values = list(range(0, 101)) + [10_000, -10_000]
+    values = [*list(range(0, 101)), 10000, -10000]
 
     hist = build_histogram(values, bins=10, clip_lo_pct=1, clip_hi_pct=99, as_int=True)
 

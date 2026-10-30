@@ -24,9 +24,6 @@ _COMMANDS: dict[str, Command] = {
         supports_json=True,
     ),
     "process": Command("Process raw listings", "estate_value_index.cli.process_listings"),
-    "features": Command(
-        "Materialize features to BigQuery", "estate_value_index.cli.materialize_features"
-    ),
     "areas": Command(
         "Generate area statistics JSON for the web UI",
         "estate_value_index.cli.generate_area_statistics",
@@ -38,10 +35,6 @@ _COMMANDS: dict[str, Command] = {
     "value-analysis": Command(
         "Generate value analysis enrichment JSON",
         "estate_value_index.cli.generate_value_analysis",
-    ),
-    "area-metrics": Command(
-        "Print area-level model performance metrics",
-        "estate_value_index.cli.area_performance_metrics",
     ),
     "train-production-models": Command(
         "Train the two production prediction models",

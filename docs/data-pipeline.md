@@ -1,14 +1,13 @@
 # Data pipeline
 
 The data path starts with authorized listing ingestion output, lands raw listings in BigQuery,
-materializes engineered features, then feeds model training or serving artifacts. The public
+then feeds model training or serving artifacts. The public
 repo contains code and synthetic fixtures only. Redistributable listing data is not included.
 
 ## Main flow
 
 ```text
 Permissioned listing source -> JSONL + upload path -> process_listings -> booli_raw.listings
-  -> materialize_features -> booli_features.engineered_features
   -> train-production-models -> web/models/* -> Next /api/* -> FastAPI /predict
 ```
 
@@ -18,7 +17,7 @@ Permissioned listing source -> JSONL + upload path -> process_listings -> booli_
 - Ingestion utilities and loaders: `src/estate_value_index/ingestion/`
 - Pipeline orchestration: `src/estate_value_index/pipelines/core/complete_pipeline.py`
 - Pipeline tasks: `src/estate_value_index/pipelines/tasks/`
-- BigQuery schemas: `schemas/bq_raw_listings.json`, `schemas/bq_features_engineered.json`
+- BigQuery schemas: `schemas/bq_raw_listings.json`
 - Pipeline config: `config/pipeline_config.yaml`
 - Web enrichment JSON (`data/derived/`, synced to GCS): `area_statistics.json`,
   `value_analysis.json`, and `overall_statistics.json` (city-wide stats for `/stats`;

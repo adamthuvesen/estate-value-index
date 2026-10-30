@@ -58,7 +58,7 @@ def generate_area_statistics_task(
     if not output_file.exists():
         raise FileNotFoundError(f"Output file not created: {output_file}")
 
-    with open(output_file, encoding="utf-8") as f:
+    with Path(output_file).open(encoding="utf-8") as f:
         stats = json.load(f)
         areas_count = len(stats.get("areas", []))
 
@@ -116,7 +116,7 @@ def generate_overall_statistics_task(
     if not output_file.exists():
         raise FileNotFoundError(f"Output file not created: {output_file}")
 
-    with open(output_file, encoding="utf-8") as f:
+    with Path(output_file).open(encoding="utf-8") as f:
         stats = json.load(f)
         total_properties = stats.get("metadata", {}).get("total_properties", 0)
 
@@ -178,7 +178,7 @@ def generate_value_analysis_task(
     if not output_file.exists():
         raise FileNotFoundError(f"Output file not created: {output_file}")
 
-    with open(output_file, encoding="utf-8") as f:
+    with Path(output_file).open(encoding="utf-8") as f:
         analysis = json.load(f)
         stats = analysis.get("statistics", {})
         properties_count = stats.get("total_properties", 0)

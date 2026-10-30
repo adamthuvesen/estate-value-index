@@ -238,31 +238,6 @@ def load_listings(
     )
 
 
-def _find_project_root(start: Path) -> Path:
-    """Walk upward from ``start`` until a ``pyproject.toml`` is found."""
-    for candidate in (start, *start.parents):
-        if (candidate / "pyproject.toml").is_file():
-            return candidate
-    raise FileNotFoundError(
-        f"Could not locate project root (no pyproject.toml found above {start})"
-    )
-
-
-def load_default_dataset(*, drop_duplicate_listing_ids: bool = True) -> pd.DataFrame:
-    """Load data from the repo's ``data/`` directory.
-
-    Walks upward from this module until a ``pyproject.toml`` marker is found,
-    then loads listings from ``<project_root>/data``. Raises ``FileNotFoundError``
-    rather than silently returning an empty DataFrame when the marker or the
-    data directory is missing.
-    """
-    project_root = _find_project_root(Path(__file__).resolve())
-    default_data_dir = project_root / "data"
-    if not default_data_dir.is_dir():
-        raise FileNotFoundError(f"Default data directory not found: {default_data_dir}")
-    return load_listings(default_data_dir, drop_duplicate_listing_ids=drop_duplicate_listing_ids)
-
-
 def load_from_bigquery(
     project_id: str | None = None,
     dataset_id: str | None = None,
@@ -322,9 +297,8 @@ def load_features_from_bigquery(
 ) -> pd.DataFrame:
     """Load pre-computed engineered features from BigQuery.
 
-    This function loads features materialized by
-    ``uv run python -m estate_value_index.cli features``, skipping the feature
-    engineering step.
+    Reads the engineered features table in BigQuery, so feature engineering
+    is not repeated.
 
     Args:
         project_id: GCP project ID. If None, uses environment config.

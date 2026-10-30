@@ -238,7 +238,7 @@ def test_train_test_distribution_isolation() -> None:
     """The training-fold context's global stats match a feature run that never saw the test rows."""
     df = _disjoint_distribution_frame()
     df_sorted = sort_by_temporal_order(df, date_column="sold_date")
-    train_df, test_df = create_temporal_holdout_split(
+    train_df, _test_df = create_temporal_holdout_split(
         df_sorted, test_size=0.5, date_column="sold_date"
     )
 
@@ -325,7 +325,7 @@ def test_build_feature_context_uses_train_df() -> None:
     df = df.iloc[rng.permutation(len(df))].reset_index(drop=True)
 
     df_sorted = sort_by_temporal_order(df, date_column="sold_date")
-    train_df, test_df = create_temporal_holdout_split(
+    train_df, _test_df = create_temporal_holdout_split(
         df_sorted, test_size=0.5, date_column="sold_date"
     )
 

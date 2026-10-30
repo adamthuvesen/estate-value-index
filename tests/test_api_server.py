@@ -169,7 +169,7 @@ def test_health_responds_while_predicts_in_flight() -> None:
     active_predicts = 0
     lock = threading.Lock()
 
-    def slow_predict(_df):  # noqa: ANN001
+    def slow_predict(_df):
         nonlocal active_predicts
         with lock:
             active_predicts += 1

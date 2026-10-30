@@ -102,12 +102,12 @@ def build_histogram(
     bin_width = (hi - lo) / bins
 
     def r(x: float) -> float:
-        return int(round(x)) if as_int else x
+        return round(x) if as_int else x
 
     return {
         "min": r(lo),
         "max": r(hi),
-        "bin_width": int(round(bin_width)) if as_int else bin_width,
+        "bin_width": round(bin_width) if as_int else bin_width,
         "counts": [int(c) for c in counts],
         "p1": r(p1),
         "p25": r(p25),
@@ -829,7 +829,7 @@ def generate_overall_statistics(
 
     logger.info("Writing overall statistics to %s...", paths.output)
     paths.output.parent.mkdir(parents=True, exist_ok=True)
-    with open(paths.output, "w", encoding="utf-8") as f:
+    with Path(paths.output).open("w", encoding="utf-8") as f:
         json.dump(output_data, f, indent=2, ensure_ascii=False)
 
     logger.info(

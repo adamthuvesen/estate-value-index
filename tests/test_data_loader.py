@@ -9,7 +9,6 @@ from src.estate_value_index.ml.data_loader import (
     _coerce_numeric,
     _coerce_records,
     _iter_json_objects,
-    load_default_dataset,
     load_listings,
     load_raw_records,
 )
@@ -281,27 +280,6 @@ class TestListingLoading:
 
         df = load_listings(temp_data_dir)
         assert len(df) == 0
-
-
-class TestDefaultDatasetLoading:
-    @pytest.mark.unit
-    def test_load_default_dataset_path_resolution(self):
-        try:
-            df = load_default_dataset()
-            assert isinstance(df, pd.DataFrame)
-        except FileNotFoundError:
-            # No data directory in test env — expected
-            pass
-
-    @pytest.mark.unit
-    def test_load_default_dataset_duplicate_parameter(self):
-        try:
-            df1 = load_default_dataset(drop_duplicate_listing_ids=True)
-            df2 = load_default_dataset(drop_duplicate_listing_ids=False)
-            assert isinstance(df1, pd.DataFrame)
-            assert isinstance(df2, pd.DataFrame)
-        except FileNotFoundError:
-            pass
 
 
 class TestErrorHandling:

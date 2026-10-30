@@ -372,7 +372,7 @@ def _stats_dict(stats: pd.DataFrame) -> dict[str, dict[str, float]]:
 
 
 def _float_stat(row: pd.Series, column: str, *, fallback: float = np.nan) -> float:
-    value = row[column] if column in row else fallback
+    value = row.get(column, fallback)
     if pd.isna(value):
         return float(fallback)
     return float(value)

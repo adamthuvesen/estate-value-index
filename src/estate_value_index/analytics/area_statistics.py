@@ -34,7 +34,7 @@ class AreaStatisticsPaths:
 
 
 def load_json(filepath: Path) -> dict:
-    with open(filepath, encoding="utf-8") as f:
+    with Path(filepath).open(encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -342,7 +342,7 @@ def calculate_monthly_median_prices(properties: list[dict], months: int = 12) ->
             continue
         try:
             sold_date = datetime.strptime(sold_date_str, "%Y-%m-%d")
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             continue
         label = target_labels.get((sold_date.year, sold_date.month))
         if label is not None:
@@ -761,7 +761,7 @@ def _area_statistics_output(
 
 def _write_area_statistics(output_data: dict[str, Any], output_path: Path) -> None:
     logger.info("Writing output to %s...", output_path)
-    with open(output_path, "w", encoding="utf-8") as f:
+    with Path(output_path).open("w", encoding="utf-8") as f:
         json.dump(output_data, f, indent=2, ensure_ascii=False)
 
 

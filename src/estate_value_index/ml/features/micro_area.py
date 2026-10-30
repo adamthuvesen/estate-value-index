@@ -524,7 +524,7 @@ def _neighbor_cells(cell: object) -> set[str]:
 
     try:
         cells = set(h3.grid_disk(cell, 1))
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return set()
     cells.discard(cell)
     return {str(value) for value in cells}
@@ -794,7 +794,7 @@ def _stats_dict(stats: pd.DataFrame) -> dict[str, dict[str, float]]:
 
 
 def _float_stat(row: pd.Series, column: str, *, fallback: float = np.nan) -> float:
-    value = row[column] if column in row else fallback
+    value = row.get(column, fallback)
     if pd.isna(value):
         return float(fallback)
     return float(value)

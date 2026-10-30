@@ -73,16 +73,11 @@ def _log_data_collection_summary(logger: Any, ingestion_result: dict[str, Any]) 
     ingestion_info = ingestion_result.get("ingestion", {})
     processing_info = ingestion_result.get("processing", {})
     bq_info = ingestion_result.get("bigquery", {})
-    features_info = ingestion_result.get("features", {})
 
     fetched = ingestion_info.get("validation", {}).get("valid_listings", 0)
     processed = processing_info.get("total_listings", 0)
     bq_rows = bq_info.get("uploaded", 0) if bq_info else 0
-    feat_rows = features_info.get("row_count", 0) if features_info else 0
-    logger.info(
-        "Stage 1 complete: "
-        f"fetched={fetched}, processed={processed}, bq={bq_rows}, features={feat_rows}"
-    )
+    logger.info(f"Stage 1 complete: fetched={fetched}, processed={processed}, bq={bq_rows}")
 
 
 def _run_data_collection_stage(
@@ -108,7 +103,6 @@ def _run_data_collection_stage(
     ingestion_result = complete_ingestion_flow(
         max_pages=max_pages,
         upload_to_bq=not dry_run,
-        materialize_features=not dry_run,
         upload_to_cloud=False,
         sync_after_upload=False,
         config_file=config_path,
@@ -152,7 +146,6 @@ def _training_config(
     use_vertex: bool,
     machine_type: str,
     rebuild_container: bool,
-    skip_ingestion: bool,
     dry_run: bool,
 ) -> TrainingFlowConfig:
     if use_vertex:
@@ -160,7 +153,6 @@ def _training_config(
             tune=tune,
             machine_type=machine_type,
             rebuild_container=rebuild_container,
-            skip_materialization=not skip_ingestion,
             register_to_vertex=False,
             stream_logs=True,
             dry_run=dry_run,
@@ -181,7 +173,6 @@ def _run_training_stage(
     use_vertex: bool,
     machine_type: str,
     rebuild_container: bool,
-    skip_ingestion: bool,
     dry_run: bool,
 ) -> dict[str, Any]:
     logger.info(f"Stage 2: Training ({'vertex' if use_vertex else 'local'}, tune={tune})")
@@ -190,7 +181,6 @@ def _run_training_stage(
         use_vertex=use_vertex,
         machine_type=machine_type,
         rebuild_container=rebuild_container,
-        skip_ingestion=skip_ingestion,
         dry_run=dry_run,
     )
     training_result = vertex_training_flow(config=config)
@@ -408,7 +398,6 @@ def complete_pipeline_flow(
             use_vertex=use_vertex,
             machine_type=machine_type,
             rebuild_container=rebuild_container,
-            skip_ingestion=skip_ingestion,
             dry_run=dry_run,
         )
         if not training_result.get("success", False):

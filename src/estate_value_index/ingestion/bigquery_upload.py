@@ -29,7 +29,7 @@ def prepare_bq_row(item: dict[str, Any]) -> dict[str, Any]:
             return None
         try:
             return int(float(value))
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             return None
 
     def to_float(value: Any) -> float | None:
@@ -37,7 +37,7 @@ def prepare_bq_row(item: dict[str, Any]) -> dict[str, Any]:
             return None
         try:
             return float(value)
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             return None
 
     return {

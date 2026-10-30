@@ -73,7 +73,6 @@ intentionally git-ignored.
 - General ML changes: `uv run pytest tests/ml tests/test_training.py tests/test_features.py`
 - Leakage-sensitive changes: `uv run pytest tests/ml/test_temporal_leakage.py`
 - Model serving/integrity: `uv run pytest tests/api/test_model_integrity.py tests/test_api_server.py`
-- Feature materialization: `uv run pytest tests/ml/test_feature_materialization.py tests/test_data_loader.py`
 
 ## Useful commands
 

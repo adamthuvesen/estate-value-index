@@ -287,14 +287,7 @@ def load_raw_training_frame(
     data_source: str,
     data_file: str | Path | None,
 ) -> pd.DataFrame:
-    frame, skip_feature_engineering = load_training_dataframe(
-        use_materialized_features=False,
-        data_source=data_source,
-        data_file=data_file,
-    )
-    if skip_feature_engineering:
-        raise ValueError("Production model training requires raw listings")
-    return frame
+    return load_training_dataframe(data_source=data_source, data_file=data_file)
 
 
 def train_and_persist_production_models(
@@ -589,15 +582,6 @@ def _prepare_raw_for_model(
     if not requires_listing_price:
         raw = mask_ask_price_signals(raw)
     return raw
-
-
-def _engineer_for_model(raw_frame: pd.DataFrame, model: TieredProductionModel) -> pd.DataFrame:
-    """Engineer rows the same way ``model.predict`` does, for offline calibration inputs."""
-    raw = _prepare_raw_for_model(
-        raw_frame.reset_index(drop=True),
-        requires_listing_price=model.requires_listing_price,
-    )
-    return create_optimized_features(raw, context=model.context)
 
 
 def _feature_matrix(

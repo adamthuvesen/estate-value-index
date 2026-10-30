@@ -8,50 +8,15 @@ import pandas as pd
 """Heuristic spatial and energy estimates."""
 
 
-def _estimate_energy_efficiency(year: Any, area: Any) -> float:
-    """Estimate energy efficiency based on construction year and size."""
-    if pd.isna(year) or pd.isna(area):
-        return 5.0  # Default medium efficiency
-
-    year = int(year)
-    if year >= 2010:
-        base_score = 9.0  # Very energy efficient
-    elif year >= 2000:
-        base_score = 7.5  # Good efficiency
-    elif year >= 1990:
-        base_score = 6.0  # Moderate efficiency
-    elif year >= 1980:
-        base_score = 5.0  # Lower efficiency
-    elif year >= 1970:
-        base_score = 4.0  # Poor efficiency (often renovated)
-    else:
-        base_score = 6.0  # Older buildings often renovated
-
-    # Adjust for size (smaller units easier to heat efficiently)
-    if area < 40:
-        size_bonus = 1.0
-    elif area < 60:
-        size_bonus = 0.5
-    elif area > 80:
-        size_bonus = -0.5
-    else:
-        size_bonus = 0.0
-
-    return min(10.0, max(1.0, base_score + size_bonus))
-
-
 def _estimate_energy_efficiency_series(
     years: pd.Series | None, areas: pd.Series | None
 ) -> pd.Series:
-    """Vectorised twin of :func:`_estimate_energy_efficiency`.
+    """Estimate energy efficiency (1-10) per row from construction year and area.
 
-    Same bin boundaries and same default-on-NaN behaviour, but operates on
-    whole columns at once so it doesn't pay Python-per-row overhead. The
-    scalar function is kept so callers and tests outside the DataFrame path
-    keep working.
+    Rows with a missing year or area get the default score of 5.0.
     """
     if years is None or areas is None:
-        # No source columns → match the scalar default for every row.
+        # No source columns: every row gets the default score.
         index = (
             years.index
             if isinstance(years, pd.Series)
@@ -65,7 +30,7 @@ def _estimate_energy_efficiency_series(
     year_arr = pd.to_numeric(years, errors="coerce").to_numpy(dtype="float64", na_value=np.nan)
     area_arr = pd.to_numeric(areas, errors="coerce").to_numpy(dtype="float64", na_value=np.nan)
 
-    # Year-based base score: bins mirror the scalar function's elif ladder.
+    # Year-based base score by construction-year bin.
     base = np.select(
         condlist=[
             year_arr >= 2010,
@@ -79,7 +44,7 @@ def _estimate_energy_efficiency_series(
         default=np.nan,
     )
 
-    # Size adjustment: bins mirror the scalar function's <40 / <60 / >80 branches.
+    # Size adjustment by area bin: smaller units heat more efficiently.
     size_bonus = np.select(
         condlist=[
             area_arr < 40,
@@ -93,7 +58,7 @@ def _estimate_energy_efficiency_series(
     raw = base + size_bonus
     clipped = np.clip(raw, 1.0, 10.0)
 
-    # If either input is NaN the scalar function returns 5.0; preserve that.
+    # A missing year or area gets the default score.
     missing = np.isnan(year_arr) | np.isnan(area_arr)
     result = np.where(missing, 5.0, clipped)
     return pd.Series(result, index=years.index, dtype=float)

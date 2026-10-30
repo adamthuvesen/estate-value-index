@@ -10,7 +10,6 @@ from estate_value_index.ml.poi import (
     STOCKHOLM_CENTER,
     STOCKHOLM_CENTER_LAT,
     STOCKHOLM_CENTER_LON,
-    compute_distance_to_city_center,
     compute_distance_to_city_center_series,
     count_pois_within_radius,
     distance_to_nearest_poi,
@@ -20,34 +19,13 @@ from estate_value_index.ml.poi import (
 class TestStockholmCenterConstants:
     def test_stockholm_center_is_sergels_torg(self):
         # Sergels Torg ≈ 59.3326, 18.0649
-        assert STOCKHOLM_CENTER_LAT == pytest.approx(59.3326, abs=0.001)
-        assert STOCKHOLM_CENTER_LON == pytest.approx(18.0649, abs=0.001)
+        assert pytest.approx(59.3326, abs=0.001) == STOCKHOLM_CENTER_LAT
+        assert pytest.approx(18.0649, abs=0.001) == STOCKHOLM_CENTER_LON
 
     def test_stockholm_center_tuple(self):
         assert isinstance(STOCKHOLM_CENTER, tuple)
         assert len(STOCKHOLM_CENTER) == 2
         assert STOCKHOLM_CENTER == (STOCKHOLM_CENTER_LAT, STOCKHOLM_CENTER_LON)
-
-
-class TestDistanceToCityCenter:
-    def test_center_has_zero_distance(self):
-        dist = compute_distance_to_city_center(STOCKHOLM_CENTER_LAT, STOCKHOLM_CENTER_LON)
-        assert dist == pytest.approx(0.0, abs=1.0)
-
-    def test_sodermalm_distance(self):
-        # Mariatorget → Sergels Torg ≈ 1.5-2 km
-        dist = compute_distance_to_city_center(59.3186, 18.0626)
-        assert 1000 < dist < 3000
-
-    def test_danderyd_distance(self):
-        # Danderyd → Sergels Torg ≈ 7-10 km
-        dist = compute_distance_to_city_center(59.3943, 18.0406)
-        assert 6000 < dist < 12000
-
-    def test_nan_input_returns_nan(self):
-        assert np.isnan(compute_distance_to_city_center(np.nan, 18.0649))
-        assert np.isnan(compute_distance_to_city_center(59.3326, np.nan))
-        assert np.isnan(compute_distance_to_city_center(np.nan, np.nan))
 
 
 class TestDistanceToCityCenterSeries:

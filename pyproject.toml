@@ -7,7 +7,7 @@ name = "estate-value-index"
 version = "1.0.0"
 description = "Swedish real estate ML system: authorized listings → BigQuery → LightGBM → Next.js"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.14"
 license = {text = "MIT"}
 authors = [
     {name = "Estate Value Index Team"}
@@ -17,8 +17,7 @@ classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.14",
 ]
 
 # Core dependencies (production runtime)
@@ -68,14 +67,14 @@ pipeline = [
 # Development dependencies
 # `[dev]` pulls in every extra needed to actually run the test suite, so a
 # fresh worktree can `uv pip install -e ".[dev]"` and have pytest collect
-# without chasing ad-hoc deps (evidently, matplotlib, seaborn, geopy, etc.).
+# without chasing ad-hoc deps (matplotlib, seaborn, geopy, etc.).
 dev = [
     "pytest>=7.4.0",
     "pytest-cov>=4.1.0",
     "pytest-mock>=3.11.0",
-    "ruff>=0.1.0",
     "pre-commit>=4.0.0",
-    "estate-value-index[ml,pipeline,viz,geo,monitoring,vertex]",
+    "httpx>=0.28.1",
+    "estate-value-index[ml,pipeline,viz,geo,analysis]",
 ]
 
 # Visualization dependencies
@@ -85,8 +84,8 @@ viz = [
     "statsmodels>=0.14.0",
 ]
 
-# Vertex AI training dependencies (additional to ml)
-vertex = [
+# Analysis extras: scipy for value analysis; pyarrow for Arrow-backed BigQuery results
+analysis = [
     "pyarrow>=12.0.0",
     "scipy>=1.10.0",
 ]
@@ -97,14 +96,14 @@ geo = [
     "h3>=4.0.0",
 ]
 
-# ML monitoring and drift detection
-monitoring = [
-    "evidently>=0.4.0,<0.5.0",
-]
-
 # All optional dependencies
 all = [
-    "estate-value-index[ml,dev,pipeline,viz,vertex,geo,monitoring]",
+    "estate-value-index[ml,dev,pipeline,viz,analysis,geo]",
+]
+
+[dependency-groups]
+dev = [
+    "ruff==0.17.4",
 ]
 
 [project.scripts]
@@ -167,7 +166,7 @@ filterwarnings = [
 
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+target-version = "py314"
 exclude = [
     ".git",
     ".venv",
@@ -185,7 +184,12 @@ select = [
     "F",  # pyflakes
     "I",  # isort
     "B",  # flake8-bugbear
+    "SIM", # flake8-simplify
     "C4", # flake8-comprehensions
+    "PTH", # flake8-use-pathlib
+    "RUF", # ruff-specific rules
+    "PGH003", # blanket type: ignore
+    "PGH004", # blanket noqa
     "UP", # pyupgrade
 ]
 ignore = [
@@ -194,10 +198,12 @@ ignore = [
     "C901",  # too complex
 ]
 
+# Size-bucket labels ("40–50") and docs use the en dash and multiplication sign on purpose.
+allowed-confusables = ["–", "×"]
+
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]  # Allow unused imports in __init__ files
 "tests/*" = ["B011", "E402"]  # assert False; sys.path before imports
-"src/estate_value_index/ingestion/booli/settings.py" = ["F403"]  # optional local_settings
 
 [tool.ruff.lint.isort]
 known-first-party = ["estate_value_index"]

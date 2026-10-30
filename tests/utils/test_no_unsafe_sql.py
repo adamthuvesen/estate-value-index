@@ -110,10 +110,13 @@ def _find_unsafe_sql(tree: ast.AST, module: str) -> list[tuple[str, int]]:
 
         def visit_JoinedStr(self, node: ast.JoinedStr) -> None:
             interpolations = [v for v in node.values if isinstance(v, ast.FormattedValue)]
-            if interpolations and _SQL_STATEMENT.search(_joinedstr_text(node)):
-                if not all(_is_safe_call(fv.value) for fv in interpolations):
-                    qualname = f"{module}:{'.'.join(self._stack) or '<module>'}"
-                    findings.append((qualname, node.lineno))
+            if (
+                interpolations
+                and _SQL_STATEMENT.search(_joinedstr_text(node))
+                and not all(_is_safe_call(fv.value) for fv in interpolations)
+            ):
+                qualname = f"{module}:{'.'.join(self._stack) or '<module>'}"
+                findings.append((qualname, node.lineno))
             self.generic_visit(node)
 
     Visitor().visit(tree)

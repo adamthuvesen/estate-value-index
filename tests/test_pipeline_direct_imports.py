@@ -6,19 +6,6 @@ from pathlib import Path
 import pytest
 
 
-class TestFeatureMaterializationTask:
-    def test_materialize_features_no_subprocess(self):
-        source = Path("src/estate_value_index/pipelines/tasks/training.py").read_text()
-        assert (
-            "from estate_value_index.ml.feature_materialization import materialize_features"
-            in source
-        )
-
-        from estate_value_index.pipelines.tasks.training import materialize_features_task
-
-        assert "subprocess.run" not in inspect.getsource(materialize_features_task)
-
-
 class TestAreaStatisticsTask:
     def test_generate_area_statistics_task_no_subprocess(self):
         from estate_value_index.pipelines.tasks.analytics import generate_area_statistics_task
@@ -58,28 +45,6 @@ class TestScriptEntrypoints:
 class TestNoSubprocessRegressions:
     """subprocess usage must be limited to external tools (gcloud, gsutil, etc.)."""
 
-    def test_training_tasks_subprocess_usage(self):
-        source = Path("src/estate_value_index/pipelines/tasks/training.py").read_text()
-
-        # Extract just the materialize_features_task function body
-        lines = source.split("\n")
-        in_materialize_task = False
-        materialize_task_lines = []
-        for line in lines:
-            if "def materialize_features_task" in line:
-                in_materialize_task = True
-            if in_materialize_task:
-                materialize_task_lines.append(line)
-                if line.startswith("def ") and "materialize_features_task" not in line:
-                    break
-                if line.startswith("@task") and len(materialize_task_lines) > 10:
-                    break
-
-        materialize_task_source = "\n".join(materialize_task_lines)
-        assert "subprocess.run" not in materialize_task_source, (
-            "materialize_features_task still uses subprocess.run"
-        )
-
     def test_analytics_tasks_subprocess_usage(self):
         from estate_value_index.pipelines.tasks import analytics
 
@@ -97,16 +62,6 @@ class TestNoSubprocessRegressions:
 
 
 class TestImportStructure:
-    def test_training_imports_materialize_features(self):
-        from estate_value_index.pipelines.tasks import training
-
-        source = Path("src/estate_value_index/pipelines/tasks/training.py").read_text()
-        assert (
-            hasattr(training, "materialize_features")
-            or "from estate_value_index.ml.feature_materialization import materialize_features"
-            in source
-        )
-
     def test_analytics_imports_generators(self):
         source = Path("src/estate_value_index/pipelines/tasks/analytics.py").read_text()
         assert (
@@ -158,22 +113,6 @@ class TestUnifiedCliSubcommands:
 
         assert result == 0
         assert captured["argv"] == ["--output", str(output), "--model-type", "no_list_price"]
-
-    def test_area_metrics_dispatches_with_parsed_args(self, monkeypatch):
-        from estate_value_index.cli import __main__ as cli_main
-
-        captured = {}
-
-        def fake_area_metrics_main(argv):
-            captured["argv"] = argv
-            return 0
-
-        monkeypatch.setattr(cli_main, "_load_handler", lambda command: fake_area_metrics_main)
-
-        result = cli_main.main(["area-metrics"])
-
-        assert result == 0
-        assert captured["argv"] == []
 
 
 if __name__ == "__main__":

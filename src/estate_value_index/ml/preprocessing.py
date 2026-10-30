@@ -57,9 +57,8 @@ def normalize_area_for_model(area: object, *, empty_for_unknown: bool = False) -
     Args:
         area: Raw area string (any Booli-shaped or pre-cleaned value).
         empty_for_unknown: When True, map missing/unknown areas to ``""`` instead
-            of ``"unknown"`` — useful for keys that need to be join-safe (e.g. the
-            geocode join in feature materialization, where ``"unknown"`` would
-            produce a sentinel match).
+            of ``"unknown"`` — useful for keys that need to be join-safe, where
+            ``"unknown"`` would produce a sentinel match.
     """
     extracted = extract_area_name(area)
     if extracted is None or extracted == "":
@@ -117,35 +116,6 @@ def filter_valid_listings(
         filtered = filtered.dropna(subset=list(existing_features))
 
     return filtered.reset_index(drop=True)
-
-
-def prepare_features(
-    frame: pd.DataFrame,
-    *,
-    feature_spec: FeatureSpec | None = None,
-    target: str = "sold_price",
-) -> tuple[pd.DataFrame, pd.Series, FeatureSpec]:
-    """Split the dataset into features and target along with the feature spec."""
-
-    if feature_spec is None:
-        feature_spec = FeatureSpec(
-            numeric=[col for col in NUMERIC_FEATURE_NAMES if col in frame.columns],
-            categorical=[col for col in CATEGORICAL_FEATURE_NAMES if col in frame.columns],
-            target=target,
-        )
-
-    missing_features = [
-        col for col in feature_spec.numeric + feature_spec.categorical if col not in frame.columns
-    ]
-    if missing_features:
-        raise KeyError(f"Missing expected feature columns: {missing_features}")
-    if target not in frame.columns:
-        raise KeyError(f"Missing target column '{target}'")
-
-    X = frame[feature_spec.numeric + feature_spec.categorical].copy()
-    y = frame[target].copy()
-
-    return X, y, feature_spec
 
 
 def drop_outliers_quantile(

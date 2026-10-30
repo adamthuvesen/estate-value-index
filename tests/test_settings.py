@@ -10,14 +10,9 @@ import pytest
 from src.estate_value_index.utils.settings import (
     bq_table,
     get_batch_size,
-    get_cloud_run_region,
-    get_cloud_run_service_name,
     get_cv_folds,
-    get_data_source,
     get_median_ape_threshold,
     get_min_ingestion_validation_rate,
-    get_model_output_dir,
-    get_model_prefix,
     get_random_state,
     get_test_size,
     is_debug,
@@ -55,9 +50,8 @@ class TestEnvConfig:
             assert config.gcs_bucket == "test-bucket"
 
     def test_load_env_config_missing_required_var(self):
-        with patch.dict(os.environ, {}, clear=True):
-            with pytest.raises(KeyError):
-                load_env_config()
+        with patch.dict(os.environ, {}, clear=True), pytest.raises(KeyError):
+            load_env_config()
 
     def test_load_env_config_with_defaults(self):
         env_vars = {
@@ -106,7 +100,7 @@ ingestion:
                 assert config["bigquery"]["batch_size"] == 2000
                 assert config["ingestion"]["min_validation_rate"] == 0.6
             finally:
-                os.unlink(f.name)
+                Path(f.name).unlink()
 
     def test_load_yaml_config_nonexistent_file(self):
         assert load_yaml_config("nonexistent.yaml") == {}
@@ -125,15 +119,19 @@ class TestHelperFunctions:
             assert get_median_ape_threshold() == 0.09
 
     def test_get_median_ape_threshold_from_yaml(self):
-        with patch.dict(os.environ, {"MAX_MEDIAN_APE_THRESHOLD": ""}):
-            with patch("src.estate_value_index.utils.settings.load_yaml_config") as mock_load:
-                mock_load.return_value = {"training": {"median_ape_threshold": 0.07}}
-                assert get_median_ape_threshold() == 0.07
+        with (
+            patch.dict(os.environ, {"MAX_MEDIAN_APE_THRESHOLD": ""}),
+            patch("src.estate_value_index.utils.settings.load_yaml_config") as mock_load,
+        ):
+            mock_load.return_value = {"training": {"median_ape_threshold": 0.07}}
+            assert get_median_ape_threshold() == 0.07
 
     def test_get_median_ape_threshold_default(self):
-        with patch.dict(os.environ, {}, clear=True):
-            with patch("src.estate_value_index.utils.settings.load_yaml_config", return_value={}):
-                assert get_median_ape_threshold() == 0.08
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            patch("src.estate_value_index.utils.settings.load_yaml_config", return_value={}),
+        ):
+            assert get_median_ape_threshold() == 0.08
 
     def test_get_random_state_from_yaml(self):
         with patch("src.estate_value_index.utils.settings.load_yaml_config") as mock_load:
@@ -172,15 +170,19 @@ class TestHelperFunctions:
             assert get_batch_size() == 1500
 
     def test_get_batch_size_default(self):
-        with patch.dict(os.environ, {}, clear=True):
-            with patch("src.estate_value_index.utils.settings.load_yaml_config", return_value={}):
-                assert get_batch_size() == 1000
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            patch("src.estate_value_index.utils.settings.load_yaml_config", return_value={}),
+        ):
+            assert get_batch_size() == 1000
 
     def test_get_min_ingestion_validation_rate(self):
-        with patch.dict(os.environ, {}, clear=True):
-            with patch("src.estate_value_index.utils.settings.load_yaml_config") as mock_load:
-                mock_load.return_value = {"ingestion": {"min_validation_rate": 0.6}}
-                assert get_min_ingestion_validation_rate() == 0.6
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            patch("src.estate_value_index.utils.settings.load_yaml_config") as mock_load,
+        ):
+            mock_load.return_value = {"ingestion": {"min_validation_rate": 0.6}}
+            assert get_min_ingestion_validation_rate() == 0.6
 
 
 class TestBooleanFlags:
@@ -249,48 +251,6 @@ class TestBooleanFlags:
         assert settings_fn is gcs_fn
 
 
-class TestEnvVarFunctions:
-    def test_get_data_source_from_env(self):
-        with patch.dict(os.environ, {"DATA_SOURCE": "bigquery"}):
-            assert get_data_source() == "bigquery"
-
-    def test_get_data_source_default(self):
-        with patch.dict(os.environ, {}, clear=True):
-            assert get_data_source() == "bigquery"
-
-    def test_get_model_prefix_from_env(self):
-        with patch.dict(os.environ, {"MODEL_PREFIX": "custom_model"}):
-            assert get_model_prefix() == "custom_model"
-
-    def test_get_model_prefix_default(self):
-        with patch.dict(os.environ, {}, clear=True):
-            assert get_model_prefix() == "price_prediction_model"
-
-    def test_get_model_output_dir_from_env(self):
-        with patch.dict(os.environ, {"MODEL_OUTPUT_DIR": "custom/models"}):
-            assert get_model_output_dir() == Path("custom/models")
-
-    def test_get_model_output_dir_default(self):
-        with patch.dict(os.environ, {}, clear=True):
-            assert get_model_output_dir() == Path("web/models")
-
-    def test_get_cloud_run_service_name_from_env(self):
-        with patch.dict(os.environ, {"CLOUD_RUN_SERVICE_NAME": "custom-service"}):
-            assert get_cloud_run_service_name() == "custom-service"
-
-    def test_get_cloud_run_service_name_default(self):
-        with patch.dict(os.environ, {}, clear=True):
-            assert get_cloud_run_service_name() == "estate-value-index-app"
-
-    def test_get_cloud_run_region_from_env(self):
-        with patch.dict(os.environ, {"CLOUD_RUN_REGION": "us-central1"}):
-            assert get_cloud_run_region() == "us-central1"
-
-    def test_get_cloud_run_region_default(self):
-        with patch.dict(os.environ, {}, clear=True):
-            assert get_cloud_run_region() == "europe-north1"
-
-
 class TestConfigSummary:
     def test_print_config_summary_with_valid_config(self, capsys):
         env_vars = {
@@ -304,24 +264,26 @@ class TestConfigSummary:
             "GCS_BUCKET": "test-bucket",
         }
 
-        with patch.dict(os.environ, env_vars):
-            with patch("src.estate_value_index.utils.settings.load_yaml_config") as mock_load:
-                mock_load.return_value = {
-                    "training": {"median_ape_threshold": 0.07},
-                    "bigquery": {"batch_size": 2000},
-                    "ingestion": {"min_validation_rate": 0.6},
-                }
+        with (
+            patch.dict(os.environ, env_vars),
+            patch("src.estate_value_index.utils.settings.load_yaml_config") as mock_load,
+        ):
+            mock_load.return_value = {
+                "training": {"median_ape_threshold": 0.07},
+                "bigquery": {"batch_size": 2000},
+                "ingestion": {"min_validation_rate": 0.6},
+            }
 
-                print_config_summary()
+            print_config_summary()
 
-                captured = capsys.readouterr()
-                assert "ESTATE VALUE INDEX CONFIGURATION SUMMARY" in captured.out
-                assert "test-project" in captured.out
-                assert "test_raw" in captured.out
-                assert "test_listings" in captured.out
-                assert "test_features" in captured.out
-                assert "test_engineered_features" in captured.out
-                assert "test-bucket" in captured.out
+            captured = capsys.readouterr()
+            assert "ESTATE VALUE INDEX CONFIGURATION SUMMARY" in captured.out
+            assert "test-project" in captured.out
+            assert "test_raw" in captured.out
+            assert "test_listings" in captured.out
+            assert "test_features" in captured.out
+            assert "test_engineered_features" in captured.out
+            assert "test-bucket" in captured.out
 
     def test_print_config_summary_with_missing_vars(self, capsys):
         with patch.dict(os.environ, {}, clear=True):
