@@ -25,10 +25,7 @@ type LoadResult =
 
 async function loadAreas(): Promise<LoadResult> {
   try {
-    const [data, areas] = await Promise.all([
-      getAreaStatisticsData(),
-      getAreaOverviewList(),
-    ]);
+    const [data, areas] = await Promise.all([getAreaStatisticsData(), getAreaOverviewList()]);
     return { ok: true, areas, meta: data.metadata };
   } catch (error) {
     console.error("Error loading areas:", error);
@@ -43,9 +40,7 @@ const ERROR_COPY: Record<"missing" | "error", string> = {
 };
 
 function Shell({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">{children}</div>
-  );
+  return <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">{children}</div>;
 }
 
 /** Swatch key for the per-m² color grade — the coding is otherwise undocumented. */
@@ -89,9 +84,10 @@ export default async function AreasPage() {
   const isStale = staleInfo?.isStale ?? false;
   const hasLimited = areas.some((area) => area.has_limited_data);
 
-  const metaLine = isStale && staleInfo
-    ? `Source: Booli · Updated ${formatDateSv(meta.generated_at)} · ${Math.floor(staleInfo.ageDays)} days old`
-    : `Source: Booli · Updated ${formatDateSv(meta.generated_at)}`;
+  const metaLine =
+    isStale && staleInfo
+      ? `Source: Booli · Updated ${formatDateSv(meta.generated_at)} · ${Math.floor(staleInfo.ageDays)} days old`
+      : `Source: Booli · Updated ${formatDateSv(meta.generated_at)}`;
 
   return (
     <Shell>
@@ -101,8 +97,8 @@ export default async function AreasPage() {
         title="Stockholm areas"
         lead={
           <>
-            Market statistics across {meta.total_areas} areas. Table 1 ranks prices, momentum,
-            and where the model finds the most undervalued homes.
+            Market statistics across {meta.total_areas} areas. Table 1 ranks prices, momentum, and
+            where the model finds the most undervalued homes.
           </>
         }
       >
@@ -121,9 +117,7 @@ export default async function AreasPage() {
           meta={metaLine}
           stale={isStale}
           actions={<PerSqmLegend />}
-          footnote={
-            hasLimited ? "† Limited sample — interpret with care." : undefined
-          }
+          footnote={hasLimited ? "† Limited sample — interpret with care." : undefined}
         >
           <AreasTable areas={areas} />
         </FigureFrame>

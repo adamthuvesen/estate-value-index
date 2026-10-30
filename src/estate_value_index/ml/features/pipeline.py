@@ -37,13 +37,13 @@ class SimplePredictionPipeline:
         X_eng = create_optimized_features(X_raw, context=self.context)
 
         # Select and prepare features
-        X = X_eng[self.numeric_features + self.categorical_features].copy()
+        model_input = X_eng[[*self.numeric_features, *self.categorical_features]].copy()
 
         # Handle missing values using training statistics
-        X = self._fill_missing_values(X)
+        model_input = self._fill_missing_values(model_input)
 
         # Predict and transform back from log space
-        y_pred_log = self.model.predict(X)
+        y_pred_log = self.model.predict(model_input)
         return np.expm1(y_pred_log)
 
     def _fill_missing_values(self, X: pd.DataFrame) -> pd.DataFrame:
@@ -59,7 +59,7 @@ class SimplePredictionPipeline:
         for col in self.categorical_features:
             if col in X.columns:
                 mode_val = self.context.categorical_fill_values.get(col, "unknown")
-                if mode_val is None or (isinstance(mode_val, float) and pd.isna(mode_val)):
+                if isinstance(mode_val, float) and pd.isna(mode_val):
                     mode_val = "unknown"
                 X[col] = X[col].fillna(mode_val)
                 X[col] = X[col].astype("category")

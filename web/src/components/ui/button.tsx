@@ -45,9 +45,7 @@ export function Button({
   type = "button",
   ...props
 }: ButtonProps) {
-  return (
-    <button type={type} className={buttonClasses(variant, size, className)} {...props} />
-  );
+  return <button type={type} className={buttonClasses(variant, size, className)} {...props} />;
 }
 
 interface ButtonLinkProps extends ComponentPropsWithoutRef<typeof Link> {

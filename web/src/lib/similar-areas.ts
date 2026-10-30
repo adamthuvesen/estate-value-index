@@ -13,11 +13,7 @@ type CurrentArea = Pick<AreaOverview, "area_name" | "price_tier" | "avg_sold_pri
  * Score: +3 same price tier · +2 avg sold price within 10% · +1 within 20%.
  * Ties keep input order (stable sort); returns at most `n`.
  */
-export function selectSimilarAreas(
-  current: CurrentArea,
-  all: AreaOverview[],
-  n = 3,
-): ScoredArea[] {
+export function selectSimilarAreas(current: CurrentArea, all: AreaOverview[], n = 3): ScoredArea[] {
   return all
     .filter((area) => area.area_name !== current.area_name)
     .map((area) => {
@@ -25,7 +21,8 @@ export function selectSimilarAreas(
       if (area.price_tier === current.price_tier) {
         score += 3;
       }
-      const priceDiff = Math.abs(area.avg_sold_price - current.avg_sold_price) / current.avg_sold_price;
+      const priceDiff =
+        Math.abs(area.avg_sold_price - current.avg_sold_price) / current.avg_sold_price;
       if (priceDiff < 0.1) {
         score += 2;
       } else if (priceDiff < 0.2) {

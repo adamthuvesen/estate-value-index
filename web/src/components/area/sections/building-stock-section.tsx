@@ -1,9 +1,6 @@
 "use client";
 
-import type {
-  AreaPropertyCharacteristics,
-  ConstructionEraDistribution,
-} from "@/lib/area-types";
+import type { AreaPropertyCharacteristics, ConstructionEraDistribution } from "@/lib/area-types";
 import { formatPercent } from "@/lib/format";
 import { FigureFrame } from "@/components/ui/figure-frame";
 import { ConstructionEraChart } from "@/components/area/charts/construction-era-chart";

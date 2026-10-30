@@ -4,12 +4,7 @@ import Link from "next/link";
 import { FigureFrame } from "@/components/ui/figure-frame";
 import { SectionIntro } from "@/components/stats/section-intro";
 import type { OverallRecords, RecordSale } from "@/lib/overall-statistics-types";
-import {
-  formatDateSv,
-  formatNumber,
-  formatSek,
-  formatSignedPct,
-} from "@/lib/format";
+import { formatDateSv, formatNumber, formatSek, formatSignedPct } from "@/lib/format";
 
 interface CardConfig {
   label: string;

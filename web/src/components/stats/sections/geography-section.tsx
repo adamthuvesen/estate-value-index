@@ -26,8 +26,13 @@ function RankRows({
         const width = (area.median_price_per_sqm / max) * 100;
         const low = area.sales_count < LOW_N;
         return (
-          <li key={area.area_name} className="group grid grid-cols-[1.5rem_9rem_1fr_auto] items-center gap-3">
-            <span className="num text-right text-caption text-ledger-dimmed">{rankOffset + i + 1}</span>
+          <li
+            key={area.area_name}
+            className="group grid grid-cols-[1.5rem_9rem_1fr_auto] items-center gap-3"
+          >
+            <span className="num text-right text-caption text-ledger-dimmed">
+              {rankOffset + i + 1}
+            </span>
             <Link
               href={`/area/${area.area_name}`}
               className="focus-ring truncate text-body-sm font-medium text-ledger-text transition-colors hover:text-ledger-accent"
@@ -108,7 +113,10 @@ function RankTable({ areas }: { areas: GeographyArea[] }) {
         </thead>
         <tbody className="divide-y divide-ledger-border">
           {areas.map((area, i) => (
-            <tr key={area.area_name} className="group transition-colors hover:bg-ledger-elevated/60">
+            <tr
+              key={area.area_name}
+              className="group transition-colors hover:bg-ledger-elevated/60"
+            >
               <td className="num px-3 py-2 text-right text-body-sm text-ledger-dimmed">{i + 1}</td>
               <td className="px-3 py-2">
                 <Link

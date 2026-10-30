@@ -37,8 +37,12 @@ function ValueFinderContent() {
       limit: Number(searchParams.get("limit")) || 50,
       offset: Number(searchParams.get("offset")) || 0,
       area: searchParams.get("area")?.split(",").filter(Boolean),
-      min_living_area: searchParams.get("min_living_area") ? Number(searchParams.get("min_living_area")) : undefined,
-      max_living_area: searchParams.get("max_living_area") ? Number(searchParams.get("max_living_area")) : undefined,
+      min_living_area: searchParams.get("min_living_area")
+        ? Number(searchParams.get("min_living_area"))
+        : undefined,
+      max_living_area: searchParams.get("max_living_area")
+        ? Number(searchParams.get("max_living_area"))
+        : undefined,
       min_rooms: searchParams.get("min_rooms") ? Number(searchParams.get("min_rooms")) : undefined,
       max_rooms: searchParams.get("max_rooms") ? Number(searchParams.get("max_rooms")) : undefined,
       min_price: searchParams.get("min_price") ? Number(searchParams.get("min_price")) : undefined,
@@ -46,8 +50,12 @@ function ValueFinderContent() {
       property_type: searchParams.get("property_type")?.split(",").filter(Boolean),
       has_elevator: searchParams.get("has_elevator") === "true" ? true : undefined,
       has_balcony: searchParams.get("has_balcony") === "true" ? true : undefined,
-      min_value_score: searchParams.get("min_value_score") ? Number(searchParams.get("min_value_score")) : undefined,
-      max_value_score: searchParams.get("max_value_score") ? Number(searchParams.get("max_value_score")) : undefined,
+      min_value_score: searchParams.get("min_value_score")
+        ? Number(searchParams.get("min_value_score"))
+        : undefined,
+      max_value_score: searchParams.get("max_value_score")
+        ? Number(searchParams.get("max_value_score"))
+        : undefined,
       value_tier: searchParams.get("value_tier")?.split(",").filter(Boolean) as ValueTier[],
       search: searchParams.get("search") || undefined,
     };
@@ -73,7 +81,7 @@ function ValueFinderContent() {
 
       router.push(`/value-finder?${params.toString()}`, { scroll: false });
     },
-    [router, getFiltersFromUrl]
+    [router, getFiltersFromUrl],
   );
 
   useEffect(() => {
@@ -175,15 +183,9 @@ function ValueFinderContent() {
         >
           {metadata && (
             <StatBar>
-              <Stat
-                value={formatNumber(metadata.statistics.total_properties)}
-                label="Properties"
-              />
+              <Stat value={formatNumber(metadata.statistics.total_properties)} label="Properties" />
               <Stat value={metadata.statistics.value_score.mean.toFixed(1)} label="Avg score" />
-              <Stat
-                value={String(metadata.statistics.area_statistics.total_areas)}
-                label="Areas"
-              />
+              <Stat value={String(metadata.statistics.area_statistics.total_areas)} label="Areas" />
             </StatBar>
           )}
         </PageHero>
@@ -259,11 +261,23 @@ function ValueFinderContent() {
               {!isLoading && properties && properties.properties.length === 0 && (
                 <div className="px-6 py-16 text-center">
                   <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-ledger-elevated">
-                    <svg className="h-6 w-6 text-ledger-dimmed" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    <svg
+                      className="h-6 w-6 text-ledger-dimmed"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={1.75}
+                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                      />
                     </svg>
                   </div>
-                  <h3 className="mt-4 font-display text-lg font-semibold text-ledger-text">No matches</h3>
+                  <h3 className="mt-4 font-display text-lg font-semibold text-ledger-text">
+                    No matches
+                  </h3>
                   <p className="mx-auto mt-1.5 max-w-sm text-[14px] text-ledger-muted">
                     Nothing fits these filters. Try widening the range or clearing a tier.
                   </p>
@@ -291,7 +305,12 @@ function ValueFinderFallback() {
           lead="Every recent sale, scored against the model's estimate. Filter by value tier to surface the widest gaps between price paid and predicted worth."
         />
         <div className="mt-10 lg:mt-12">
-          <FigureFrame kind="table" index={1} title="Scored sales register" meta="Loading register…">
+          <FigureFrame
+            kind="table"
+            index={1}
+            title="Scored sales register"
+            meta="Loading register…"
+          >
             <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
               {Array.from({ length: 6 }).map((_, i) => (
                 <SkeletonCard key={i} />
@@ -311,4 +330,3 @@ export default function ValueFinderPage() {
     </Suspense>
   );
 }
-

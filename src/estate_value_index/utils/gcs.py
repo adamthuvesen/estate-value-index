@@ -4,10 +4,14 @@ import hashlib
 import logging
 import posixpath
 from pathlib import Path
+from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
 from estate_value_index.utils.approval import require_approval
 from estate_value_index.utils.settings import get_settings, is_gcs_enabled
+
+if TYPE_CHECKING:
+    from estate_value_index.utils.clients import StorageBlob, StorageBucket, StorageClient
 
 logger = logging.getLogger(__name__)
 
@@ -50,8 +54,8 @@ class GCSClient:
     def __init__(self, bucket_name: str | None = None):
         self.enabled = is_gcs_enabled()
         self.bucket_name = bucket_name
-        self._client = None
-        self._bucket = None
+        self._client: StorageClient | None = None
+        self._bucket: StorageBucket | None = None
 
         if self.enabled:
             # Resolve the bucket only when GCS is actually used, so disabled
@@ -70,6 +74,11 @@ class GCSClient:
             except Exception as exc:
                 raise RuntimeError(f"Failed to initialize GCS client: {exc}") from exc
 
+    def _blob(self, gcs_path: str) -> StorageBlob:
+        if self._bucket is None:
+            raise RuntimeError("GCS bucket is not initialised")
+        return self._bucket.blob(gcs_path)
+
     def upload_file(self, local_path: str | Path, gcs_path: str, *, approved: bool = False) -> str:
         """Upload a local file to GCS. Returns the GCS URI (or the local path when disabled)."""
         local_path = Path(local_path)
@@ -77,7 +86,7 @@ class GCSClient:
             return str(local_path)
 
         require_approval(f"upload {local_path.name} to GCS", approved)
-        blob = self._bucket.blob(gcs_path)
+        blob = self._blob(gcs_path)
         blob.upload_from_filename(str(local_path))
         gcs_uri = f"gs://{self.bucket_name}/{gcs_path}"
         logger.info("Uploaded %s to %s", local_path, gcs_uri)
@@ -92,7 +101,7 @@ class GCSClient:
             return local_path
 
         local_path.parent.mkdir(parents=True, exist_ok=True)
-        blob = self._bucket.blob(gcs_path)
+        blob = self._blob(gcs_path)
         blob.download_to_filename(str(local_path))
         logger.info("Downloaded gs://%s/%s to %s", self.bucket_name, gcs_path, local_path)
         return local_path
@@ -100,7 +109,10 @@ class GCSClient:
     def exists(self, gcs_path: str) -> bool:
         if not self.enabled:
             return Path(gcs_path).exists()
-        return self._bucket.blob(gcs_path).exists()
+        return self._blob(gcs_path).exists()
+
+    def delete(self, gcs_path: str) -> None:
+        self._blob(gcs_path).delete()
 
 
 def resolve_data_path(
@@ -153,7 +165,7 @@ def _rollback_partial_upload(client: GCSClient, artefact_dest: str) -> None:
     if not client.enabled:
         return
     try:
-        client._bucket.blob(artefact_dest).delete()
+        client.delete(artefact_dest)
     except Exception as cleanup_exc:  # pragma: no cover - best-effort
         logger.warning(
             "Failed to roll back partial upload %s: %s",

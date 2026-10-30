@@ -5,25 +5,25 @@
  */
 
 export const LISTING_ID_PATTERNS = [/^\/(?:annons|bostad)\/(?:[^/]+\/)*?(\d+)\/?$/i];
-export const LISTING_ID_QUERY_KEYS = ['booliid', 'listingid', 'objectid', 'id'];
+export const LISTING_ID_QUERY_KEYS = ["booliid", "listingid", "objectid", "id"];
 
-const TRUTHY = new Set(['true', 't', 'yes', 'y', '1', 'ja']);
-const FALSY = new Set(['false', 'f', 'no', 'n', '0', 'nej']);
+const TRUTHY = new Set(["true", "t", "yes", "y", "1", "ja"]);
+const FALSY = new Set(["false", "f", "no", "n", "0", "nej"]);
 
 /** Align with Python `to_bool` / `_coerce_nullable_bool` truth table. */
 export function coerceBool(value: unknown): boolean | null {
   if (value == null) {
     return null;
   }
-  if (typeof value === 'boolean') {
+  if (typeof value === "boolean") {
     return value;
   }
-  if (typeof value === 'number') {
+  if (typeof value === "number") {
     if (value === 1) return true;
     if (value === 0) return false;
     return null;
   }
-  if (typeof value === 'string') {
+  if (typeof value === "string") {
     const token = value.trim().toLowerCase();
     if (TRUTHY.has(token)) return true;
     if (FALSY.has(token)) return false;

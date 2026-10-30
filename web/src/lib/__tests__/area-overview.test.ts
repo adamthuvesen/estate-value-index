@@ -6,8 +6,9 @@ jest.mock("../area-statistics-cache", () => ({
   getAreaStatisticsData: jest.fn(),
 }));
 
-const mockedGetAreaStatisticsData =
-  getAreaStatisticsData as jest.MockedFunction<typeof getAreaStatisticsData>;
+const mockedGetAreaStatisticsData = getAreaStatisticsData as jest.MockedFunction<
+  typeof getAreaStatisticsData
+>;
 
 function areaStatistics(
   partial: Partial<AreaStatistics> & Pick<AreaStatistics, "area_name">,
@@ -71,7 +72,11 @@ function statisticsData(areas: AreaStatistics[]): AreaStatisticsData {
       generated_at: "2026-06-01T00:00:00Z",
       total_areas: areas.length,
       total_properties: 0,
-      data_sources: { feature_context: "fixture", value_analysis: "fixture", raw_listings: "fixture" },
+      data_sources: {
+        feature_context: "fixture",
+        value_analysis: "fixture",
+        raw_listings: "fixture",
+      },
     },
     areas: Object.fromEntries(areas.map((a) => [a.area_name, a])),
   };
@@ -146,9 +151,18 @@ describe("getAreaOverviewList", () => {
   it("returns all areas sorted by listing count descending", async () => {
     mockedGetAreaStatisticsData.mockResolvedValue(
       statisticsData([
-        areaStatistics({ area_name: "small", overview: { ...areaStatistics({ area_name: "small" }).overview, listing_count: 5 } }),
-        areaStatistics({ area_name: "big", overview: { ...areaStatistics({ area_name: "big" }).overview, listing_count: 50 } }),
-        areaStatistics({ area_name: "mid", overview: { ...areaStatistics({ area_name: "mid" }).overview, listing_count: 20 } }),
+        areaStatistics({
+          area_name: "small",
+          overview: { ...areaStatistics({ area_name: "small" }).overview, listing_count: 5 },
+        }),
+        areaStatistics({
+          area_name: "big",
+          overview: { ...areaStatistics({ area_name: "big" }).overview, listing_count: 50 },
+        }),
+        areaStatistics({
+          area_name: "mid",
+          overview: { ...areaStatistics({ area_name: "mid" }).overview, listing_count: 20 },
+        }),
       ]),
     );
 

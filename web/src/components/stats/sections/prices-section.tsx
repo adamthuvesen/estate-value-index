@@ -4,12 +4,7 @@ import { FigureFrame } from "@/components/ui/figure-frame";
 import { SectionIntro } from "@/components/stats/section-intro";
 import { HistogramBarChart } from "@/components/stats/charts/histogram-bar-chart";
 import type { OverallPrices } from "@/lib/overall-statistics-types";
-import {
-  formatNumber,
-  formatSek,
-  formatShortSek,
-  formatShortThousands,
-} from "@/lib/format";
+import { formatNumber, formatSek, formatShortSek, formatShortThousands } from "@/lib/format";
 
 function Quartiles({
   p25,
@@ -30,7 +25,10 @@ function Quartiles({
   return (
     <dl className="mt-5 grid grid-cols-3 gap-3 border-t border-ledger-border pt-4">
       {cells.map(([label, value, strong]) => (
-        <div key={label} className={strong ? "rounded-sm bg-ledger-accent-tint px-3 py-2" : "px-3 py-2"}>
+        <div
+          key={label}
+          className={strong ? "rounded-sm bg-ledger-accent-tint px-3 py-2" : "px-3 py-2"}
+        >
           <dt className="eyebrow text-ledger-dimmed">{label}</dt>
           <dd
             className={`num mt-1 text-heading font-semibold ${

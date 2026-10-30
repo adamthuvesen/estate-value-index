@@ -8,8 +8,9 @@ jest.mock("@/lib/value-analysis-cache", () => ({
   getValueAnalysisData: jest.fn(),
 }));
 
-const mockedGetValueAnalysisData =
-  getValueAnalysisData as jest.MockedFunction<typeof getValueAnalysisData>;
+const mockedGetValueAnalysisData = getValueAnalysisData as jest.MockedFunction<
+  typeof getValueAnalysisData
+>;
 
 function makeRequest(query = ""): NextRequest {
   return new NextRequest(`http://localhost/api/value-finder${query}`);
@@ -129,7 +130,9 @@ describe("value-finder API errors", () => {
   it("returns filtered data for valid queries", async () => {
     mockedGetValueAnalysisData.mockResolvedValue(valueAnalysisData());
 
-    const response = await getValueFinder(makeRequest("?limit=1&offset=0&value_tier=Excellent%20Value"));
+    const response = await getValueFinder(
+      makeRequest("?limit=1&offset=0&value_tier=Excellent%20Value"),
+    );
     const body = await response.json();
 
     expect(response.status).toBe(200);
@@ -178,7 +181,7 @@ describe("value-finder API errors", () => {
         "Data file is not available and GCS fallback is disabled.",
         "/app/data/derived/value_analysis.json",
         "derived/value_analysis.json",
-      )
+      ),
     );
 
     const response = await getValueFinder(makeRequest());

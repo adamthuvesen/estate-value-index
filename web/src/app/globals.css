@@ -1,4 +1,4 @@
-@import 'tailwindcss';
+@import "tailwindcss";
 
 /* ============================================================
    Nordic Ledger — a Swedish property register, taken literally.
@@ -42,14 +42,11 @@
   --color-val-high-line: #f1cfc9;
 
   /* ---------- Fonts ---------- */
-  --font-sans:
-    var(--font-inter), system-ui, -apple-system, Segoe UI, sans-serif;
+  --font-sans: var(--font-inter), system-ui, -apple-system, Segoe UI, sans-serif;
   --font-mono:
-    var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo, Monaco,
-    Consolas, Liberation Mono, Courier New, monospace;
-  --font-display:
-    var(--font-schibsted), var(--font-inter), system-ui, -apple-system,
-    sans-serif;
+    var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    Liberation Mono, Courier New, monospace;
+  --font-display: var(--font-schibsted), var(--font-inter), system-ui, -apple-system, sans-serif;
 
   /* ---------- Type scale (size · line-height · tracking · weight) ---------- */
   --text-display: clamp(2.125rem, 1.06rem + 4.5vw, 3.25rem); /* 34px @375px → 52px */
@@ -107,12 +104,9 @@
   --transition-duration-ledger: 180ms;
 
   /* ---------- Elevation + focus ---------- */
-  --shadow-elev-1:
-    0 1px 2px rgba(16, 17, 20, 0.04), 0 1px 3px rgba(16, 17, 20, 0.05);
-  --shadow-elev-2:
-    0 4px 14px rgba(16, 17, 20, 0.07), 0 2px 5px rgba(16, 17, 20, 0.05);
-  --shadow-elev-3:
-    0 12px 32px rgba(16, 17, 20, 0.1), 0 4px 10px rgba(16, 17, 20, 0.06);
+  --shadow-elev-1: 0 1px 2px rgba(16, 17, 20, 0.04), 0 1px 3px rgba(16, 17, 20, 0.05);
+  --shadow-elev-2: 0 4px 14px rgba(16, 17, 20, 0.07), 0 2px 5px rgba(16, 17, 20, 0.05);
+  --shadow-elev-3: 0 12px 32px rgba(16, 17, 20, 0.1), 0 4px 10px rgba(16, 17, 20, 0.06);
   --shadow-focus: 0 0 0 3px rgba(23, 69, 143, 0.2);
 
   /* ---------- Keyframe animations ---------- */
@@ -235,7 +229,10 @@
 
   /* Tabular, aligned numerals wherever we use mono for data */
   .font-mono {
-    font-feature-settings: "tnum" 1, "zero" 1, "cv02" 1;
+    font-feature-settings:
+      "tnum" 1,
+      "zero" 1,
+      "cv02" 1;
   }
 
   ::selection {
@@ -281,7 +278,9 @@ input[type="range"]::-webkit-slider-thumb {
   border: 1.5px solid #16171a;
   box-shadow: 0 1px 3px rgba(16, 17, 20, 0.18);
   margin-top: -6px;
-  transition: box-shadow 150ms ease, transform 150ms ease;
+  transition:
+    box-shadow 150ms ease,
+    transform 150ms ease;
 }
 input[type="range"]::-webkit-slider-thumb:hover {
   transform: scale(1.1);

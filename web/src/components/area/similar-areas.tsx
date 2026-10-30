@@ -42,7 +42,9 @@ export function SimilarAreas({ areas }: SimilarAreasProps) {
             <dl className="mt-4 space-y-2 text-body-sm">
               <div className="flex items-baseline justify-between border-t border-ledger-border pt-2">
                 <dt className="text-ledger-muted">Avg price</dt>
-                <dd className="num font-medium text-ledger-text">{formatSek(area.avg_sold_price)}</dd>
+                <dd className="num font-medium text-ledger-text">
+                  {formatSek(area.avg_sold_price)}
+                </dd>
               </div>
               <div className="flex items-baseline justify-between border-t border-ledger-border pt-2">
                 <dt className="text-ledger-muted">Properties</dt>

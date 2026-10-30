@@ -67,10 +67,17 @@ export function RailNav() {
                     : "text-ledger-muted hover:bg-ledger-elevated/70 hover:text-ledger-text",
                 )}
               >
-                <span className={cn("num text-caption", isActive ? "text-ledger-accent" : "text-ledger-dimmed")}>
+                <span
+                  className={cn(
+                    "num text-caption",
+                    isActive ? "text-ledger-accent" : "text-ledger-dimmed",
+                  )}
+                >
                   {section.chapter}
                 </span>
-                {isActive && <span className="h-1.5 w-1.5 rounded-full bg-ledger-accent" aria-hidden />}
+                {isActive && (
+                  <span className="h-1.5 w-1.5 rounded-full bg-ledger-accent" aria-hidden />
+                )}
                 <span className="flex-1">{section.title}</span>
                 {FIGURE_REF[section.id] && (
                   <span className="eyebrow shrink-0 text-ledger-dimmed">

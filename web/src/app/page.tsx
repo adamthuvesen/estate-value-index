@@ -13,9 +13,7 @@ async function loadAreaNames(): Promise<string[]> {
   // let the form's free-text area field carry on.
   try {
     const areas = await getAreaOverviewList();
-    return areas
-      .map((area) => area.display_name)
-      .sort((a, b) => a.localeCompare(b, "sv"));
+    return areas.map((area) => area.display_name).sort((a, b) => a.localeCompare(b, "sv"));
   } catch (error) {
     console.error("[HOME] Area list unavailable, rendering predictor without it:", error);
     return [];

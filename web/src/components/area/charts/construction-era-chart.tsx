@@ -13,12 +13,16 @@ const ERA_ORDER = ["Pre-1900", "1900-1950", "1950-1980", "1980-2000", "2000+"];
 /** Fig. 4 — construction era, chronological, single hue. Rhymes with Fig. 2.
  *  The old tiles + legend duplication folds into the frame's footnote. */
 export function ConstructionEraChart({ construction_era }: ConstructionEraChartProps) {
-
   if (
     !construction_era.median_year ||
     Object.keys(construction_era.era_distribution).length === 0
   ) {
-    return <ChartEmpty message="No construction-era data available." height={ERA_ORDER.length * 36 + 8} />;
+    return (
+      <ChartEmpty
+        message="No construction-era data available."
+        height={ERA_ORDER.length * 36 + 8}
+      />
+    );
   }
 
   const data = ERA_ORDER.filter((era) => construction_era.era_distribution[era]).map((era) => ({

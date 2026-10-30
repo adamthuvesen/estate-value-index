@@ -4,10 +4,10 @@
 // Learn more: https://jestjs.io/docs/configuration#setupfilesafterenv-array
 
 // Mock environment variables for testing
-process.env.NODE_ENV = 'test'
+process.env.NODE_ENV = "test";
 
 // Increase timeout for integration tests
-jest.setTimeout(30000)
+jest.setTimeout(30000);
 
 // Mock console methods to reduce noise in tests
 global.console = {
@@ -18,4 +18,4 @@ global.console = {
   // info: jest.fn(),
   // warn: jest.fn(),
   // error: jest.fn(),
-}
+};

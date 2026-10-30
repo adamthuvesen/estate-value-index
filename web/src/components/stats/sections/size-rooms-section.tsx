@@ -5,11 +5,7 @@ import { SectionIntro } from "@/components/stats/section-intro";
 import { SimpleBarChart, type SimpleBar } from "@/components/stats/charts/simple-bar-chart";
 import { TrendLineChart, type TrendPoint } from "@/components/stats/charts/trend-line-chart";
 import type { OverallSizeRooms } from "@/lib/overall-statistics-types";
-import {
-  formatNumber,
-  formatShortSek,
-  formatShortThousands,
-} from "@/lib/format";
+import { formatNumber, formatShortSek, formatShortThousands } from "@/lib/format";
 
 const ROOM_ORDER = ["1", "2", "3", "4+"];
 const LOW_N = 30;
@@ -57,10 +53,7 @@ export function SizeRoomsSection({
   const curveLast = sizeRooms.ppsqm_vs_size_curve[sizeRooms.ppsqm_vs_size_curve.length - 1];
   const smallPremium =
     curveFirst && curveLast
-      ? (
-          (curveFirst.median_price_per_sqm / curveLast.median_price_per_sqm - 1) *
-          100
-        ).toFixed(0)
+      ? ((curveFirst.median_price_per_sqm / curveLast.median_price_per_sqm - 1) * 100).toFixed(0)
       : null;
 
   return (

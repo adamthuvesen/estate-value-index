@@ -84,7 +84,11 @@ describe("buildMonthlySeries", () => {
   });
 
   it("falls back to total unit when per-m² is requested without a valid living area", () => {
-    const series = buildMonthlySeries(realisticSource, { now: NOW, unit: "per_sqm", avgLivingArea: 0 });
+    const series = buildMonthlySeries(realisticSource, {
+      now: NOW,
+      unit: "per_sqm",
+      avgLivingArea: 0,
+    });
     expect(series.unit).toBe("total");
     const byAgo = Object.fromEntries(series.points.map((p) => [p.monthsAgo, p]));
     expect(byAgo[6].value).toBe(4_800_000);
@@ -104,14 +108,16 @@ describe("computeTrailingChange", () => {
   it("uses the earliest and latest real points across the realistic fixture", () => {
     const { points } = buildMonthlySeries(realisticSource, { now: NOW });
     // month_11 (2_425_000) → month_6 (4_800_000)
-    expect(computeTrailingChange(points)).toBeCloseTo(((4_800_000 - 2_425_000) / 2_425_000) * 100, 5);
+    expect(computeTrailingChange(points)).toBeCloseTo(
+      ((4_800_000 - 2_425_000) / 2_425_000) * 100,
+      5,
+    );
   });
 
   it("returns null with fewer than 2 real points", () => {
-    const { points } = buildMonthlySeries(
-      source({ monthly_prices: { month_8: 2_350_000 } }),
-      { now: NOW },
-    );
+    const { points } = buildMonthlySeries(source({ monthly_prices: { month_8: 2_350_000 } }), {
+      now: NOW,
+    });
     expect(computeTrailingChange(points)).toBeNull();
   });
 

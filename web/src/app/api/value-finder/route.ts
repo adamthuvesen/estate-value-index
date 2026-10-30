@@ -39,7 +39,10 @@ function badRequest(message: string) {
 
 function parseArrayParam(param: string | null): string[] | undefined {
   if (!param) return undefined;
-  return param.split(",").map((s) => s.trim()).filter(Boolean);
+  return param
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 
 function parseNumberParam(
@@ -109,11 +112,12 @@ function parseFilters(searchParams: URLSearchParams): ValueFinderFilters {
   return {
     sort: parseSortField(searchParams.get("sort")),
     order: parseSortOrder(searchParams.get("order")),
-    limit: parseNumberParam(searchParams, "limit", {
-      integer: true,
-      min: 1,
-      max: MAX_LIMIT,
-    }) ?? 50,
+    limit:
+      parseNumberParam(searchParams, "limit", {
+        integer: true,
+        min: 1,
+        max: MAX_LIMIT,
+      }) ?? 50,
     offset: parseNumberParam(searchParams, "offset", { integer: true, min: 0 }) ?? 0,
 
     area: parseArrayParam(searchParams.get("area")),
@@ -142,7 +146,7 @@ function buildPredicates(filters: ValueFinderFilters): Predicate[] {
 
   if (filters.value_tier) {
     const tiers = new Set(
-      Array.isArray(filters.value_tier) ? filters.value_tier : [filters.value_tier]
+      Array.isArray(filters.value_tier) ? filters.value_tier : [filters.value_tier],
     );
     predicates.push((p) => p.value_tier !== null && tiers.has(p.value_tier));
   }
@@ -154,7 +158,7 @@ function buildPredicates(filters: ValueFinderFilters): Predicate[] {
 
   if (filters.property_type) {
     const types = new Set(
-      Array.isArray(filters.property_type) ? filters.property_type : [filters.property_type]
+      Array.isArray(filters.property_type) ? filters.property_type : [filters.property_type],
     );
     predicates.push((p) => types.has(p.property_type));
   }
@@ -206,7 +210,7 @@ function buildPredicates(filters: ValueFinderFilters): Predicate[] {
       (p) =>
         p.address.toLowerCase().includes(needle) ||
         p.area.toLowerCase().includes(needle) ||
-        p.municipality.toLowerCase().includes(needle)
+        p.municipality.toLowerCase().includes(needle),
     );
   }
 
@@ -222,7 +226,7 @@ function applyFilters(properties: ValueProperty[], filters: ValueFinderFilters):
 function applySorting(
   properties: ValueProperty[],
   sortField: SortField = "value_score",
-  sortOrder: SortOrder = "desc"
+  sortOrder: SortOrder = "desc",
 ): ValueProperty[] {
   const sorted = [...properties];
 

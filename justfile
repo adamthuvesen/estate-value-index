@@ -31,7 +31,8 @@ check:
     lane types uv run --no-sync basedpyright
     lane pytest uv run --no-sync pytest -q --no-cov -p no:cacheprovider
     lane web-lint npm run lint --prefix web
-    lane web-tsc npm exec --prefix web -- tsc --noEmit -p web
+    lane web-format npm run format:check --prefix web
+    lane web-tsc npm run typecheck --prefix web
     lane web-jest npm test --prefix web
     lane web-types just types-check
     failed=0
@@ -50,7 +51,8 @@ check:
 fix: types
     uv run ruff check --fix .
     uv run ruff format .
-    npm exec --prefix web -- eslint src --fix
+    npm exec --prefix web -- oxlint --fix src
+    npm run format --prefix web
 
 # Regenerate the web TypeScript types from the Pydantic models' JSON Schema.
 types:
@@ -70,8 +72,10 @@ verify:
     @echo "verify skill not built yet (Phase 7)" >&2
     @exit 1
 
-# Full Python suite with the coverage gate, plus the web route-runtime check.
+# Full Python suite with the coverage gate, plus the web route-runtime check and the Next.js production build.
 slow:
     uv sync --locked --all-extras
     uv run --no-sync pytest -q
     npm run check:routes --prefix web
+    npm run build --prefix web
+    npm run typecheck --prefix web

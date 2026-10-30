@@ -4,15 +4,19 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from estate_value_index.ingestion.listing_row import validate_listing_rows
 from estate_value_index.utils.approval import require_approval
 from estate_value_index.utils.bigquery_safety import quote_identifier, safe_table_ref
-from estate_value_index.utils.clients import get_bq_client
+from estate_value_index.utils.clients import BigQueryClient, get_bq_client
 from estate_value_index.utils.settings import get_settings
+
+if TYPE_CHECKING:
+    from google.cloud import bigquery
 
 logger = logging.getLogger(__name__)
 
@@ -99,7 +103,13 @@ def _load_unique_bq_rows(processed_file: Path) -> list[dict[str, Any]]:
     return rows
 
 
-def _merge_query(table_ref: str, temp_table_ref: str, schema, *, update_existing: bool) -> str:
+def _merge_query(
+    table_ref: str,
+    temp_table_ref: str,
+    schema: Sequence[bigquery.SchemaField],
+    *,
+    update_existing: bool,
+) -> str:
     insert_fields = ", ".join(quote_identifier(field.name) for field in schema)
     insert_values = ", ".join(f"source.{quote_identifier(field.name)}" for field in schema)
     insert_clause = f"WHEN NOT MATCHED THEN INSERT ({insert_fields}) VALUES ({insert_values})"
@@ -122,16 +132,30 @@ def _merge_query(table_ref: str, temp_table_ref: str, schema, *, update_existing
         """
 
 
-def _execute_merge(client, table_ref: str, temp_table_ref: str, schema, *, update_existing: bool):
+def _execute_merge(
+    client: BigQueryClient,
+    table_ref: str,
+    temp_table_ref: str,
+    schema: Sequence[bigquery.SchemaField],
+    *,
+    update_existing: bool,
+) -> tuple[int, int]:
     merge_job = client.query(
         _merge_query(table_ref, temp_table_ref, schema, update_existing=update_existing)
     )
     merge_job.result()
-    stats = merge_job._properties.get("statistics", {}).get("query", {}).get("dmlStats", {})
-    return int(stats.get("insertedRowCount", 0)), int(stats.get("updatedRowCount", 0))
+    stats = merge_job.dml_stats
+    if stats is None:
+        return 0, 0
+    return stats.inserted_row_count, stats.updated_row_count
 
 
-def _merge_temp_table(client, table_ref: str, temp_table_ref: str, schema) -> tuple[int, int]:
+def _merge_temp_table(
+    client: BigQueryClient,
+    table_ref: str,
+    temp_table_ref: str,
+    schema: Sequence[bigquery.SchemaField],
+) -> tuple[int, int]:
     try:
         return _execute_merge(client, table_ref, temp_table_ref, schema, update_existing=True)
     except Exception as e:

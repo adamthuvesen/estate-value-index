@@ -46,9 +46,7 @@ const ERROR_COPY: Record<"missing" | "error", string> = {
 };
 
 function Shell({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">{children}</div>
-  );
+  return <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">{children}</div>;
 }
 
 /** Static contents anchors shown under the hero on mobile (the rail is hidden). */

@@ -1,10 +1,10 @@
-import { NextResponse } from 'next/server';
+import { NextResponse } from "next/server";
 import { getAreaStatisticsData } from "@/lib/area-statistics-cache";
 
 // Lock to the Node runtime so localhost `fetch` to the FastAPI sidecar works.
-export const runtime = 'nodejs';
+export const runtime = "nodejs";
 
-const FASTAPI_URL = process.env.PREDICTION_API_URL || 'http://localhost:8000';
+const FASTAPI_URL = process.env.PREDICTION_API_URL || "http://localhost:8000";
 const HEALTH_CHECK_TIMEOUT = 5000; // 5 seconds
 const AREA_DATA_STALE_DAYS = 8;
 
@@ -22,30 +22,30 @@ async function checkFastApi(): Promise<CheckResult> {
 
   try {
     const response = await fetch(`${FASTAPI_URL}/health`, {
-      method: 'GET',
+      method: "GET",
       signal: controller.signal,
     });
 
     if (response.ok) {
       const data = (await response.json()) as FastAPIHealth;
       return {
-        status: 'healthy',
+        status: "healthy",
         details: {
           models_loaded: data.models_loaded,
           models_count: data.models_count,
         },
       };
     }
-    console.error('[HEALTH] FastAPI unhealthy, status:', response.status);
+    console.error("[HEALTH] FastAPI unhealthy, status:", response.status);
     return {
-      status: 'unhealthy',
+      status: "unhealthy",
       details: { http_status: response.status },
     };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[HEALTH] FastAPI check failed:', errorMessage);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    console.error("[HEALTH] FastAPI check failed:", errorMessage);
     return {
-      status: 'unhealthy',
+      status: "unhealthy",
       details: { error: errorMessage },
     };
   } finally {
@@ -94,20 +94,20 @@ export async function GET() {
   const [fastapi, areaData] = await Promise.all([checkFastApi(), checkAreaData()]);
 
   const checks: Record<string, CheckResult> = {
-    nextjs: { status: 'healthy' },
+    nextjs: { status: "healthy" },
     fastapi,
     area_data: areaData,
   };
 
-  const allHealthy = Object.values(checks).every((check) => check.status === 'healthy');
+  const allHealthy = Object.values(checks).every((check) => check.status === "healthy");
   const httpStatus = allHealthy ? 200 : 503;
 
   return NextResponse.json(
     {
-      status: allHealthy ? 'healthy' : 'degraded',
+      status: allHealthy ? "healthy" : "degraded",
       checks,
       timestamp: new Date().toISOString(),
     },
-    { status: httpStatus }
+    { status: httpStatus },
   );
 }

@@ -19,6 +19,7 @@ export function SiteHeader() {
   const pathname = usePathname() ?? "/";
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPath, setMenuPath] = useState(pathname);
+  // oxlint-disable-next-line react/purity -- the year is display-only, so an impure read during render changes no state
   const currentYear = new Date().getFullYear();
 
   // Close the mobile disclosure on route change (adjust state during render;
@@ -68,7 +69,9 @@ export function SiteHeader() {
                     >
                       {chapterIndex(order)}
                     </span>
-                    {active && <span className="h-1.5 w-1.5 rounded-full bg-ledger-accent" aria-hidden />}
+                    {active && (
+                      <span className="h-1.5 w-1.5 rounded-full bg-ledger-accent" aria-hidden />
+                    )}
                     {item.label}
                   </Link>
                 );
@@ -111,10 +114,7 @@ export function SiteHeader() {
         </div>
       </div>
       {hasNav && menuOpen && (
-        <nav
-          id="mobile-nav"
-          className="border-t border-ledger-border bg-ledger-bg md:hidden"
-        >
+        <nav id="mobile-nav" className="border-t border-ledger-border bg-ledger-bg md:hidden">
           <ul className="mx-auto flex max-w-7xl flex-col px-4 py-2 sm:px-6">
             {siteConfig.navItems.map((item, order) => {
               const active = isActive(pathname, item.href);
@@ -135,7 +135,9 @@ export function SiteHeader() {
                     >
                       {chapterIndex(order)}
                     </span>
-                    {active && <span className="h-1.5 w-1.5 rounded-full bg-ledger-accent" aria-hidden />}
+                    {active && (
+                      <span className="h-1.5 w-1.5 rounded-full bg-ledger-accent" aria-hidden />
+                    )}
                     {item.label}
                   </Link>
                 </li>

@@ -9,11 +9,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import {
-  axisDefaults,
-  chartColors,
-  ChartTooltip
-} from "@/components/charts/chart-theme";
+import { axisDefaults, chartColors, ChartTooltip } from "@/components/charts/chart-theme";
 
 export interface TrendPoint {
   label: string;

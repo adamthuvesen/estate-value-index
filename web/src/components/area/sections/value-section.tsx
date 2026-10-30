@@ -43,7 +43,8 @@ export function ValueSection({ valueInsights, updatedAt, stale }: ValueSectionPr
             {formatNumberOrDash(insights.avg_value_score, 1)}
           </p>
           <p className="mt-1 text-caption text-ledger-muted">
-            Median: <span className="num">{formatNumberOrDash(insights.median_value_score, 1)}</span>
+            Median:{" "}
+            <span className="num">{formatNumberOrDash(insights.median_value_score, 1)}</span>
           </p>
         </div>
         <div className="rounded-sm border border-ledger-border bg-ledger-elevated p-4">

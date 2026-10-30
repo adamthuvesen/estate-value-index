@@ -1,10 +1,7 @@
 import { PageHero } from "@/components/ui/page-hero";
 import { Stat, StatBar } from "@/components/ui/stat-bar";
 import { BarcodeStrip } from "@/components/stats/barcode-strip";
-import type {
-  OverallHero,
-  OverallStatisticsMetadata,
-} from "@/lib/overall-statistics-types";
+import type { OverallHero, OverallStatisticsMetadata } from "@/lib/overall-statistics-types";
 import { formatNumber, formatShortSek } from "@/lib/format";
 
 function monthYear(iso: string): string {
@@ -19,9 +16,7 @@ export function StatsHero({
   hero: OverallHero;
   metadata: OverallStatisticsMetadata;
 }) {
-  const range = `${monthYear(metadata.date_range.start)} – ${monthYear(
-    metadata.date_range.end,
-  )}`;
+  const range = `${monthYear(metadata.date_range.start)} – ${monthYear(metadata.date_range.end)}`;
 
   return (
     <header>

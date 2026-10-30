@@ -35,27 +35,25 @@ export function usePredictionForm({
   modelLabels,
 }: UsePredictionOptions) {
   const defaultSample = sampleListings[0]?.data;
-  const [formData, setFormData] = useState<PredictionInput>(
-    () => ({
-      ...(defaultSample ?? {
-        listing_id: "",
-        listing_price: "",
-        living_area: "",
-        rooms: "2",
-        monthly_fee: "",
-        days_on_market: "30",
-        construction_year: "",
-        property_type: "Lägenhet",
-        area: defaultAreas[0] ?? "Södermalm",
-        model: "auto",
-        floor: "",
-        elevator: "",
-        balcony: "",
-        latitude: "",
-        longitude: "",
-      }),
-    })
-  );
+  const [formData, setFormData] = useState<PredictionInput>(() => ({
+    ...(defaultSample ?? {
+      listing_id: "",
+      listing_price: "",
+      living_area: "",
+      rooms: "2",
+      monthly_fee: "",
+      days_on_market: "30",
+      construction_year: "",
+      property_type: "Lägenhet",
+      area: defaultAreas[0] ?? "Södermalm",
+      model: "auto",
+      floor: "",
+      elevator: "",
+      balcony: "",
+      latitude: "",
+      longitude: "",
+    }),
+  }));
   const [listingUrl, setListingUrl] = useState("");
   const [areaOptions, setAreaOptions] = useState<string[]>(() => {
     const unique = new Set(defaultAreas);
@@ -82,7 +80,7 @@ export function usePredictionForm({
         minimumFractionDigits: 0,
         maximumFractionDigits: 0,
       }),
-    []
+    [],
   );
 
   const handleFieldChange = (field: keyof PredictionInput, value: string) => {
@@ -140,13 +138,10 @@ export function usePredictionForm({
           payload.listing_price != null
             ? String(Math.round(payload.listing_price))
             : prev.listing_price,
-        living_area:
-          payload.living_area != null ? String(payload.living_area) : prev.living_area,
+        living_area: payload.living_area != null ? String(payload.living_area) : prev.living_area,
         rooms: normalizedRooms ?? prev.rooms,
         monthly_fee:
-          payload.monthly_fee != null
-            ? String(Math.round(payload.monthly_fee))
-            : prev.monthly_fee,
+          payload.monthly_fee != null ? String(Math.round(payload.monthly_fee)) : prev.monthly_fee,
         days_on_market:
           payload.days_on_market != null
             ? String(Math.round(payload.days_on_market))
@@ -158,14 +153,8 @@ export function usePredictionForm({
         property_type: payload.property_type ?? prev.property_type,
         area: payload.area ?? prev.area,
         floor: payload.floor != null ? String(payload.floor) : prev.floor,
-        elevator:
-          payload.elevator != null
-            ? String(payload.elevator)
-            : prev.elevator,
-        balcony:
-          payload.balcony != null
-            ? String(payload.balcony)
-            : prev.balcony,
+        elevator: payload.elevator != null ? String(payload.elevator) : prev.elevator,
+        balcony: payload.balcony != null ? String(payload.balcony) : prev.balcony,
         latitude: payload.latitude != null ? String(payload.latitude) : prev.latitude,
         longitude: payload.longitude != null ? String(payload.longitude) : prev.longitude,
       }));
@@ -270,7 +259,9 @@ export function usePredictionForm({
       }
       const errorMessage = err instanceof Error ? err.message : "Prediction failed";
       if (errorMessage.includes("fetch failed") || errorMessage.includes("ECONNREFUSED")) {
-        setError("Prediction service unavailable. Please ensure the prediction API server is running.");
+        setError(
+          "Prediction service unavailable. Please ensure the prediction API server is running.",
+        );
       } else {
         setError(errorMessage);
       }
@@ -281,7 +272,6 @@ export function usePredictionForm({
       }
     }
   };
-
 
   const resolvedModelKey = (() => {
     if (prediction?.model_id) {
@@ -302,12 +292,12 @@ export function usePredictionForm({
       ? estimateRange(rawEstimate, prediction?.estimate_range_factors ?? undefined)
       : null;
   const anchorPrice = prediction?.input_data.listing_price ?? listingPriceValue;
-  const priceDifference = displayedEstimateRange !== null && anchorPrice > 0
-    ? displayedEstimateRange.center - anchorPrice
-    : null;
-  const differencePercent = priceDifference !== null && anchorPrice > 0
-    ? (priceDifference / anchorPrice) * 100
-    : null;
+  const priceDifference =
+    displayedEstimateRange !== null && anchorPrice > 0
+      ? displayedEstimateRange.center - anchorPrice
+      : null;
+  const differencePercent =
+    priceDifference !== null && anchorPrice > 0 ? (priceDifference / anchorPrice) * 100 : null;
   const isAboveAsking = priceDifference !== null ? priceDifference > 0 : null;
 
   return {

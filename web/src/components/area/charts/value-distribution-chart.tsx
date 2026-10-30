@@ -1,14 +1,6 @@
 "use client";
 
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Cell,
-  LabelList,
-  ResponsiveContainer,
-} from "recharts";
+import { BarChart, Bar, XAxis, YAxis, Cell, LabelList, ResponsiveContainer } from "recharts";
 import { VALUE_TIERS, type ValueTier } from "@/lib/value-finder-types";
 import { chartPalette, ChartEmpty } from "@/components/charts/chart-theme";
 

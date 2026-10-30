@@ -10,17 +10,8 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import type { MonthlySeries, PriceUnit } from "@/lib/price-trend";
-import {
-  axisDefaults,
-  chartColors,
-  ChartTooltip
-} from "@/components/charts/chart-theme";
-import {
-  formatSek,
-  formatSekPerSqm,
-  formatShortSek,
-  formatShortThousands,
-} from "@/lib/format";
+import { axisDefaults, chartColors, ChartTooltip } from "@/components/charts/chart-theme";
+import { formatSek, formatSekPerSqm, formatShortSek, formatShortThousands } from "@/lib/format";
 
 interface PriceTrendChartProps {
   series: MonthlySeries;
@@ -52,9 +43,7 @@ export function PriceTrendChart({ series, unit }: PriceTrendChartProps) {
   }
 
   const median12 = series.medians.find((m) => m.key === "12m")?.value ?? null;
-  const realIndices = series.points
-    .map((p, i) => (p.isReal ? i : -1))
-    .filter((i) => i >= 0);
+  const realIndices = series.points.map((p, i) => (p.isReal ? i : -1)).filter((i) => i >= 0);
   const lastRealIndex = realIndices[realIndices.length - 1];
 
   return (
@@ -101,7 +90,12 @@ export function PriceTrendChart({ series, unit }: PriceTrendChartProps) {
           strokeWidth={1.5}
           connectNulls={false}
           isAnimationActive={false}
-          dot={(props: { cx?: number; cy?: number; index?: number; payload?: { isReal?: boolean } }) => {
+          dot={(props: {
+            cx?: number;
+            cy?: number;
+            index?: number;
+            payload?: { isReal?: boolean };
+          }) => {
             const { cx, cy, index, payload } = props;
             if (cx == null || cy == null || !payload?.isReal) {
               return <g key={index} />;

@@ -53,8 +53,18 @@ export interface BuildMonthlySeriesOptions {
 }
 
 const MONTH_NAMES = [
-  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
 ];
 
 function isReal(raw: number | null | undefined): raw is number {
@@ -122,7 +132,9 @@ export function buildMonthlySeries(
  * Returns null when fewer than 2 real points exist.
  */
 export function computeTrailingChange(points: MonthlyPoint[]): number | null {
-  const real = points.filter((p): p is MonthlyPoint & { value: number } => p.isReal && p.value !== null);
+  const real = points.filter(
+    (p): p is MonthlyPoint & { value: number } => p.isReal && p.value !== null,
+  );
   if (real.length < 2) {
     return null;
   }

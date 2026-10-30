@@ -66,6 +66,9 @@ class _FakeGCSClient:
     def exists(self, gcs_path: str) -> bool:
         return (self._base / gcs_path).exists()
 
+    def delete(self, gcs_path: str) -> None:
+        self._bucket.blob(gcs_path).delete()
+
 
 @pytest.fixture
 def fake_model_dir(tmp_path: Path) -> Path:
@@ -130,7 +133,7 @@ def test_sidecar_upload_failure_rolls_back_artefact(
             raise RuntimeError("simulated sidecar upload failure")
         return real_upload(local_path, gcs_path, approved=approved)
 
-    fake_client.upload_file = upload_with_sidecar_failure  # type: ignore[assignment]
+    monkeypatch.setattr(fake_client, "upload_file", upload_with_sidecar_failure)
 
     monkeypatch.setattr(gcs_module, "is_gcs_enabled", lambda: True)
     monkeypatch.setattr(gcs_module, "GCSClient", lambda *a, **kw: fake_client)

@@ -7,9 +7,7 @@ import { DataFileLoadError, DataFileMissingError } from "@/lib/data-file-errors"
 
 // Default to true in production, false in development/test
 const isProduction = process.env.NODE_ENV === "production";
-const GCS_ENABLED = process.env.GCS_ENABLED
-  ? process.env.GCS_ENABLED === "true"
-  : isProduction;
+const GCS_ENABLED = process.env.GCS_ENABLED ? process.env.GCS_ENABLED === "true" : isProduction;
 
 let storageClient: Storage | null = null;
 
@@ -34,34 +32,30 @@ function isNotFoundError(error: unknown): boolean {
   return code === "404" || error.message.toLowerCase().includes("no such object");
 }
 
-export async function loadDataFile(
-  localPath: string,
-  gcsPath: string
-): Promise<string> {
+export async function loadDataFile(localPath: string, gcsPath: string): Promise<string> {
   try {
     const content = await readFile(localPath, "utf-8");
-    console.debug(JSON.stringify({ level: "debug", message: "Loaded data file from local", localPath }));
+    console.debug(
+      JSON.stringify({ level: "debug", message: "Loaded data file from local", localPath }),
+    );
     return content;
   } catch (error) {
     if (error instanceof Error && "code" in error && error.code !== "ENOENT") {
-      throw new DataFileLoadError(
-        "Failed to read data file.",
-        localPath,
-        gcsPath,
-        error.message,
-      );
+      throw new DataFileLoadError("Failed to read data file.", localPath, gcsPath, error.message);
     }
 
     if (!GCS_ENABLED) {
-      console.error(JSON.stringify({
-        level: "error",
-        message: "Data file not found and GCS fallback disabled",
-        localPath,
-        gcsPath,
-        gcsEnabled: GCS_ENABLED,
-        nodeEnv: process.env.NODE_ENV,
-        remediation: "Set GCS_ENABLED=true or ensure local file exists"
-      }));
+      console.error(
+        JSON.stringify({
+          level: "error",
+          message: "Data file not found and GCS fallback disabled",
+          localPath,
+          gcsPath,
+          gcsEnabled: GCS_ENABLED,
+          nodeEnv: process.env.NODE_ENV,
+          remediation: "Set GCS_ENABLED=true or ensure local file exists",
+        }),
+      );
       throw new DataFileMissingError(
         "Data file is not available and GCS fallback is disabled.",
         localPath,
@@ -69,7 +63,14 @@ export async function loadDataFile(
       );
     }
 
-    console.debug(JSON.stringify({ level: "debug", message: "Local file not found, downloading from GCS", localPath, gcsPath }));
+    console.debug(
+      JSON.stringify({
+        level: "debug",
+        message: "Local file not found, downloading from GCS",
+        localPath,
+        gcsPath,
+      }),
+    );
 
     try {
       const storage = getStorageClient();
@@ -83,7 +84,14 @@ export async function loadDataFile(
       try {
         await mkdir(dirname(localPath), { recursive: true });
         await writeFile(localPath, contentStr, "utf-8");
-        console.debug(JSON.stringify({ level: "debug", message: "Downloaded and cached data file locally", localPath, gcsPath }));
+        console.debug(
+          JSON.stringify({
+            level: "debug",
+            message: "Downloaded and cached data file locally",
+            localPath,
+            gcsPath,
+          }),
+        );
       } catch (writeError) {
         console.warn(`[GCS] Failed to cache file locally: ${writeError}`);
       }
@@ -94,12 +102,7 @@ export async function loadDataFile(
       if (isNotFoundError(gcsError)) {
         throw new DataFileMissingError("Data file is not available in GCS.", localPath, gcsPath);
       }
-      throw new DataFileLoadError(
-        "Failed to load data file.",
-        localPath,
-        gcsPath,
-        message,
-      );
+      throw new DataFileLoadError("Failed to load data file.", localPath, gcsPath, message);
     }
   }
 }

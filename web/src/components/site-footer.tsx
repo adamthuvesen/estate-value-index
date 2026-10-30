@@ -38,6 +38,7 @@ export function SiteFooter() {
             >
               GitHub
             </Link>
+            {/* oxlint-disable-next-line react/purity -- server component: the year is display-only, and each request renders it fresh */}
             <span className="text-ledger-dimmed">© {new Date().getFullYear()}</span>
           </nav>
         </div>

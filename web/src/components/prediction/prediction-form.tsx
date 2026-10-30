@@ -308,9 +308,7 @@ function AmenityToggle({
               onClick={() => onChange(option.value)}
               className={cn(
                 "focus-ring rounded-pill px-3.5 py-1 text-body-sm font-medium transition-colors",
-                selected
-                  ? "bg-ledger-text text-white"
-                  : "text-ledger-muted hover:text-ledger-text",
+                selected ? "bg-ledger-text text-white" : "text-ledger-muted hover:text-ledger-text",
               )}
             >
               {option.label}

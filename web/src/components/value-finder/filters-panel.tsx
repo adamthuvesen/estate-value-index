@@ -5,10 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { DualRangeSlider } from "@/components/ui/dual-range-slider";
 import { formatSek } from "@/lib/format";
 import { VALUE_TIER_STYLES } from "@/lib/tiers";
-import {
-  VALUE_TIERS,
-  type ValueFinderFilters,
-} from "@/lib/value-finder-types";
+import { VALUE_TIERS, type ValueFinderFilters } from "@/lib/value-finder-types";
 
 interface FiltersPanelProps {
   filters: ValueFinderFilters;
@@ -50,7 +47,11 @@ export function FiltersPanel({
   }).length;
 
   const handleAreaToggle = (area: string) => {
-    const currentAreas = Array.isArray(filters.area) ? filters.area : filters.area ? [filters.area] : [];
+    const currentAreas = Array.isArray(filters.area)
+      ? filters.area
+      : filters.area
+        ? [filters.area]
+        : [];
     const newAreas = currentAreas.includes(area)
       ? currentAreas.filter((a) => a !== area)
       : [...currentAreas, area];
@@ -58,10 +59,14 @@ export function FiltersPanel({
   };
 
   const filteredAreas = availableAreas.filter((area) =>
-    area.toLowerCase().includes(areaSearch.toLowerCase())
+    area.toLowerCase().includes(areaSearch.toLowerCase()),
   );
 
-  const selectedAreas = Array.isArray(filters.area) ? filters.area : filters.area ? [filters.area] : [];
+  const selectedAreas = Array.isArray(filters.area)
+    ? filters.area
+    : filters.area
+      ? [filters.area]
+      : [];
   const selectedTiers = Array.isArray(filters.value_tier)
     ? filters.value_tier
     : filters.value_tier
@@ -79,7 +84,9 @@ export function FiltersPanel({
         >
           <h2 className="eyebrow text-ledger-text">Filters</h2>
           {activeFilterCount > 0 && (
-            <Badge variant="accent" className="num">{activeFilterCount}</Badge>
+            <Badge variant="accent" className="num">
+              {activeFilterCount}
+            </Badge>
           )}
           <svg
             className={`h-4 w-4 text-ledger-dimmed transition-transform lg:hidden ${mobileOpen ? "rotate-180" : ""}`}
@@ -125,14 +132,20 @@ export function FiltersPanel({
                     disabled={isLoading}
                     className="disabled:cursor-not-allowed disabled:opacity-40"
                   />
-                  <span className={`h-2 w-2 shrink-0 rounded-full ${VALUE_TIER_STYLES[tier].dot}`} aria-hidden />
-                  <span className="text-[13px] font-medium text-ledger-text">{VALUE_TIER_STYLES[tier].label}</span>
+                  <span
+                    className={`h-2 w-2 shrink-0 rounded-full ${VALUE_TIER_STYLES[tier].dot}`}
+                    aria-hidden
+                  />
+                  <span className="text-[13px] font-medium text-ledger-text">
+                    {VALUE_TIER_STYLES[tier].label}
+                  </span>
                 </label>
               );
             })}
           </div>
           <p className="mt-3 text-[12px] leading-relaxed text-ledger-dimmed">
-            A property counts as good value when it sold at least 5% or 200k kr below the model estimate.
+            A property counts as good value when it sold at least 5% or 200k kr below the model
+            estimate.
           </p>
         </div>
 
@@ -143,9 +156,7 @@ export function FiltersPanel({
           minValue={filters.min_value_score ?? valueScoreRange.min}
           maxValue={filters.max_value_score ?? valueScoreRange.max}
           format={(lo, hi) => `${lo}–${hi}`}
-          onCommit={(lo, hi) =>
-            onFiltersChange({ min_value_score: lo, max_value_score: hi })
-          }
+          onCommit={(lo, hi) => onFiltersChange({ min_value_score: lo, max_value_score: hi })}
         />
 
         <RangeField
@@ -166,9 +177,7 @@ export function FiltersPanel({
           minValue={filters.min_living_area ?? livingAreaRange.min}
           maxValue={filters.max_living_area ?? livingAreaRange.max}
           format={(lo, hi) => `${lo}–${hi} m²`}
-          onCommit={(lo, hi) =>
-            onFiltersChange({ min_living_area: lo, max_living_area: hi })
-          }
+          onCommit={(lo, hi) => onFiltersChange({ min_living_area: lo, max_living_area: hi })}
         />
 
         <RangeField
@@ -184,7 +193,10 @@ export function FiltersPanel({
         {/* Areas */}
         <div className="px-5 py-5">
           <FieldLabel>
-            Areas {selectedAreas.length > 0 && <span className="text-ledger-accent">({selectedAreas.length})</span>}
+            Areas{" "}
+            {selectedAreas.length > 0 && (
+              <span className="text-ledger-accent">({selectedAreas.length})</span>
+            )}
           </FieldLabel>
           <input
             type="text"
@@ -236,7 +248,9 @@ export function FiltersPanel({
                         const newTypes = isSelected
                           ? selectedTypes.filter((t) => t !== type)
                           : [...selectedTypes, type];
-                        onFiltersChange({ property_type: newTypes.length > 0 ? newTypes : undefined });
+                        onFiltersChange({
+                          property_type: newTypes.length > 0 ? newTypes : undefined,
+                        });
                       }}
                       disabled={isLoading}
                       className="disabled:cursor-not-allowed disabled:opacity-40"
@@ -257,7 +271,9 @@ export function FiltersPanel({
               <input
                 type="checkbox"
                 checked={filters.has_elevator === true}
-                onChange={(e) => onFiltersChange({ has_elevator: e.target.checked ? true : undefined })}
+                onChange={(e) =>
+                  onFiltersChange({ has_elevator: e.target.checked ? true : undefined })
+                }
                 disabled={isLoading}
                 className="disabled:cursor-not-allowed disabled:opacity-40"
               />
@@ -267,7 +283,9 @@ export function FiltersPanel({
               <input
                 type="checkbox"
                 checked={filters.has_balcony === true}
-                onChange={(e) => onFiltersChange({ has_balcony: e.target.checked ? true : undefined })}
+                onChange={(e) =>
+                  onFiltersChange({ has_balcony: e.target.checked ? true : undefined })
+                }
                 disabled={isLoading}
                 className="disabled:cursor-not-allowed disabled:opacity-40"
               />

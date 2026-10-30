@@ -39,4 +39,3 @@ export interface AreaOverview {
   has_limited_data: boolean;
   sample_size: number;
 }
-

@@ -5,11 +5,7 @@ import Link from "next/link";
 import { cn } from "@/lib/cn";
 import { TierChip } from "@/components/ui/badge";
 import type { AreaOverview } from "@/lib/area-types";
-import {
-  formatNumber,
-  formatNumberOrDash,
-  formatSek,
-} from "@/lib/format";
+import { formatNumber, formatNumberOrDash, formatSek } from "@/lib/format";
 
 type SortField = keyof AreaOverview;
 type SortOrder = "asc" | "desc";
@@ -85,9 +81,7 @@ export function AreasTable({ areas }: { areas: AreaOverview[] }) {
 
   // Precompute the per-m² gradient bounds once, not per cell.
   const perSqmBounds = useMemo(() => {
-    const values = areas
-      .map((a) => a.avg_price_per_sqm)
-      .filter((p): p is number => p !== null);
+    const values = areas.map((a) => a.avg_price_per_sqm).filter((p): p is number => p !== null);
     if (values.length === 0) return null;
     const min = Math.min(...values);
     const max = Math.max(...values);
@@ -120,7 +114,12 @@ export function AreasTable({ areas }: { areas: AreaOverview[] }) {
     return sorted;
   }, [areas, sortField, sortOrder]);
 
-  const header = (field: SortField, label: string, align: "left" | "right" = "left", className?: string) => (
+  const header = (
+    field: SortField,
+    label: string,
+    align: "left" | "right" = "left",
+    className?: string,
+  ) => (
     <SortHeader
       field={field}
       label={label}
@@ -152,7 +151,10 @@ export function AreasTable({ areas }: { areas: AreaOverview[] }) {
         </thead>
         <tbody className="divide-y divide-ledger-border">
           {sortedAreas.map((area, index) => (
-            <tr key={area.area_name} className="group transition-colors hover:bg-ledger-elevated/60">
+            <tr
+              key={area.area_name}
+              className="group transition-colors hover:bg-ledger-elevated/60"
+            >
               <td className="num px-3 py-2.5 text-right text-body-sm text-ledger-dimmed">
                 {index + 1}
               </td>

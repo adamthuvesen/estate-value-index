@@ -107,9 +107,7 @@ export function ChartTooltip({
       <ul className="space-y-0.5">
         {payload.map((entry, i) => {
           const rawValue = entry.value ?? "";
-          const formatted = formatter
-            ? formatter(rawValue, entry.name, entry)
-            : rawValue;
+          const formatted = formatter ? formatter(rawValue, entry.name, entry) : rawValue;
           const [valueNode, nameNode] = Array.isArray(formatted)
             ? formatted
             : [formatted, entry.name];
@@ -125,9 +123,7 @@ export function ChartTooltip({
               {nameNode !== undefined && nameNode !== "" && (
                 <span className="text-ledger-muted">{nameNode}</span>
               )}
-              <span className="num ml-auto font-medium text-ledger-text">
-                {valueNode}
-              </span>
+              <span className="num ml-auto font-medium text-ledger-text">{valueNode}</span>
             </li>
           );
         })}
