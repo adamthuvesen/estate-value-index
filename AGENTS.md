@@ -68,6 +68,8 @@ Orchestrated pipeline: `.github/workflows/ml-pipeline.yml` runs the `evi` steps 
 Config precedence: environment -> `.env` -> the defaults in
 [src/estate_value_index/utils/settings.py](src/estate_value_index/utils/settings.py). Required env vars: [docs/data-pipeline.md](docs/data-pipeline.md#environment).
 
+Prove user-facing changes with the `verify-estate-value-index` skill at `.agents/skills/verify-estate-value-index` (`just verify all`).
+
 ## Where things live
 
 - Entry points, boundaries, and the full module map: [docs/architecture.md](docs/architecture.md)

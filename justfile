@@ -14,6 +14,7 @@ check:
         echo "web/node_modules is missing. Run: npm ci --prefix web" >&2
         exit 1
     fi
+    verify_script=.agents/skills/verify-estate-value-index/verify
     logs=$(mktemp -d)
     trap 'rm -rf "$logs"' EXIT
     names=()
@@ -25,10 +26,11 @@ check:
         names+=("$name")
         pids+=($!)
     }
-    lane ruff-check uv run --no-sync ruff check .
-    lane ruff-format uv run --no-sync ruff format --check .
+    lane ruff-check uv run --no-sync ruff check . "$verify_script"
+    lane ruff-format uv run --no-sync ruff format --check . "$verify_script"
     lane import-linter uv run --no-sync lint-imports --no-cache
     lane types uv run --no-sync basedpyright
+    lane types-verify uv run --no-sync basedpyright -p .agents/skills/verify-estate-value-index/pyrightconfig.json
     lane pytest uv run --no-sync pytest -q --no-cov -p no:cacheprovider
     lane web-lint npm run lint --prefix web
     lane web-format npm run format:check --prefix web
@@ -49,8 +51,8 @@ check:
 
 # Apply every safe automatic fix.
 fix: types
-    uv run ruff check --fix .
-    uv run ruff format .
+    uv run ruff check --fix . .agents/skills/verify-estate-value-index/verify
+    uv run ruff format . .agents/skills/verify-estate-value-index/verify
     npm exec --prefix web -- oxlint --fix src
     npm run format --prefix web
 
@@ -67,10 +69,9 @@ types-check:
         exit 1
     fi
 
-# Placeholder until the verify skill exists.
-verify:
-    @echo "verify skill not built yet (Phase 7)" >&2
-    @exit 1
+# Drive the real CLIs and API on synthetic fixtures. Args: all, list, control, or drive names.
+verify *args:
+    uv run --no-sync python .agents/skills/verify-estate-value-index/verify {{args}}
 
 # Full Python suite with the coverage gate, plus the web route-runtime check and the Next.js production build.
 slow:

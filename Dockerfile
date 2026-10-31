@@ -5,7 +5,7 @@
 # ============================================================================
 # Stage 1: Build Next.js frontend
 # ============================================================================
-FROM node:20-slim AS web-builder
+FROM node:24.22.3-slim AS web-builder
 
 WORKDIR /app/web
 
@@ -63,15 +63,28 @@ RUN apt-get update && apt-get install -y \
     curl \
     supervisor \
     libgomp1 \
+    libstdc++6 \
     apt-transport-https \
     ca-certificates \
     gnupg \
     && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg \
     && echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list \
     && apt-get update && apt-get install -y google-cloud-cli \
-    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
-    && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
+
+# Node.js from the official tarball, so the version is exact. The SHA-256 values come from
+# https://nodejs.org/dist/v24.22.3/SHASUMS256.txt.
+ARG TARGETARCH
+ARG NODE_VERSION=24.22.3
+RUN case "${TARGETARCH}" in \
+        amd64) node_arch=x64; node_sha256=061ec3e3062115705b56b51fa9cc330ab50d34b6969387d4e4b1a50c6809acc2 ;; \
+        arm64) node_arch=arm64; node_sha256=261af2af250dfd7e9f25cf151d1b2713a0adf8f10a9ad116c4947f68627affe8 ;; \
+        *) echo "unsupported TARGETARCH: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac \
+    && curl -fsSLo /tmp/node.tar.gz "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-${node_arch}.tar.gz" \
+    && echo "${node_sha256}  /tmp/node.tar.gz" | sha256sum -c - \
+    && tar -xzf /tmp/node.tar.gz -C /usr/local --strip-components=1 --no-same-owner \
+    && rm /tmp/node.tar.gz
 
 RUN useradd --create-home --shell /usr/sbin/nologin appuser
 

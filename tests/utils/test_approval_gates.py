@@ -16,7 +16,7 @@ import pandas as pd
 import pytest
 
 from estate_value_index.analytics import publish
-from estate_value_index.cli import vertex_train
+from estate_value_index.cli import sync_listings, vertex_train
 from estate_value_index.exceptions import InfrastructureError
 from estate_value_index.ingestion import bigquery_upload, geocoding, ingest, sync
 from estate_value_index.utils import gcs as gcs_module
@@ -325,3 +325,15 @@ def test_listings_backup_refuses_without_approval(
     with pytest.raises(ApprovalRequired):
         sync.backup_listings_to_gcs(listings)
     assert bucket.uploads == []
+
+
+def test_sync_command_refuses_before_reading_bigquery_when_gcs_is_enabled(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    read_bigquery = MagicMock()
+    monkeypatch.setattr(sync_listings, "is_gcs_enabled", lambda: True)
+    monkeypatch.setattr(sync_listings, "sync_bigquery_to_local", read_bigquery)
+
+    with pytest.raises(ApprovalRequired):
+        sync_listings.main(["--output", str(tmp_path / "listings.jsonl")])
+    read_bigquery.assert_not_called()

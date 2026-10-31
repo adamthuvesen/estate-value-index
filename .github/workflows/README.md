@@ -15,7 +15,7 @@ The following checks are run by `ci.yml`:
 - Python 3.11 dependencies are installed with `uv sync --all-extras`.
 - Ruff lint and format checks are run.
 - The Python test suite is run with coverage.
-- ESLint, Jest, and TypeScript checks are run under `web/`.
+- oxlint, the oxfmt format check, Jest, and TypeScript checks are run under `web/`.
 - The serving and Vertex AI Dockerfiles are built when affected paths change.
 
 Coverage output is uploaded as the `coverage-report` artifact.

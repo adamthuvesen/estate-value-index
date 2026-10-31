@@ -12,6 +12,8 @@ from estate_value_index.ingestion.sync import (
     sync_bigquery_to_local,
     verify_sync,
 )
+from estate_value_index.utils.approval import require_approval
+from estate_value_index.utils.settings import is_gcs_enabled
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -28,6 +30,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
+    if is_gcs_enabled():
+        require_approval("back up listings to GCS", args.approved)
     synced = sync_bigquery_to_local(args.output)
     summary = verify_sync(args.output)
     backups = backup_listings_to_gcs(args.output, approved=args.approved)

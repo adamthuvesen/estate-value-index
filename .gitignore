@@ -84,3 +84,4 @@ build/
 # Images (scraped property images)
 data/images/
 
+.verify/
