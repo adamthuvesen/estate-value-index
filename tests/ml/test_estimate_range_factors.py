@@ -145,8 +145,10 @@ def test_factors_land_in_metrics_payload() -> None:
         lgbm_params={"num_leaves": 20},
         tuned=True,
         data_fingerprint={"rows": 15, "max_sold_date": "2026-07-01", "sha256": "ab"},
+        commit_sha="abc123",
     )
 
+    assert payload["commit_sha"] == "abc123"
     assert payload["estimate_range_factors"] is factors
     assert payload["data_fingerprint"]["rows"] == 15
     assert payload["package_version"] == installed_package_version()

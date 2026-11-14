@@ -21,7 +21,6 @@ USAGE
 PROJECT_ID="${GCP_PROJECT_ID:-}"
 REGION="${GCP_REGION:-europe-north1}"
 DATASET_RAW="booli_raw"
-DATASET_FEATURES="booli_features"
 SCHEMA_DIR="schemas"
 
 while [[ $# -gt 0 ]]; do
@@ -48,7 +47,6 @@ done
 
 : "${PROJECT_ID:?GCP project is required; pass --project or set GCP_PROJECT_ID}"
 : "${DATASET_RAW:?DATASET_RAW is required}"
-: "${DATASET_FEATURES:?DATASET_FEATURES is required}"
 
 echo "Setting up BigQuery for project: $PROJECT_ID"
 echo "Region: $REGION"
@@ -63,15 +61,6 @@ if bq --project_id="$PROJECT_ID" show --dataset "${PROJECT_ID}:${DATASET_RAW}" &
 else
   bq mk --location=EU --dataset "${PROJECT_ID}:${DATASET_RAW}"
   echo "  Created dataset $DATASET_RAW"
-fi
-
-# Create booli_features dataset
-echo "Ensuring dataset exists: $DATASET_FEATURES"
-if bq --project_id="$PROJECT_ID" show --dataset "${PROJECT_ID}:${DATASET_FEATURES}" &> /dev/null; then
-  echo "  Dataset $DATASET_FEATURES already exists, skipping"
-else
-  bq mk --location=EU --dataset "${PROJECT_ID}:${DATASET_FEATURES}"
-  echo "  Created dataset $DATASET_FEATURES"
 fi
 
 # Create booli_raw.listings table
@@ -98,7 +87,6 @@ echo "BigQuery setup complete."
 echo ""
 echo "Verifying setup..."
 bq ls "${PROJECT_ID}:${DATASET_RAW}"
-bq ls "${PROJECT_ID}:${DATASET_FEATURES}"
 echo ""
 echo "Schema for $DATASET_RAW.listings:"
 bq show --schema "${PROJECT_ID}:${DATASET_RAW}.listings"

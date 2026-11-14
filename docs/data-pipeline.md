@@ -38,8 +38,6 @@ GCP_REGION=europe-north1
 BIGQUERY_PROJECT_ID=your-gcp-project-id
 BIGQUERY_DATASET_RAW=booli_raw
 BIGQUERY_TABLE_LISTINGS=listings
-BIGQUERY_DATASET_FEATURES=booli_features
-BIGQUERY_TABLE_FEATURES=engineered_features
 GCS_BUCKET=your-gcs-bucket
 ```
 
@@ -60,12 +58,10 @@ Precedence: environment -> `.env` -> the `Settings` defaults.
 BigQuery datasets:
 
 - **booli_raw:** raw listings (e.g. `listings`, partitioned)
-- **booli_features:** engineered features (e.g. `engineered_features`, partitioned)
 
 ## BigQuery rules
 
 - Typical raw table: `booli_raw.listings`.
-- Typical feature table: `booli_features.engineered_features`.
 - Project, dataset, and table names come from environment variables first.
 - Use helpers such as `src/estate_value_index/utils/bigquery_safety.py` for validation and parameterized/operator-only SQL.
 - Treat dynamic SQL fragments like `where_clause` as trusted operator fragments only, never direct user input.

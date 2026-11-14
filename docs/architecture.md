@@ -80,7 +80,7 @@ cli                    (entry points)
 ## Shared conventions
 
 - **Config:** `utils/settings.py` holds one `pydantic-settings` model (`Settings`, `extra="forbid"`). Read it with `get_settings()`.
-- **Model metadata:** each `*_metrics.json` carries `package_version` and `data_fingerprint` (row count, newest `sold_date`, content hash of the training frame). `api_server.py` refuses an artifact whose `package_version` differs from the installed package, and `/health` reports both per model.
+- **Model metadata:** each `*_metrics.json` carries `package_version`, `commit_sha`, and `data_fingerprint` (row count, newest `sold_date`, content hash of the training frame). `api_server.py` refuses an artifact whose `package_version` differs from the installed package, and `/health` reports all three per model.
 - **Web types:** `just types` generates `web/src/lib/generated/api-types.ts` from the Pydantic models' JSON Schema (`scripts/export_web_schema.py`); `just check` fails on drift.
 - **GCP clients:** create BigQuery / Storage clients via the cached factory in `utils/clients.py` (`get_bq_client`, `get_storage_client`). Do not instantiate `bigquery.Client()` / `storage.Client()` ad hoc.
 - **Errors:** raise the domain exceptions in `exceptions.py` (`DataError`, `ModelError`, `InfrastructureError`, etc.) rather than swallowing failures in the data path.

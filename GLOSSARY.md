@@ -55,6 +55,9 @@ One of two tiered LightGBM ensembles served by the API: `no_list_price` and `wit
 **Package version stamp**:
 The installed `estate-value-index` version, written to each model's metrics file as `package_version`. The API refuses a model without a matching stamp.
 
+**Commit SHA**:
+The git commit training ran from (`GITHUB_SHA`, else `git rev-parse HEAD`, else `unknown`), written to the metrics file as `commit_sha`. `/health` reports it. It records provenance; the API does not check it.
+
 **Data fingerprint**:
 The row count, newest `sold_date`, and content hash of the training frame, written to the metrics file as `data_fingerprint`. It identifies the data a model trained on. `ml/data_fingerprint.py`.
 

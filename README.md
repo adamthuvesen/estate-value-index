@@ -66,8 +66,6 @@ GCP_REGION=europe-north1
 BIGQUERY_PROJECT_ID=your-gcp-project-id
 BIGQUERY_DATASET_RAW=booli_raw
 BIGQUERY_TABLE_LISTINGS=listings
-BIGQUERY_DATASET_FEATURES=booli_features
-BIGQUERY_TABLE_FEATURES=engineered_features
 GCS_BUCKET=your-gcs-bucket
 ```
 

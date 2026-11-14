@@ -27,9 +27,13 @@ RUN uv export --frozen --no-dev --no-hashes --extra ml --extra analysis --extra 
     && uv pip install --system -r /tmp/requirements.txt \
     && uv pip install --system --no-deps .
 
+# The trainer stamps this commit into each model's metrics file.
+ARG GIT_COMMIT=unknown
+
 # Default environment configuration (can be overridden in the job spec)
 ENV GCS_ENABLED=true \
-    GCP_REGION=europe-north1
+    GCP_REGION=europe-north1 \
+    GITHUB_SHA=$GIT_COMMIT
 
 # The entrypoint runs the same production trainer used for local training.
 ENTRYPOINT ["python", "-m", "estate_value_index.cli", "train-production-models"]

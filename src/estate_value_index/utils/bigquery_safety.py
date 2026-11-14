@@ -165,8 +165,7 @@ _FILTER_OPERATORS: dict[str, str] = {
 class Filter:
     """A single structured SQL predicate: ``column <operator> value``.
 
-    Pass a list of these to ``load_from_bigquery(filters=...)`` /
-    ``load_features_from_bigquery(filters=...)`` instead of a raw SQL string.
+    Pass a list of these to ``load_from_bigquery(filters=...)`` instead of a raw SQL string.
     :func:`build_filter_clause` validates the column as an identifier, checks the
     operator against :data:`_FILTER_OPERATORS`, and binds the value as a query
     parameter — so a Filter cannot carry a SQL fragment even when authored by an

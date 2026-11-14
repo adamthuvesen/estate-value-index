@@ -6,6 +6,7 @@ import argparse
 import json
 from pathlib import Path
 
+from estate_value_index.cli.vertex_train import resolve_commit_sha
 from estate_value_index.ml.production_models import (
     DEFAULT_LISTING_FEATURE_SET,
     DEFAULT_MODEL_PREFIX,
@@ -53,6 +54,7 @@ def main(argv: list[str] | None = None) -> int:
         random_state=args.random_state,
         tune=args.tune,
         approved=args.approved,
+        commit_sha=resolve_commit_sha(),
     )
 
     summary = {

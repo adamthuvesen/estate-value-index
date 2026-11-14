@@ -62,6 +62,9 @@ def required_production_artifact_files(model_prefix: str = DEFAULT_MODEL_PREFIX)
     )
 
 
+UNKNOWN_COMMIT = "unknown"
+
+
 def installed_package_version() -> str:
     """The version training stamps into model metadata and serving checks on load."""
     return version(PACKAGE_NAME)

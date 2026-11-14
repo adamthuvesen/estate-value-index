@@ -58,6 +58,12 @@ def vertex_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("GCS_BUCKET", "bucket")
 
 
+_IMAGE = [
+    "--image-uri",
+    "europe-north1-docker.pkg.dev/test-project/vertex-training/lgbm-trainer:abc",
+]
+
+
 def _vertex_job(state: str) -> str:
     return json.dumps(
         {
@@ -90,10 +96,32 @@ def test_vertex_train_refuses_without_approval(run_process: MagicMock, vertex_en
 def test_vertex_train_dry_run_starts_no_process(
     run_process: MagicMock, vertex_env: None, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    assert vertex_train.main(["--dry-run", "--tune"]) == 0
+    assert vertex_train.main(["--dry-run", "--tune", *_IMAGE]) == 0
     assert run_process.call_count == 0
     spec = json.loads(capsys.readouterr().out)
     assert spec["workerPoolSpecs"][0]["containerSpec"]["args"][-1] == "--tune"
+    env = {e["name"] for e in spec["workerPoolSpecs"][0]["containerSpec"]["env"]}
+    assert "GITHUB_SHA" not in env
+
+
+def test_vertex_train_defaults_the_image_to_the_head_commit(
+    mocker: Any, vertex_env: None, capsys: pytest.CaptureFixture[str]
+) -> None:
+    mocker.patch.object(vertex_train.subprocess, "check_output", side_effect=["cafe0123\n", ""])
+    assert vertex_train.main(["--dry-run"]) == 0
+    spec = json.loads(capsys.readouterr().out)
+    image = spec["workerPoolSpecs"][0]["containerSpec"]["imageUri"]
+    assert image.endswith("/vertex-training/lgbm-trainer:cafe0123")
+
+
+def test_vertex_train_refuses_a_dirty_tree_without_an_image_uri(
+    mocker: Any, vertex_env: None
+) -> None:
+    mocker.patch.object(
+        vertex_train.subprocess, "check_output", side_effect=["cafe0123\n", " M file.py\n"]
+    )
+    with pytest.raises(SystemExit, match="uncommitted changes"):
+        vertex_train.main(["--dry-run"])
 
 
 def test_vertex_train_approved_reads_ids_from_the_json_response(
@@ -106,7 +134,10 @@ def test_vertex_train_approved_reads_ids_from_the_json_response(
     download = mocker.patch.object(vertex_train, "download_model_artifacts")
 
     assert (
-        vertex_train.main(["--approved", "--poll-seconds", "0", "--model-dir", str(tmp_path)]) == 0
+        vertex_train.main(
+            ["--approved", "--poll-seconds", "0", "--model-dir", str(tmp_path), *_IMAGE]
+        )
+        == 0
     )
 
     create, describe = (call.args[0] for call in run_process.call_args_list)
@@ -126,7 +157,7 @@ def test_vertex_train_fails_loudly_when_the_job_fails(
     download = mocker.patch.object(vertex_train, "download_model_artifacts")
 
     with pytest.raises(InfrastructureError, match="JOB_STATE_FAILED"):
-        vertex_train.main(["--approved", "--poll-seconds", "0"])
+        vertex_train.main(["--approved", "--poll-seconds", "0", *_IMAGE])
     download.assert_not_called()
 
 
@@ -135,7 +166,7 @@ def test_vertex_train_rejects_a_response_without_a_job_name(
 ) -> None:
     run_process.return_value = _completed(json.dumps({"state": "JOB_STATE_PENDING"}))
     with pytest.raises(InfrastructureError, match="custom job name"):
-        vertex_train.main(["--approved", "--poll-seconds", "0"])
+        vertex_train.main(["--approved", "--poll-seconds", "0", *_IMAGE])
 
 
 # --- Model promotion ---
@@ -337,3 +368,30 @@ def test_sync_command_refuses_before_reading_bigquery_when_gcs_is_enabled(
     with pytest.raises(ApprovalRequired):
         sync_listings.main(["--output", str(tmp_path / "listings.jsonl")])
     read_bigquery.assert_not_called()
+
+
+def test_resolve_commit_sha_prefers_github_sha(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("GITHUB_SHA", "feedface")
+    assert vertex_train.resolve_commit_sha() == "feedface"
+
+
+def test_resolve_commit_sha_without_git_is_unknown(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("GITHUB_SHA", raising=False)
+    monkeypatch.setenv("PATH", "")
+    assert vertex_train.resolve_commit_sha() == "unknown"
+
+
+def test_train_cli_refuses_before_loading_data(
+    mocker: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from estate_value_index.cli import train_production_models
+    from estate_value_index.ml import production_models
+
+    monkeypatch.setenv("GCS_ENABLED", "true")
+    loader = mocker.patch.object(production_models, "load_raw_training_frame")
+
+    with pytest.raises(ApprovalRequired):
+        train_production_models.main(["--model-dir", str(tmp_path / "models")])
+
+    assert loader.call_count == 0
+    assert not (tmp_path / "models").exists()

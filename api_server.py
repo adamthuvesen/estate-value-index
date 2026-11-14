@@ -159,6 +159,8 @@ class LoadedModelInfo(BaseModel):
     """What a loaded model artifact is: its code version, its bytes, and its training data."""
 
     package_version: str
+    # The commit training ran from; null for artifacts trained before the stamp.
+    commit_sha: str | None
     sha256: str
     data_fingerprint: DataFingerprint | None
 
@@ -318,6 +320,7 @@ def load_all_models(models_dir: Path) -> dict[str, dict[str, Any]]:
             "estimate_range_factors": _estimate_range_factors(metrics, model_type),
             "info": LoadedModelInfo(
                 package_version=package_version,
+                commit_sha=metrics.get("commit_sha"),
                 sha256=digest,
                 data_fingerprint=data_fingerprint,
             ),

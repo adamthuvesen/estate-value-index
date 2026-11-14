@@ -31,8 +31,6 @@ class Settings(BaseSettings):
     bigquery_project_id: str | None = None
     bigquery_dataset_raw: str = "booli_raw"
     bigquery_table_listings: str = "listings"
-    bigquery_dataset_features: str = "booli_features"
-    bigquery_table_features: str = "engineered_features"
     gcs_enabled: bool = False
     gcs_bucket: str | None = None
     # Where the Vertex trainer uploads artifacts (a gs:// URI or a bucket prefix).

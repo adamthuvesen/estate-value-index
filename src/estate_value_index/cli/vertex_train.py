@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -21,6 +22,7 @@ from typing import Any, Final
 from estate_value_index.exceptions import InfrastructureError
 from estate_value_index.model_artifacts import (
     DEFAULT_MODEL_PREFIX,
+    UNKNOWN_COMMIT,
     required_production_artifact_files,
 )
 from estate_value_index.utils.approval import require_approval
@@ -32,6 +34,34 @@ _TERMINAL_STATES: Final = frozenset(
     {"JOB_STATE_SUCCEEDED", "JOB_STATE_FAILED", "JOB_STATE_CANCELLED", "JOB_STATE_EXPIRED"}
 )
 _CONTAINER_MODEL_DIR: Final = "/tmp/estate-value-index/models"
+
+
+def resolve_commit_sha() -> str:
+    """The commit the code was built from: ``GITHUB_SHA``, else ``git rev-parse HEAD``, else unknown."""
+    if sha := os.environ.get("GITHUB_SHA"):
+        return sha
+    try:
+        sha = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True, timeout=10)
+    except OSError, subprocess.SubprocessError:
+        return UNKNOWN_COMMIT
+    return sha.strip() or UNKNOWN_COMMIT
+
+
+def _head_commit() -> str:
+    """HEAD's sha, the tag of the image built from it. Refuse a dirty tree: no image matches it."""
+    try:
+        sha = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True, timeout=10).strip()
+        dirty = subprocess.check_output(["git", "status", "--porcelain"], text=True, timeout=10)
+    except (OSError, subprocess.SubprocessError) as error:
+        raise SystemExit(
+            "refused: cannot read git HEAD to pick the trainer image. Pass --image-uri."
+        ) from error
+    if dirty.strip():
+        raise SystemExit(
+            "refused: uncommitted changes, and no trainer image matches them. "
+            "Commit them and build the image for the commit, or pass --image-uri."
+        )
+    return sha
 
 
 def build_job_spec(
@@ -164,7 +194,11 @@ def main(argv: list[str] | None = None) -> int:
         description="Run the production trainer on Vertex AI, wait for it, and download the artifacts.",
     )
     parser.add_argument("--machine-type", default="n1-standard-4")
-    parser.add_argument("--image-uri", default=None, help="Default: the lgbm-trainer:latest image.")
+    parser.add_argument(
+        "--image-uri",
+        default=None,
+        help="Default: the lgbm-trainer image tagged with the HEAD sha (refused if the tree is dirty). CI passes the image built from the run commit.",
+    )
     parser.add_argument("--service-account", default=None)
     parser.add_argument("--display-name", default=None)
     parser.add_argument("--model-dir", type=Path, default=Path("web/models"))
@@ -183,12 +217,14 @@ def main(argv: list[str] | None = None) -> int:
     bucket = settings.require_gcs_bucket()
     region = settings.gcp_region
     run_id = datetime.now().strftime("%Y%m%d-%H%M%S")
+    if not args.dry_run:
+        require_approval("submit a Vertex AI training job", args.approved)
     spec = build_job_spec(
         project_id=project_id,
         bucket=bucket,
         run_id=run_id,
         image_uri=args.image_uri
-        or f"{region}-docker.pkg.dev/{project_id}/vertex-training/lgbm-trainer:latest",
+        or f"{region}-docker.pkg.dev/{project_id}/vertex-training/lgbm-trainer:{_head_commit()}",
         machine_type=args.machine_type,
         service_account=args.service_account
         or f"estate-value-index-service-acc@{project_id}.iam.gserviceaccount.com",
@@ -201,7 +237,6 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(spec, indent=2))
         return 0
 
-    require_approval("submit a Vertex AI training job", args.approved)
     job = submit_job(
         spec,
         project_id=project_id,

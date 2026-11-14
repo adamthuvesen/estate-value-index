@@ -1,8 +1,9 @@
 """Which data a model trained on: row count, newest ``sold_date``, and a content hash (D7).
 
 The BigQuery listings table is mutable, so the metrics artifact records this
-fingerprint instead of a snapshot pin. The same frame always gives the same
-fingerprint, whatever its row or column order.
+fingerprint instead of a snapshot pin. The same frame gives the same
+fingerprint whatever its column order. Row order does not matter only when
+``listing_id`` is unique, because rows are sorted by ``listing_id`` alone.
 """
 
 from __future__ import annotations

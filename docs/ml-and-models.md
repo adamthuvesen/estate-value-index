@@ -67,7 +67,7 @@ intentionally git-ignored.
   hand-edited.
 - Runtime model sync can come from GCS through `scripts/startup.sh`.
 - Model integrity uses `.sha256` sidecars; do not bypass those checks casually.
-- Training writes `package_version` and `data_fingerprint` into each `*_metrics.json`. The API refuses a model with a missing or different `package_version`, so retrain after a version bump and before the next deploy. See [ADR 0003](adr/0003-stamp-and-fingerprint-model-artifacts.md).
+- Training writes `package_version`, `commit_sha`, and `data_fingerprint` into each `*_metrics.json`. The API refuses a model with a missing or different `package_version`, so retrain after a version bump and before the next deploy. See [ADR 0003](adr/0003-stamp-and-fingerprint-model-artifacts.md).
 - Features have one code path, `ml/features/`, for training and serving. Materialized features and drift monitoring were deleted: [ADR 0002](adr/0002-no-materialized-features-or-drift-monitoring.md).
 
 ## Checks to run

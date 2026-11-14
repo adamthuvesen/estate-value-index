@@ -5,8 +5,12 @@ steps:
       - build
       - -f
       - vertex_ai/Dockerfile
+      - --build-arg
+      - GIT_COMMIT=${_GIT_COMMIT}
       - -t
       - ${_IMAGE_URI}
       - .
 images:
   - ${_IMAGE_URI}
+options:
+  logging: CLOUD_LOGGING_ONLY

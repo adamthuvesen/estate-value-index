@@ -187,7 +187,9 @@ def test_health_responds_while_predicts_in_flight() -> None:
 
     transport = ASGITransport(app=api_server.app)
     api_server.MODEL_CACHE.clear()
-    info = api_server.LoadedModelInfo(package_version="1.0.0", sha256="ab", data_fingerprint=None)
+    info = api_server.LoadedModelInfo(
+        package_version="1.0.0", commit_sha=None, sha256="ab", data_fingerprint=None
+    )
     api_server.MODEL_CACHE["with_list_price"] = {
         "model": mock_model,
         "path": Path("dummy.joblib"),

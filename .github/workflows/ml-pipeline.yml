@@ -2,10 +2,16 @@ name: ML Pipeline
 
 # Required environment-scoped GitHub secrets:
 #   GCP_WORKLOAD_IDENTITY_PROVIDER - Workload Identity Federation provider resource
-#   GCP_SERVICE_ACCOUNT - service account email with permissions:
+#   GCP_SERVICE_ACCOUNT - service account email with these roles:
 #     - BigQuery Data Editor
 #     - Vertex AI User
 #     - Storage Admin (for GCS model upload)
+#     - Cloud Build Editor (roles/cloudbuild.builds.editor), to submit the image build
+#     - Artifact Registry Writer (roles/artifactregistry.writer), to push the image
+#     - Service Account User (roles/iam.serviceAccountUser) on the Cloud Build service account
+#     - Logs Viewer (roles/logging.viewer), only if cloudbuild.yaml stops using CLOUD_LOGGING_ONLY
+#   Check once, read-only: gcloud projects get-iam-policy <project> --flatten=bindings \
+#     --filter="bindings.members:serviceAccount:<sa>" --format="table(bindings.role)"
 #
 # Required environment-scoped GitHub variables:
 #   GCP_PROJECT_ID

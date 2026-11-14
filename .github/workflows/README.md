@@ -72,8 +72,8 @@ The dedicated `evi-cloud-run-runtime@<project>.iam.gserviceaccount.com` runtime
 service account is attached to the service.
 
 ```bash
-gh workflow run deploy.yml -f environment=staging
-gh workflow run deploy.yml -f environment=production
+gh workflow run deploy.yml -f environment=staging -f approved=true
+gh workflow run deploy.yml -f environment=production -f approved=true
 ```
 
 Set the `approved` input to true on each `deploy.yml` run. Without it the workflow refuses to deploy.
@@ -102,7 +102,25 @@ mode:
 - `BOOLI_API_PRIVATE_KEY`
 
 Long-lived service-account JSON keys should not be stored in repository secrets.
-The deployer identity needs the permissions named in each workflow header. The
+The deployer identity needs the permissions named in each workflow header.
+For `ml-pipeline.yml`, the `GCP_SERVICE_ACCOUNT` identity needs these roles. Every
+non-local run builds the trainer image with Cloud Build, so the Cloud Build and
+Artifact Registry roles are required:
+
+- Cloud Build Editor (`roles/cloudbuild.builds.editor`)
+- Artifact Registry Writer (`roles/artifactregistry.writer`)
+- Service Account User (`roles/iam.serviceAccountUser`) on the Cloud Build service account
+- Logs Viewer (`roles/logging.viewer`), only if `vertex_ai/cloudbuild.yaml` stops using `CLOUD_LOGGING_ONLY`
+- BigQuery Data Editor, Vertex AI User, and Storage Admin
+
+Check the granted roles once with this read-only command:
+
+```bash
+gcloud projects get-iam-policy <project> --flatten=bindings \
+  --filter="bindings.members:serviceAccount:<sa>" --format="table(bindings.role)"
+```
+
+The
 Cloud Run runtime identity is limited to reading its GCS artifacts.
 
 ## Troubleshooting

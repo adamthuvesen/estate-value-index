@@ -79,6 +79,7 @@ from estate_value_index.model_artifacts import (
     DEFAULT_MODEL_PREFIX,
     LISTING_MODEL_ID,
     NO_LIST_MODEL_ID,
+    UNKNOWN_COMMIT,
     installed_package_version,
     production_artifact_names,
 )
@@ -305,8 +306,10 @@ def train_from_data_source(
     random_state: int | None = None,
     tune: bool = False,
     approved: bool = False,
+    commit_sha: str = UNKNOWN_COMMIT,
 ) -> dict[str, ProductionTrainingResult]:
     """Load training rows from ``data_source`` and train both production models."""
+    # Refuse before the data load; train_and_persist_production_models checks again for direct callers.
     _require_upload_approval(approved)
     specs = production_specs(
         no_list_feature_set=no_list_feature_set,
@@ -322,6 +325,7 @@ def train_from_data_source(
         random_state=random_state,
         tune=tune,
         approved=approved,
+        commit_sha=commit_sha,
     )
 
 
@@ -335,6 +339,7 @@ def train_and_persist_production_models(
     random_state: int | None = None,
     tune: bool = False,
     approved: bool = False,
+    commit_sha: str = UNKNOWN_COMMIT,
 ) -> dict[str, ProductionTrainingResult]:
     """Run temporal evaluation, refit on all rows, and persist both models.
 
@@ -401,6 +406,7 @@ def train_and_persist_production_models(
             lgbm_params=lgbm_params,
             tuned=tune,
             data_fingerprint=fingerprint_training_frame(filtered).model_dump(mode="json"),
+            commit_sha=commit_sha,
         )
         artifact_paths = persist_production_model(
             production_model,
@@ -820,10 +826,12 @@ def _metrics_payload(
     lgbm_params: dict[str, Any],
     tuned: bool,
     data_fingerprint: dict[str, Any],
+    commit_sha: str,
 ) -> dict[str, Any]:
     return {
         "model_id": model.model_id,
         "package_version": installed_package_version(),
+        "commit_sha": commit_sha,
         "data_fingerprint": data_fingerprint,
         "model_type": model.model_type,
         "feature_set": model.feature_set,
