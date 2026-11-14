@@ -92,6 +92,8 @@ def drive_train(run: Run, shared: Shared) -> str:
         check(sidecar, hashlib.sha256(model.read_bytes()).hexdigest(), f"{model_id} sha256 sidecar")
         metrics = json.loads(Path(artifacts["metrics"]).read_text())
         check(metrics.get("package_version"), version, f"package_version in {model_id} metrics")
+        if not metrics.get("commit_sha"):
+            raise DriveFailure(f"commit_sha in {model_id} metrics is missing or empty")
         fingerprint = metrics.get("data_fingerprint") or {}
         check(
             fingerprint.get("rows"),
@@ -141,6 +143,11 @@ def drive_serve(run: Run, shared: Shared) -> str:
     for model_id in MODELS:
         info = health["models"][model_id]
         check(info["package_version"], version, f"/health package_version of {model_id}")
+        check(
+            info["commit_sha"],
+            _metrics(summary, model_id)["commit_sha"],
+            f"/health commit_sha of {model_id}",
+        )
         check(
             info["data_fingerprint"],
             _metrics(summary, model_id)["data_fingerprint"],
@@ -236,7 +243,16 @@ def drive_spend_refusal(run: Run, shared: Shared) -> str:
             f"upload-enrichment process: expected a non-zero exit with only stderr, "
             f"got exit {real.returncode}, stdout {real.stdout.strip()[:80]!r}"
         )
-    return f"{len(SPEND_CASES)} spending commands refuse without --approved; the process exits {real.returncode}"
+    build = run.cmd(["bash", "vertex_ai/build_and_push.sh"], extra_env=SPEND_ENV, expect_exit=None)
+    if build.returncode == 0 or "refused" not in build.stderr:
+        raise DriveFailure(
+            f"build_and_push.sh without --approved: expected a refusal, "
+            f"got exit {build.returncode}, stderr {build.stderr.strip()[:80]!r}"
+        )
+    return (
+        f"{len(SPEND_CASES)} spending commands and the image build script refuse without "
+        f"--approved; the process exits {real.returncode}"
+    )
 
 
 DRIVES = {
@@ -262,7 +278,7 @@ DRIVES = {
         "every spending command refuses without --approved and no tripwire is hit",
         ["src/estate_value_index/utils/approval.py", "src/estate_value_index/utils/gcs.py",
          "src/estate_value_index/cli/**", "src/estate_value_index/ingestion/**",
-         "src/estate_value_index/analytics/publish.py"],
+         "src/estate_value_index/analytics/publish.py", "vertex_ai/**"],
         drive_spend_refusal,
     ),
 }  # fmt: skip

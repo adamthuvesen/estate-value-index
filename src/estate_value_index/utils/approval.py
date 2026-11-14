@@ -8,7 +8,10 @@ class ApprovalRequired(SystemExit):
     """
 
     def __init__(self, action: str):
-        super().__init__(f"Refused: {action} needs approval. Pass --approved or approved=True.")
+        super().__init__(
+            f"Refused: {action} needs approval. "
+            "From the CLI, pass --approved. From a workflow, set the approved input to true."
+        )
         self.action = action
 
 

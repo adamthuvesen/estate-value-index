@@ -26,7 +26,7 @@ your own lawful data source, BigQuery, GCS, or local environment.
 
 ## Main path and entry points
 
-There is no orchestration framework. The `evi` CLI owns every step, and
+There is no orchestration framework ([ADR 0001](adr/0001-cli-and-github-actions-only-orchestrator.md)). The `evi` CLI owns every step, and
 `.github/workflows/ml-pipeline.yml` calls the steps in order. `deploy.yml` is the
 one deploy path. Every step that spends or writes to production (`backfill --load`,
 `vertex-train`, `promote-model`, `upload-enrichment`) refuses without the approval flag.
@@ -106,6 +106,7 @@ cli                    (entry points)
 
 ## Related guides
 
+- Terms: [GLOSSARY.md](../GLOSSARY.md). Decisions: [adr/](adr/). Agent rules: [AGENTS.md](../AGENTS.md)
 - Pipeline and BigQuery changes: [data-pipeline.md](data-pipeline.md)
 - Model and training changes: [ml-and-models.md](ml-and-models.md)
 - API, web, and deploy changes: [api-web-deploy.md](api-web-deploy.md)

@@ -29,7 +29,7 @@ BigQuery, GCS, and `.env` for production-like runs.
 | Web | Next.js 16, React 19 |
 | Orchestration | `evi` CLI + GitHub Actions |
 | Deploy | Docker, Cloud Run, GCS |
-| Tooling | Python 3.14+, Node 20, uv, just, pytest, Jest |
+| Tooling | Python 3.14+, Node 24, uv, just, pytest, Jest |
 
 ## How it fits together
 
@@ -40,11 +40,11 @@ Authorized listing source -> BigQuery raw listings -> engineered features -> Lig
 
 The `evi` CLI runs each step: ingest, train (local or Vertex AI), quality gate, promote, and
 analytics. `.github/workflows/ml-pipeline.yml` chains them, and `deploy.yml` is the one deploy
-path. Start with [docs/architecture.md](docs/architecture.md) for the full map.
+path. Start with [docs/architecture.md](docs/architecture.md) for the full map. Agents and contributors: read [AGENTS.md](AGENTS.md) first, then [GLOSSARY.md](GLOSSARY.md). Past decisions are in [docs/adr/](docs/adr/).
 
 ## Setup
 
-Prerequisites: Python 3.14+ (`uv` installs it), Node 20 (see `web/.nvmrc`), `uv`, and `just`. GCP/BigQuery/GCS access is needed for data and
+Prerequisites: Python 3.14+ (`uv` installs it), Node 24 (see `web/.nvmrc`), `uv`, and `just`. GCP/BigQuery/GCS access is needed for data and
 production-like runs, not for the test suite.
 
 ```bash
@@ -111,8 +111,11 @@ fixtures are synthetic and are the only data meant for public redistribution.
 ## Common tasks
 
 ```bash
-# Lint, format check, and tests for Python and web (the CI `check` job)
+# Lint, format check, types, and tests for Python and web (the CI `check` job)
 just check
+
+# Drive the real CLI and API on synthetic data
+just verify
 
 # Apply safe automatic fixes
 just fix
@@ -169,7 +172,7 @@ Why the system is built the way it is, and the failure mode each choice guards a
 | `scripts/` | Deploy, startup, cloud setup, and research helpers |
 | `tests/` | Python test suite |
 
-Deeper docs: [data-pipeline.md](docs/data-pipeline.md),
+Deeper docs: [AGENTS.md](AGENTS.md), [GLOSSARY.md](GLOSSARY.md), [data-pipeline.md](docs/data-pipeline.md),
 [ml-and-models.md](docs/ml-and-models.md),
 [api-web-deploy.md](docs/api-web-deploy.md).
 

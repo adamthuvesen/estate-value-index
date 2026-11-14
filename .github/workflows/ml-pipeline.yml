@@ -53,11 +53,6 @@ on:
         required: false
         default: false
         type: boolean
-      rebuild_container:
-        description: 'Rebuild Vertex AI training container'
-        required: false
-        default: false
-        type: boolean
       approved:
         description: 'Approve spend and production writes (BigQuery, Vertex AI, GCS); a local run does not need it'
         required: true
@@ -78,8 +73,6 @@ jobs:
       BOOLI_API_PRIVATE_KEY: ${{ secrets.BOOLI_API_PRIVATE_KEY }}
       BIGQUERY_DATASET_RAW: ${{ vars.BIGQUERY_DATASET_RAW || 'booli_raw' }}
       BIGQUERY_TABLE_LISTINGS: ${{ vars.BIGQUERY_TABLE_LISTINGS || 'listings' }}
-      BIGQUERY_DATASET_FEATURES: ${{ vars.BIGQUERY_DATASET_FEATURES || 'booli_features' }}
-      BIGQUERY_TABLE_FEATURES: ${{ vars.BIGQUERY_TABLE_FEATURES || 'engineered_features' }}
       LISTINGS_FILE: data/raw/booli/booli_listings_prod.json
       MODEL_DIR: web/models
 
@@ -147,9 +140,9 @@ jobs:
         if: inputs.mode != 'full'
         run: uv run evi sync --output "$LISTINGS_FILE"
 
-      - name: Rebuild the Vertex training container
-        if: inputs.mode != 'local' && inputs.rebuild_container
-        run: ./vertex_ai/build_and_push.sh --project "$GCP_PROJECT_ID" --region "$GCP_REGION"
+      - name: Build the Vertex training container for this commit
+        if: inputs.mode != 'local'
+        run: ./vertex_ai/build_and_push.sh --project "$GCP_PROJECT_ID" --region "$GCP_REGION" --tag "$GITHUB_SHA" --approved
 
       - name: Train locally
         if: inputs.mode == 'local'
@@ -162,7 +155,8 @@ jobs:
         id: vertex
         if: inputs.mode != 'local'
         run: |
-          args=(--model-dir "$MODEL_DIR" --approved)
+          image_uri="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/vertex-training/lgbm-trainer:${GITHUB_SHA}"
+          args=(--model-dir "$MODEL_DIR" --image-uri "$image_uri" --approved)
           if [ "${{ inputs.tune }}" = "true" ]; then args+=(--tune); fi
           uv run evi vertex-train "${args[@]}" > vertex-train.json
           cat vertex-train.json

@@ -1,87 +1,65 @@
 # AGENTS.md
 
 **estate-value-index** predicts Swedish real estate values: authorized listing
-ingestion -> BigQuery -> LightGBM -> Next.js + FastAPI. Python 3.14 via
-**uv**; Node 20 for `web/`; Next.js 16. The `evi` CLI and GitHub Actions are the only orchestrators.
+ingestion -> BigQuery -> LightGBM -> Next.js + FastAPI. Python 3.14 via **uv**;
+Node 24 for `web/`. The `evi` CLI and GitHub Actions are the only orchestrators.
 
-This file is project facts only. Tone, principles, and git etiquette live in
-the user-level `~/.claude/CLAUDE.md` and `~/dotfiles/agents/AGENTS.md`.
-
-## Read next
-
-Read the matching guide before touching that part of the system:
-
-- [docs/architecture.md](docs/architecture.md): system shape, entry points, dependency direction, conventions
-- [docs/data-pipeline.md](docs/data-pipeline.md): ingestion, BigQuery, environment vars, leakage rules
-- [docs/ml-and-models.md](docs/ml-and-models.md): training contract, feature context, model artifacts
-- [docs/api-web-deploy.md](docs/api-web-deploy.md): FastAPI, Next.js routes, container, Cloud Run
-
-`docs/internal/` (git-ignored) holds model metrics, experiment reports, and
-research notes. Put performance numbers and experiment results there, never in
-the public docs tree. Index: `docs/internal/README.md`. The root `reports/`
-directory (git-ignored) holds historical raw experiment artifacts; the
-writeups live in `docs/internal/experiments/`.
-
-## Rules
-
-- Run Python via `uv run ...` after `uv sync --all-extras`. Never pip, never manual activate.
-- Run `just check` before commit. CI runs the same recipe.
-- Never commit to `main` directly; branch and PR.
-- Never hand-edit `web/models/` (generated training output).
-- Never use `localStorage` / `sessionStorage` in web code.
-- Never interpolate ad hoc strings into BigQuery SQL. Use the parameterized /
-  operator-only patterns in [src/estate_value_index/utils/bigquery_safety.py](src/estate_value_index/utils/bigquery_safety.py).
-- Respect `sold_date` chronology: temporal splits for evaluation, no future
-  rows in aggregates. Check: `uv run pytest tests/ml/test_temporal_leakage.py`.
-- Use `--dry-run` on CLIs that support it when the outcome is uncertain.
-- Functions that spend money or write to production refuse unless the caller passes
-  `approved=True` ([src/estate_value_index/utils/approval.py](src/estate_value_index/utils/approval.py)).
-  Never approve a run yourself; the user approves it.
-- If a doc disagrees with code, fix the doc in the same change.
+Terms: [GLOSSARY.md](GLOSSARY.md). Decisions: [docs/adr/](docs/adr/).
 
 ## Commands
 
 ```bash
-uv sync --all-extras             # create/update the .venv (setup)
-npm ci --prefix web              # install web dependencies (setup)
-just check                       # lint, format check, tests; CI runs the same
-just fix                         # apply safe automatic fixes
-just slow                        # full suite with the coverage gate, plus the route check
-cd web && npm run dev            # app on localhost:3000
-just types                       # regenerate web/src/lib/generated/api-types.ts
-gh workflow run deploy.yml -f environment=staging -f approved=true   # deploy
+uv sync --all-extras    # setup: Python environment
+npm ci --prefix web     # setup: web dependencies
+just check              # lint, format, types, tests; CI runs the same
+just fix                # apply safe automatic fixes
+just verify             # drive the real CLI and API on synthetic data
+just slow               # full suite with the coverage gate, plus the web build
+just types              # regenerate web/src/lib/generated/api-types.ts
 ```
 
-Typical local training:
+Prove user-facing changes with the `verify-estate-value-index` skill in
+`.agents/skills/verify-estate-value-index` (`just verify all`).
 
-```bash
-GCS_ENABLED=false uv run python -m estate_value_index.cli train-production-models \
-  --data-source bigquery --model-dir web/models
-```
+`evi --help` lists the pipeline steps. Config precedence: environment -> `.env`
+-> the defaults in `src/estate_value_index/utils/settings.py`.
 
-Add `--tune` only when parameter search is wanted. It runs one Optuna study per
-production model and takes longer than routine retraining.
+## Layout
 
-Orchestrated pipeline: `.github/workflows/ml-pipeline.yml` runs the `evi` steps in order
-(see [docs/data-pipeline.md](docs/data-pipeline.md)).
+- `src/estate_value_index/`: `cli/` entry points, `analytics/`, `ml/`, `ingestion/`, `areas.py`, `utils/`
+- `api_server.py`: FastAPI prediction service
+- `web/`: Next.js app and API routes
+- `vertex_ai/`: Vertex AI trainer container
+- `.github/workflows/`: `ci.yml`, `ml-pipeline.yml`, `deploy.yml` (the one deploy path)
+- `schemas/`: BigQuery schemas
+- `tests/conftest.py`: shared fixtures
 
-Config precedence: environment -> `.env` -> the defaults in
-[src/estate_value_index/utils/settings.py](src/estate_value_index/utils/settings.py). Required env vars: [docs/data-pipeline.md](docs/data-pipeline.md#environment).
+Guides: [architecture](docs/architecture.md), [data pipeline](docs/data-pipeline.md),
+[ML and models](docs/ml-and-models.md), [API, web, deploy](docs/api-web-deploy.md).
 
-Prove user-facing changes with the `verify-estate-value-index` skill at `.agents/skills/verify-estate-value-index` (`just verify all`).
+## Enforced Rules
 
-## Where things live
+| Rule | Enforced by |
+| --- | --- |
+| Spending money or writing to production refuses without approval | `src/estate_value_index/utils/approval.py::require_approval`, `tests/utils/test_approval_gates.py::test_require_approval_refuses_with_system_exit` |
+| Module layers import in one direction | `pyproject.toml::Layers` |
+| Only `cli/vertex_train.py` starts a process | `pyproject.toml::Process modules` |
+| Only the owner modules use network clients | `pyproject.toml::Network clients` |
+| Only the owner modules import Google Cloud SDKs | `pyproject.toml::Google Cloud SDKs` |
+| Raw listings, derived data, and trained models stay out of git | `.gitignore::data/raw/booli/*`, `.gitignore::web/models/*` |
+| Training and evaluation respect `sold_date` chronology | `tests/ml/test_temporal_leakage.py::test_validate_temporal_leakage_rejects_boundary` |
+| BigQuery SQL uses bound parameters | `tests/utils/test_no_unsafe_sql.py::test_no_unreviewed_dynamic_sql` |
+| One bad listing row stops the BigQuery load | `src/estate_value_index/ingestion/listing_row.py::validate_listing_rows` |
+| Area names have one owner and fixed forms | `tests/test_areas.py::test_area_forms_match_the_replaced_implementations` |
+| The API refuses a model with a missing or different package version | `api_server.py::_check_package_version`, `tests/api/test_model_integrity.py::test_load_all_models_refuses_a_different_package_version` |
+| The API refuses a model whose `.sha256` sidecar does not match | `api_server.py::_verify_model_integrity` |
+| Web TypeScript types match the Pydantic models | `justfile::types-check` |
 
-- Entry points, boundaries, and the full module map: [docs/architecture.md](docs/architecture.md)
-- FastAPI prediction service: [api_server.py](api_server.py)
-- ML (features, loading, training): `src/estate_value_index/ml/`
-- Shared test fixtures (start here for exploration): [tests/conftest.py](tests/conftest.py)
-- Container and GCS model sync: [Dockerfile](Dockerfile), [scripts/startup.sh](scripts/startup.sh)
+## Limits code cannot enforce
 
-## Gotchas
-
-The traps live with the code they bite; the guides carry the detail:
-
-- Temporal leakage, feature context, categorical handling: [docs/ml-and-models.md](docs/ml-and-models.md)
-- Models sync from GCS at startup (not baked into the image); `GCS_ENABLED`
-  differs across CI/dev/prod: [docs/api-web-deploy.md](docs/api-web-deploy.md)
+- Never approve a spend or production write yourself. The user approves it.
+- Use `--dry-run` on CLIs that support it when the outcome is uncertain.
+- Put model metrics, experiment results, and research notes in `docs/internal/`
+  (git-ignored, absent on a fresh clone), never in the public docs tree.
+- Models sync from GCS at startup and are not baked into the image. `GCS_ENABLED`
+  differs across CI, dev, and prod: [docs/api-web-deploy.md](docs/api-web-deploy.md).

@@ -13,7 +13,7 @@ The app serves predictions through FastAPI and a Next.js frontend/API layer in o
 ## API and web rules
 
 - API routes that need Node APIs should export `runtime = 'nodejs'`.
-- Do not use `localStorage` or `sessionStorage` in web artifacts.
+- Browser storage is banned in web code by the oxlint config (`web/.oxlintrc.json`).
 - Booli URL handling should stay allow-listed and timeout-bound.
 - Keep FastAPI errors from leaking stack traces; responses should expose correlation IDs where applicable.
 - Prediction work should not block the event loop when existing code already offloads it.
@@ -34,4 +34,5 @@ The app serves predictions through FastAPI and a Next.js frontend/API layer in o
 - FastAPI/API changes: `uv run pytest tests/test_api_server.py tests/api`
 - Web route changes: `cd web && npm test`
 - Deploy/startup changes: `uv run pytest tests/test_deployment_integration.py tests/api/test_gcs_sidecar_upload.py`
-- Full confidence before commit: `uv run pytest`, plus web tests for any `web/` change.
+- Full confidence before commit: `just check`. Prove a user-facing change with `just verify` (the `verify-estate-value-index` skill).
+- Web toolchain: Node 24 (`web/.nvmrc`), `npm ci --prefix web`, oxlint and oxfmt.

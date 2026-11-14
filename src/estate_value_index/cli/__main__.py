@@ -8,6 +8,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from importlib import import_module
 
+from pydantic import ValidationError
+
 
 @dataclass(frozen=True)
 class Command:
@@ -70,6 +72,24 @@ def _load_handler(command_name: str) -> Callable[[list[str] | None], int]:
     return getattr(import_module(command.module), command.handler)
 
 
+def _report_invalid_settings(error: ValidationError) -> int:
+    unknown = [
+        str(issue["loc"][0]).upper()
+        for issue in error.errors()
+        if issue["type"] == "extra_forbidden"
+    ]
+    if unknown:
+        print(
+            f"error: .env has unknown keys: {', '.join(unknown)}. Remove them (see .env.example).",
+            file=sys.stderr,
+        )
+    for issue in error.errors():
+        if issue["type"] != "extra_forbidden":
+            field = ".".join(str(part) for part in issue["loc"]).upper()
+            print(f"error: {field}: {issue['msg']}", file=sys.stderr)
+    return 2
+
+
 def main(argv: list[str] | None = None) -> int:
     """Parse global flags and dispatch subcommand args to the owning module."""
     parser = argparse.ArgumentParser(
@@ -91,7 +111,12 @@ def main(argv: list[str] | None = None) -> int:
     handler_args = list(remaining)
     if args.json and command.supports_json:
         handler_args.insert(0, "--json")
-    return _load_handler(args.command)(handler_args)
+    try:
+        return _load_handler(args.command)(handler_args)
+    except ValidationError as error:
+        if error.title != "Settings":
+            raise
+        return _report_invalid_settings(error)
 
 
 if __name__ == "__main__":

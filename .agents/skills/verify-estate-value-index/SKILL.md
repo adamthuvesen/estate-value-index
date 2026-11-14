@@ -21,10 +21,10 @@ From the repo root, after `uv sync --all-extras` and `npm ci --prefix web`:
 
 | Drive | Asserts |
 | --- | --- |
-| `train` | `train-production-models --data-source json` writes both models with sidecar, context, metrics, and importance files. The sidecar matches the model bytes. Metrics carry the package version and a data fingerprint whose row count equals the fixture's. |
+| `train` | `train-production-models --data-source json` writes both models with sidecar, context, metrics, and importance files. The sidecar matches the model bytes. Metrics carry the package version, a commit SHA, and a data fingerprint whose row count equals the fixture's. |
 | `serve` | `/health` reports both models, their versions, and the training fingerprints. Predict returns a plausible SEK value and a typed `estimate_range_factors`. Three malformed requests return 422. An artifact with no version stamp, or the wrong one, is not loaded and `/health` returns 503. |
 | `analytics` | `value-analysis`, `areas`, and `overall-stats` write files that validate against `analytics/web_json.py`. `just types-check` reports the generated TypeScript types current. |
-| `spend-refusal` | Without `--approved`, the BigQuery load (`backfill --load`), `vertex-train`, `promote-model`, `sync`, `upload-enrichment`, and train with GCS enabled each raise `ApprovalRequired`, the exception imported from `utils/approval.py`. The train case creates no model dir. One real process exits non-zero with only stderr. |
+| `spend-refusal` | Without `--approved`, the BigQuery load (`backfill --load`), `vertex-train`, `promote-model`, `sync`, `upload-enrichment`, and train with GCS enabled each raise `ApprovalRequired`, the exception imported from `utils/approval.py`. The train case creates no model dir. One real process exits non-zero with only stderr. `vertex_ai/build_and_push.sh` without `--approved` prints a refusal and exits non-zero before it reaches `gcloud`. |
 
 `serve` and `analytics` read the models that `train` made in the same run. They fail, never skip, when training fails.
 
