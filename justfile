@@ -79,4 +79,3 @@ slow:
     uv run --no-sync pytest -q
     npm run check:routes --prefix web
     npm run build --prefix web
-    npm run typecheck --prefix web

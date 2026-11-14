@@ -1,5 +1,6 @@
 import { buildMonthlySeries, computeTrailingChange } from "../price-trend";
 import type { MonthlySeriesSource } from "../price-trend";
+import type { MonthlyPrices } from "../generated/api-types";
 
 // Fixed reference date so month labels are deterministic.
 const NOW = new Date("2026-06-15T00:00:00Z");
@@ -13,15 +14,34 @@ function source(partial: Partial<MonthlySeriesSource> = {}): MonthlySeriesSource
   };
 }
 
+// The generated type lists all 12 months, so fixtures fill the gaps with null.
+function monthlyPrices(partial: Partial<MonthlyPrices>): MonthlyPrices {
+  return {
+    month_1: null,
+    month_2: null,
+    month_3: null,
+    month_4: null,
+    month_5: null,
+    month_6: null,
+    month_7: null,
+    month_8: null,
+    month_9: null,
+    month_10: null,
+    month_11: null,
+    month_12: null,
+    ...partial,
+  };
+}
+
 // Realistic entry shaped like data/derived/area_statistics.json (bromma_mariehall:
 // 4 real months of 12, medians present, avg living area ~61 m²).
 const realisticSource = source({
-  monthly_prices: {
+  monthly_prices: monthlyPrices({
     month_6: 4_800_000,
     month_9: 3_800_000,
     month_10: 3_450_000,
     month_11: 2_425_000,
-  },
+  }),
   median_price_3m: 3_750_000,
   median_price_6m: 3_750_000,
   median_price_12m: 3_850_000,
@@ -30,7 +50,7 @@ const realisticSource = source({
 describe("buildMonthlySeries", () => {
   it("preserves gaps — no forward/back fill of missing months", () => {
     const series = buildMonthlySeries(
-      source({ monthly_prices: { month_3: 3_000_000, month_1: 3_300_000 } }),
+      source({ monthly_prices: monthlyPrices({ month_3: 3_000_000, month_1: 3_300_000 }) }),
       { now: NOW },
     );
 
@@ -50,7 +70,10 @@ describe("buildMonthlySeries", () => {
 
   it("uses medians mode with fewer than 3 real points but medians present", () => {
     const series = buildMonthlySeries(
-      source({ monthly_prices: { month_8: 2_350_000 }, median_price_12m: 3_000_000 }),
+      source({
+        monthly_prices: monthlyPrices({ month_8: 2_350_000 }),
+        median_price_12m: 3_000_000,
+      }),
       { now: NOW },
     );
     expect(series.realCount).toBe(1);
@@ -98,7 +121,7 @@ describe("buildMonthlySeries", () => {
 describe("computeTrailingChange", () => {
   it("computes % change from first to last real point, ignoring nulls between", () => {
     const { points } = buildMonthlySeries(
-      source({ monthly_prices: { month_3: 3_000_000, month_1: 3_300_000 } }),
+      source({ monthly_prices: monthlyPrices({ month_3: 3_000_000, month_1: 3_300_000 }) }),
       { now: NOW },
     );
     // month_3 (earlier) → month_1 (later): +10%
@@ -115,9 +138,12 @@ describe("computeTrailingChange", () => {
   });
 
   it("returns null with fewer than 2 real points", () => {
-    const { points } = buildMonthlySeries(source({ monthly_prices: { month_8: 2_350_000 } }), {
-      now: NOW,
-    });
+    const { points } = buildMonthlySeries(
+      source({ monthly_prices: monthlyPrices({ month_8: 2_350_000 }) }),
+      {
+        now: NOW,
+      },
+    );
     expect(computeTrailingChange(points)).toBeNull();
   });
 

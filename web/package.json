@@ -9,7 +9,7 @@
     "lint": "oxlint --max-warnings=0 src && npm run check:routes",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "oxlint --type-aware --type-check --deny-warnings",
     "check:routes": "node scripts/check-route-runtime.mjs",
     "test": "jest",
     "test:watch": "jest --watch",
@@ -18,7 +18,7 @@
   "dependencies": {
     "@google-cloud/storage": "7.21.0",
     "@tailwindcss/postcss": "4.3.2",
-    "next": "16.2.10",
+    "next": "16.4.6",
     "react": "19.2.7",
     "react-dom": "19.2.7",
     "recharts": "3.9.2",
@@ -26,7 +26,7 @@
   },
   "devDependencies": {
     "@types/jest": "30.0.0",
-    "@types/node": "20.17.0",
+    "@types/node": "24.19.2",
     "@types/react": "19.2.17",
     "@types/react-dom": "19.2.3",
     "jest": "30.4.2",

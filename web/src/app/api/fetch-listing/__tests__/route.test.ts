@@ -50,6 +50,9 @@ function property(overrides: Partial<ValueProperty> = {}): ValueProperty {
     days_on_market: 59,
     listing_price: 3_900_000,
     price_per_sqm: 72_000,
+    is_rankable: true,
+    missing_core_fields: [],
+    rank_suppressed_reason: null,
     ...overrides,
   };
 }
