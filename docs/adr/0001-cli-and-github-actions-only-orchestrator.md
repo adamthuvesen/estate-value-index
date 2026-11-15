@@ -2,7 +2,7 @@
 
 Status: accepted (2026-11-12)
 
-The repo had a Prefect layer (about 2.5k lines) that wrapped `gcloud` and shell scripts, and it read script output with regexes. It also had three deploy paths: `deploy.yml`, `scripts/deploy_cloud_run.sh`, and a Prefect deployment flow. We deleted the Prefect layer. Each pipeline step is now an `evi` command, `ml-pipeline.yml` calls them in order, and `deploy.yml` is the one deploy path. Vertex AI is the `vertex_ai/` trainer container plus one submit command, `evi vertex-train`, which reads the job id and model URI from the `gcloud --format=json` response.
+The repo had a Prefect layer (about 2.5k lines) that wrapped `gcloud` and shell scripts, and it read script output with regexes. It also had three deploy paths: `deploy.yml`, a Cloud Run deploy script, and a Prefect deployment flow. We deleted the Prefect layer. Each pipeline step is now an `evi` command, `ml-pipeline.yml` calls them in order, and `deploy.yml` is the one deploy path. Vertex AI is the `vertex_ai/` trainer container plus one submit command, `evi vertex-train`, which reads the job id and model URI from the `gcloud --format=json` response.
 
 ## Considered options
 

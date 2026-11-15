@@ -2,7 +2,7 @@
 
 Status: accepted (2026-11-12)
 
-Production training hard-coded `use_materialized_features=False`, so the materialized-features layer (about 1.6k lines) ran nowhere in production. Drift monitoring (about 670 lines) ran on a schedule that was disabled. We deleted both (commit `a6956f6`). Features are computed in one place, `ml/features/`, for training and serving alike.
+Production training hard-coded `use_materialized_features=False`, so the materialized-features layer (about 1.6k lines) ran nowhere in production. Drift monitoring (about 670 lines) ran on a schedule that was disabled. We deleted both (commit `a6956f6`). Features are computed in one place, `src/estate_value_index/ml/features/`, for training and serving alike.
 
 ## Considered options
 
@@ -12,4 +12,4 @@ Production training hard-coded `use_materialized_features=False`, so the materia
 ## Consequences
 
 - No automated drift signal exists. The quality gate `evi check-model` (MdAPE threshold) and a fresh temporal backtest are the only checks on model quality.
-- If drift monitoring is wanted, build it on the shared feature code in `ml/features/`. Do not add a second feature path. Git history holds the old code.
+- If drift monitoring is wanted, build it on the shared feature code in `src/estate_value_index/ml/features/`. Do not add a second feature path. Git history holds the old code.

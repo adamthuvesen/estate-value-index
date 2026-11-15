@@ -4,7 +4,7 @@
 ingestion -> BigQuery -> LightGBM -> Next.js + FastAPI. Python 3.14 via **uv**;
 Node 24 for `web/`. The `evi` CLI and GitHub Actions are the only orchestrators.
 
-Terms: [GLOSSARY.md](GLOSSARY.md). Decisions: [docs/adr/](docs/adr/).
+Domain terms are in `GLOSSARY.md` and decisions in `docs/adr/`. A change that adds, renames, or redefines a term, or reverses a decision, updates them in the same commit.
 
 ## Commands
 
