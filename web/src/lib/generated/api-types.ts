@@ -27,7 +27,7 @@ export interface Amenities {
  */
 export interface AmenityEffect {
   known_count: number;
-  median_ppsqm_with: number;
+  median_ppsqm_with: number | null;
   median_ppsqm_without: number | null;
   naive_diff_pct: number | null;
   share_with: number;
@@ -220,9 +220,9 @@ export interface ConstructionEraDistribution {
 export interface RecentProperty {
   address: string | null;
   listing_id: string;
-  living_area: number;
+  living_area: number | null;
   price_per_sqm: number | null;
-  rooms: number;
+  rooms: number | null;
   sold_date: string;
   sold_price: number;
   url: string | null;

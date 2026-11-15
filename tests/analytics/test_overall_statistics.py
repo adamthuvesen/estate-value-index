@@ -314,3 +314,35 @@ def test_generate_overall_statistics_end_to_end(tmp_path):
     assert best is not None
     assert best["value_score"] == 90.0
     assert best["area_name"] == "sodermalm"
+
+
+def test_amenity_effect_without_present_rows_fits_the_web_contract():
+    from estate_value_index.analytics.web_json import AmenityEffect
+
+    rows = [{"balcony": False, "sold_price": 5_000_000, "living_area": 50}]
+
+    effect = _amenity_effect(rows, "balcony")
+
+    assert effect["median_ppsqm_with"] is None
+    AmenityEffect.model_validate(effect)
+
+
+def test_recent_sales_without_rooms_or_area_fit_the_web_contract():
+    from estate_value_index.analytics.area_statistics import get_recent_properties
+    from estate_value_index.analytics.web_json import RecentProperty
+
+    recent = get_recent_properties(
+        [
+            {
+                "listing_id": "1",
+                "url": None,
+                "address": "Street 1",
+                "sold_price": 5_000_000,
+                "sold_date": "2026-11-01",
+                "living_area": None,
+                "rooms": None,
+            }
+        ]
+    )
+
+    assert [RecentProperty.model_validate(item).rooms for item in recent] == [None]

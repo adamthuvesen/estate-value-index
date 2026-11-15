@@ -255,8 +255,8 @@ class RecentProperty(_Strict):
     address: str | None
     sold_price: float
     sold_date: str
-    living_area: float
-    rooms: float
+    living_area: float | None
+    rooms: float | None
     price_per_sqm: float | None
 
 
@@ -466,7 +466,7 @@ class ConstructionEraPoint(_Strict):
 class AmenityEffect(_Strict):
     known_count: int
     share_with: float
-    median_ppsqm_with: float
+    median_ppsqm_with: float | None
     median_ppsqm_without: float | None
     naive_diff_pct: float | None
     within_area_diff_pct: float | None
