@@ -281,7 +281,7 @@ export interface BestValueSale {
   living_area: number | null;
   prediction_delta_percentage: number;
   rooms: number | null;
-  sold_date: string;
+  sold_date: string | null;
   sold_price: number;
   url: string | null;
   value_score: number;
@@ -298,7 +298,7 @@ export interface BiggestBidUpSale {
   living_area: number | null;
   premium_pct: number;
   rooms: number | null;
-  sold_date: string;
+  sold_date: string | null;
   sold_price: number;
   url: string | null;
 }
@@ -379,7 +379,7 @@ export interface FastestSale {
   display_name: string;
   living_area: number | null;
   rooms: number | null;
-  sold_date: string;
+  sold_date: string | null;
   sold_price: number;
   url: string | null;
 }
@@ -425,7 +425,7 @@ export interface HighestPricePerSqmSale {
   living_area: number | null;
   price_per_sqm: number;
   rooms: number | null;
-  sold_date: string;
+  sold_date: string | null;
   sold_price: number;
   url: string | null;
 }
@@ -600,7 +600,7 @@ export interface RecordSale {
   display_name: string;
   living_area: number | null;
   rooms: number | null;
-  sold_date: string;
+  sold_date: string | null;
   sold_price: number;
   url: string | null;
 }

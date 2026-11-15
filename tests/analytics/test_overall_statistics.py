@@ -346,3 +346,33 @@ def test_recent_sales_without_rooms_or_area_fit_the_web_contract():
     )
 
     assert [RecentProperty.model_validate(item).rooms for item in recent] == [None]
+
+
+def test_records_keep_an_undated_sale_valid_for_the_web_contract():
+    from estate_value_index.analytics.web_json import OverallRecords
+
+    rows = [
+        {
+            "address": "A 1",
+            "area": "sodermalm",
+            "sold_price": 9_000_000,
+            "living_area": 50,
+            "sold_date": None,  # sold price but no recorded date
+            "days_on_market": 5,
+            "listing_price": 8_000_000,
+        },
+        {
+            "address": "B 2",
+            "area": "sodermalm",
+            "sold_price": 6_000_000,
+            "living_area": 60,
+            "sold_date": "2026-02-01",
+            "days_on_market": 3,
+            "listing_price": 5_500_000,
+        },
+    ]
+
+    records = build_records(rows, value_properties=[])
+
+    assert records["most_expensive"]["sold_date"] is None
+    OverallRecords.model_validate(records)

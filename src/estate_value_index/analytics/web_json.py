@@ -318,7 +318,8 @@ class RecordSale(_Strict):
     address: str | None
     area_name: str
     display_name: str
-    sold_date: str
+    # A record can be an undated sale; `_record_base` passes the missing date on.
+    sold_date: str | None
     url: str | None
     living_area: float | None
     rooms: float | None

@@ -46,8 +46,12 @@ function RecordCard({ label, record, headline, caption, footnote }: CardConfig) 
           >
             {record.display_name}
           </Link>
-          {" · "}
-          <span className="num">{formatDateSv(record.sold_date)}</span>
+          {record.sold_date ? (
+            <>
+              {" · "}
+              <span className="num">{formatDateSv(record.sold_date)}</span>
+            </>
+          ) : null}
           {record.living_area ? (
             <span className="num"> · {formatNumber(record.living_area)} m²</span>
           ) : null}
