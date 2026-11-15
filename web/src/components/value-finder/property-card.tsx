@@ -36,11 +36,13 @@ export function PropertyCard({ property }: PropertyCardProps) {
   const half = (Math.abs(clamped) / BAND) * 50; // width from center, in %
   const fillLeft = belowPrediction ? 50 - half : 50;
 
-  const soldDate = new Date(property.sold_date).toLocaleDateString("en-GB", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
+  const soldDate = property.sold_date
+    ? new Date(property.sold_date).toLocaleDateString("en-GB", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      })
+    : "—";
 
   return (
     <article className="ledger-card ledger-card-hover group flex flex-col p-4">
@@ -177,11 +179,13 @@ function InsufficientDataCard({ property }: PropertyCardProps) {
   const reason = missing ? `Missing ${missing}` : "Insufficient data";
   const sizeLabel = property.living_area ? `${property.living_area} m²` : "—";
 
-  const soldDate = new Date(property.sold_date).toLocaleDateString("en-GB", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
+  const soldDate = property.sold_date
+    ? new Date(property.sold_date).toLocaleDateString("en-GB", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      })
+    : "—";
 
   return (
     <article className="flex flex-col rounded-ledger border border-dashed border-ledger-border-emphasis bg-ledger-elevated/50 p-4">

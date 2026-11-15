@@ -824,7 +824,7 @@ export interface ValueProperty {
   property_type: string | null;
   rank_suppressed_reason: string | null;
   rooms: number | null;
-  sold_date: string;
+  sold_date: string | null;
   sold_price: number;
   url: string | null;
   value_score: number | null;

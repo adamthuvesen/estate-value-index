@@ -100,6 +100,9 @@ def test_output_matches_the_web_json_contract():
         ["address", "municipality", "property_type"]
     ].astype(object)
     df.loc[df.index[5:7], ["address", "municipality", "property_type"]] = None
+    # A sold price with no recorded sale date is a valid ingested listing too.
+    df["sold_date"] = df["sold_date"].astype(object)
+    df.loc[df.index[7], "sold_date"] = None
     out = calculate_value_metrics(df)
 
     ValueAnalysisData.model_validate(

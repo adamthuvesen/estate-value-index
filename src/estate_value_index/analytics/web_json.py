@@ -58,7 +58,8 @@ class ValueProperty(_Strict):
     is_rankable: bool
     rank_suppressed_reason: str | None
     missing_core_fields: list[str]
-    sold_date: str
+    # Ingest can sell a listing with no recorded date; the export keeps it.
+    sold_date: str | None
     days_on_market: float | None
     listing_price: float | None
     price_per_sqm: float | None
