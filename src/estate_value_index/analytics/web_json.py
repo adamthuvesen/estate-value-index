@@ -38,10 +38,11 @@ class ValueProperty(_Strict):
     municipality: str
     # Null on suppressed rows (rank_suppressed_reason "missing_living_area").
     living_area: float | None
-    rooms: float
+    # Nullable in the listing row; the export keeps listings without them.
+    rooms: float | None
     property_type: str
     construction_year: float | None
-    monthly_fee: float
+    monthly_fee: float | None
     floor: float | None
     elevator: bool | None
     balcony: bool | None

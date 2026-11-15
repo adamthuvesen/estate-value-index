@@ -173,11 +173,11 @@ function buildPredicates(filters: ValueFinderFilters): Predicate[] {
   }
   if (filters.min_rooms !== undefined) {
     const min = filters.min_rooms;
-    predicates.push((p) => p.rooms >= min);
+    predicates.push((p) => p.rooms !== null && p.rooms >= min);
   }
   if (filters.max_rooms !== undefined) {
     const max = filters.max_rooms;
-    predicates.push((p) => p.rooms <= max);
+    predicates.push((p) => p.rooms !== null && p.rooms <= max);
   }
   if (filters.min_price !== undefined) {
     const min = filters.min_price;

@@ -94,6 +94,8 @@ def test_output_matches_the_web_json_contract():
     df["sold_date"] = "2026-01-02"
     df["days_on_market"] = 10
     df["listing_price"] = df["sold_price"]
+    # Sold listings may lack rooms and a monthly fee; the export must keep them.
+    df.loc[df.index[3:5], ["rooms", "monthly_fee"]] = np.nan
     out = calculate_value_metrics(df)
 
     ValueAnalysisData.model_validate(

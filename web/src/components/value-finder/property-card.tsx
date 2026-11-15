@@ -127,7 +127,7 @@ export function PropertyCard({ property }: PropertyCardProps) {
       {/* Facts */}
       <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 sm:grid-cols-4">
         <Fact label="Size" value={`${property.living_area} m²`} />
-        <Fact label="Rooms" value={`${property.rooms}`} />
+        <Fact label="Rooms" value={property.rooms === null ? "–" : `${property.rooms}`} />
         <Fact
           label="Built"
           value={property.construction_year ? `${property.construction_year}` : "—"}

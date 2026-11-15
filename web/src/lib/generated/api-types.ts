@@ -815,7 +815,7 @@ export interface ValueProperty {
   living_area: number | null;
   longitude?: number | null;
   missing_core_fields: string[];
-  monthly_fee: number;
+  monthly_fee: number | null;
   municipality: string;
   predicted_price: number;
   prediction_delta_absolute: number;
@@ -823,7 +823,7 @@ export interface ValueProperty {
   price_per_sqm: number | null;
   property_type: string;
   rank_suppressed_reason: string | null;
-  rooms: number;
+  rooms: number | null;
   sold_date: string;
   sold_price: number;
   url: string | null;
