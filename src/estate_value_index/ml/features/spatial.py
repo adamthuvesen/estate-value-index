@@ -5,22 +5,22 @@ import pandas as pd
 
 from estate_value_index.ml.features.address_comps import create_address_comp_features
 from estate_value_index.ml.features.area_market import (
-    _create_area_market_features,
-    _create_area_temporal_metrics,
+    create_area_market_features,
+    create_area_temporal_metrics,
 )
 from estate_value_index.ml.features.classifiers import (
-    _classify_stockholm_district,
-    _extract_postal_code,
+    classify_stockholm_district,
+    extract_postal_code,
 )
 from estate_value_index.ml.features.context import FeatureEngineeringContext
-from estate_value_index.ml.features.heuristics import _calculate_distance_to_center
+from estate_value_index.ml.features.heuristics import calculate_distance_to_center
 from estate_value_index.ml.features.micro_area import create_micro_area_features
 from estate_value_index.ml.poi import create_poi_features
 
 """Spatial and location-based feature builders."""
 
 
-def _create_spatial_features(
+def create_spatial_features(
     df: pd.DataFrame, context: FeatureEngineeringContext | None
 ) -> pd.DataFrame:
     """Create location-based and area-level market features."""
@@ -29,16 +29,16 @@ def _create_spatial_features(
 
     # Extract postal code information
     df["postal_code"] = df.get("address", pd.Series([None] * len(df), index=df.index)).apply(
-        _extract_postal_code
+        extract_postal_code
     )
     df["postal_prefix"] = df["postal_code"].apply(lambda x: x[:3] if x and len(x) >= 3 else None)
 
     # District classification (based on postal code)
-    df["stockholm_district"] = df["postal_code"].apply(_classify_stockholm_district)
+    df["stockholm_district"] = df["postal_code"].apply(classify_stockholm_district)
 
     # Distance to center (heuristic based on area name)
     df["distance_to_center"] = df.get("area", pd.Series([None] * len(df), index=df.index)).apply(
-        _calculate_distance_to_center
+        calculate_distance_to_center
     )
 
     # POI/transit features (geocoding-based, if lat/lon available)
@@ -53,13 +53,13 @@ def _create_spatial_features(
         df["transit_accessibility_score"] = np.nan
 
     # Area-level market microstructure (with leave-one-out during training)
-    df = _create_area_market_features(df, context)
+    df = create_area_market_features(df, context)
 
     # Area price tier classification
     df = _classify_area_price_tiers(df, context)
 
     # Rolling area sales metrics (temporal spatial features)
-    df = _create_area_temporal_metrics(df, context)
+    df = create_area_temporal_metrics(df, context)
 
     return df
 
@@ -70,7 +70,7 @@ def _classify_area_price_tiers(
     """Classify areas into price tiers.
 
     Note: This only creates area_price_tier. The area_avg_price and area_listing_count
-    features are created in _create_target_encoding.
+    features are created in create_target_encoding.
     """
     # First get area_avg_price if we need to compute tiers
     if context and context.area_price_tier:

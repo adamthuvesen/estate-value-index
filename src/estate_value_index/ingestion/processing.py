@@ -15,50 +15,15 @@ import statistics
 from collections import Counter, defaultdict
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
-from estate_value_index.ingestion.booli.normalization import (
-    extract_area_token as extract_area_from_format,
-)
+from estate_value_index.areas import clean_area_name, extract_area_token
+from estate_value_index.utils.jsonl import load_jsonl_file
 
 logger = logging.getLogger(__name__)
 
 
-def load_jsonl_file(file_path: Path) -> list[dict]:
-    """Load listings from JSONL file (supports both line-delimited and array format)."""
-    listings = []
-
-    if not file_path.exists():
-        return listings
-
-    with open(file_path, encoding="utf-8") as f:
-        content = f.read().strip()
-
-        # Try JSON array format first
-        if content.startswith("["):
-            try:
-                data = json.loads(content)
-                if isinstance(data, list):
-                    listings = [item for item in data if isinstance(item, dict)]
-                    return listings
-            except json.JSONDecodeError:
-                pass
-
-        # Fall back to line-delimited JSON
-        for line_num, line in enumerate(content.split("\n"), 1):
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                listing = json.loads(line)
-                if isinstance(listing, dict):
-                    listings.append(listing)
-            except json.JSONDecodeError as e:
-                logger.warning("Invalid JSON on line %d: %s", line_num, e)
-
-    return listings
-
-
-def _pick_newer(existing: dict, new: dict) -> dict:
+def _pick_newer(existing: dict[str, Any], new: dict[str, Any]) -> dict[str, Any]:
     """Resolve a listing-id collision between an existing and a new record.
 
     Conflict resolution rule:
@@ -82,19 +47,19 @@ def _pick_newer(existing: dict, new: dict) -> dict:
         existing_scraped = datetime.fromisoformat(str(existing.get("scraped_at"))).replace(
             tzinfo=None
         )
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return existing
     try:
         new_scraped = datetime.fromisoformat(str(new.get("scraped_at"))).replace(tzinfo=None)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return existing
 
     return new if new_scraped > existing_scraped else existing
 
 
 def merge_listings(
-    new_listings: list[dict], existing_listings: list[dict]
-) -> tuple[list[dict], dict[str, int]]:
+    new_listings: list[dict[str, Any]], existing_listings: list[dict[str, Any]]
+) -> tuple[list[dict[str, Any]], dict[str, int]]:
     """Merge new listings with existing, deduplicating on ``listing_id``.
 
     All records with a ``listing_id`` are retained (newly-listed properties
@@ -106,7 +71,7 @@ def merge_listings(
     Returns:
         Tuple of (merged_listings, stats)
     """
-    listings_by_id: dict[str, dict] = {}
+    listings_by_id: dict[str, dict[str, Any]] = {}
     stats = {
         "existing_count": len(existing_listings),
         "new_count": len(new_listings),
@@ -159,66 +124,7 @@ def merge_listings(
     return list(listings_by_id.values()), stats
 
 
-def clean_area_name(area_field: str) -> str:
-    """Clean and standardize an area name."""
-    area = extract_area_from_format(area_field)
-
-    if not area:
-        return ""
-
-    # Remove quotes
-    area = area.strip('"').strip()
-
-    # Area consolidation mappings (apply first)
-    area_consolidations = {
-        "Solna kommun": "Solna",
-        "Frösunda": "Solna",
-        "Sundbyberg/Duvbo": "Sundbyberg",
-        "Sundbybergs kommun": "Sundbyberg",
-        "Rissne/Ursvik": "Sundbyberg",
-        "Kristineberg": "Kungsholmen",
-    }
-
-    for original, consolidated in area_consolidations.items():
-        if area == original:
-            area = consolidated
-            break
-
-    # Fix common spelling errors
-    spelling_fixes = {
-        "Vasasatan": "Vasastan",
-        "Kungholmen": "Kungsholmen",
-        "Östemalm": "Östermalm",
-        "Strockholm": "Stockholm",
-        "Hagastan": "Hagastaden",
-    }
-
-    for wrong, correct in spelling_fixes.items():
-        if wrong in area:
-            area = area.replace(wrong, correct)
-
-    # Handle "Söder" abbreviation
-    if area == "Söder" or area.startswith("Söder "):
-        area = area.replace("Söder", "Södermalm", 1)
-
-    # Standardize compound areas
-    if "/" in area:
-        parts = area.split("/")
-        major_districts = [
-            "Vasastan",
-            "Kungsholmen",
-            "Södermalm",
-            "Östermalm",
-            "Norrmalm",
-        ]
-        for district in reversed(major_districts):
-            if any(district in p for p in parts):
-                return district
-
-    return area
-
-
-def consolidate_sparse_areas(area_counts: Counter, min_count: int = 5) -> dict[str, str]:
+def consolidate_sparse_areas(area_counts: Counter[Any], min_count: int = 5) -> dict[str, str]:
     """Create mapping for sparse variations to parent areas."""
     consolidation_map = {}
 
@@ -307,8 +213,8 @@ def consolidate_sparse_areas(area_counts: Counter, min_count: int = 5) -> dict[s
 
 
 def apply_area_cleaning(
-    listings: list[dict], min_area_count: int = 5
-) -> tuple[list[dict], dict[str, int]]:
+    listings: list[dict[str, Any]], min_area_count: int = 5
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Apply area cleaning and consolidation to all listings.
 
     Returns:
@@ -331,7 +237,7 @@ def apply_area_cleaning(
     # Create consolidation map and apply cleaning + consolidation in a single second pass.
     consolidation_map = consolidate_sparse_areas(area_counts, min_area_count)
 
-    cleaned_listings: list[dict] = []
+    cleaned_listings: list[dict[str, Any]] = []
     final_area_counts: Counter[str] = Counter()
     for listing in listings:
         original_area = listing.get("area", "")
@@ -353,12 +259,14 @@ def apply_area_cleaning(
     return cleaned_listings, stats
 
 
-def calculate_area_medians(listings: list[dict], days_threshold: int = 1000) -> dict[str, int]:
+def calculate_area_medians(
+    listings: list[dict[str, Any]], days_threshold: int = 1000
+) -> dict[str, int]:
     """Calculate median days_on_market for each area (only valid values <= threshold)."""
     area_days = defaultdict(list)
 
     for listing in listings:
-        area = extract_area_from_format(listing.get("area", ""))
+        area = extract_area_token(listing.get("area", ""))
         days_on_market = listing.get("days_on_market")
 
         if days_on_market is not None and days_on_market <= days_threshold:
@@ -372,7 +280,7 @@ def calculate_area_medians(listings: list[dict], days_threshold: int = 1000) -> 
     return area_medians
 
 
-def calculate_overall_median(listings: list[dict], days_threshold: int = 1000) -> int:
+def calculate_overall_median(listings: list[dict[str, Any]], days_threshold: int = 1000) -> int:
     """Calculate overall median days_on_market from all valid records."""
     valid_days = []
 
@@ -385,8 +293,8 @@ def calculate_overall_median(listings: list[dict], days_threshold: int = 1000) -
 
 
 def impute_days_on_market(
-    listings: list[dict], days_threshold: int = 1000
-) -> tuple[list[dict], dict[str, int]]:
+    listings: list[dict[str, Any]], days_threshold: int = 1000
+) -> tuple[list[dict[str, Any]], dict[str, int]]:
     """Impute days_on_market values > threshold using area-based medians.
 
     Returns:
@@ -412,7 +320,7 @@ def impute_days_on_market(
             imputed_listings.append(listing)
         elif days_on_market > days_threshold:
             old_value = days_on_market
-            area = extract_area_from_format(listing.get("area", ""))
+            area = extract_area_token(listing.get("area", ""))
             area_median = area_medians.get(area)
 
             if area_median is not None:
@@ -523,7 +431,7 @@ def process_pipeline(
         logger.info("Dry run: would write %d listings to %s", len(final_listings), output_file)
     else:
         logger.info("Writing %d listings to %s", len(final_listings), output_file)
-        with open(output_file, "w", encoding="utf-8") as f:
+        with Path(output_file).open("w", encoding="utf-8") as f:
             for listing in final_listings:
                 f.write(json.dumps(listing, ensure_ascii=False) + "\n")
         logger.info("Successfully wrote %d listings", len(final_listings))

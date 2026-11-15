@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from estate_value_index.ingestion.processing import merge_listings
 
 
-def _listing(listing_id: str, **fields) -> dict:
+def _listing(listing_id: str, **fields) -> dict[str, Any]:
     base = {"listing_id": listing_id, "address": "Some Street 1"}
     base.update(fields)
     return base

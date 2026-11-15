@@ -8,10 +8,7 @@
  * with low listing counts often return null for liquidity, value scores, etc.)
  * before passing through `.toFixed()`.
  */
-export function formatNumberOrDash(
-  value: number | null | undefined,
-  decimals: number,
-): string {
+export function formatNumberOrDash(value: number | null | undefined, decimals: number): string {
   if (value === null || value === undefined) return "—";
   return value.toFixed(decimals);
 }
@@ -45,10 +42,7 @@ export function formatPercent(value: number | null | undefined, decimals = 1): s
 }
 
 /** Format a 0..1 fraction as a percentage string (multiplies by 100 first). */
-export function formatSharePct(
-  fraction: number | null | undefined,
-  decimals = 0,
-): string {
+export function formatSharePct(fraction: number | null | undefined, decimals = 0): string {
   if (fraction === null || fraction === undefined) return "—";
   return `${(fraction * 100).toFixed(decimals)}%`;
 }
@@ -87,8 +81,18 @@ export function titleCaseArea(value: string): string {
 }
 
 const MONTH_ABBR = [
-  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
 ];
 
 /** "2024-03" → "Mar ’24". Falls back to the input if it isn't `YYYY-MM`. */

@@ -1,6 +1,6 @@
 # Estate Value Index
 
-![License](https://img.shields.io/github/license/adamthuvesen/estate-value-index) ![Python](https://img.shields.io/badge/python-3.11%2B-blue)
+![License](https://img.shields.io/github/license/adamthuvesen/estate-value-index) ![Python](https://img.shields.io/badge/python-3.14%2B-blue)
 
 ![Value Finder — every recent sale scored against the model's estimate](docs/assets/value-finder.png)
 
@@ -27,9 +27,9 @@ BigQuery, GCS, and `.env` for production-like runs.
 | ML | pandas, scikit-learn, LightGBM, optional Optuna |
 | API | FastAPI |
 | Web | Next.js 16, React 19 |
-| Orchestration | Prefect 3 |
+| Orchestration | `evi` CLI + GitHub Actions |
 | Deploy | Docker, Cloud Run, GCS |
-| Tooling | Python 3.11+, Node 20+, uv, pytest, Jest |
+| Tooling | Python 3.14+, Node 24, uv, just, pytest, Jest |
 
 ## How it fits together
 
@@ -38,14 +38,13 @@ Authorized listing source -> BigQuery raw listings -> engineered features -> Lig
   -> FastAPI /predict + Next.js API routes (one Cloud Run container)
 ```
 
-The composed path is `pipelines/core/complete_pipeline.py`, which chains ingestion, feature
-materialization, training, and deploy. Each stage also runs on its own (`data_pipeline.py`,
-`training_pipeline.py`, `deployment_pipeline.py`). Start with
-[docs/architecture.md](docs/architecture.md) for the full map.
+The `evi` CLI runs each step: ingest, train (local or Vertex AI), quality gate, promote, and
+analytics. `.github/workflows/ml-pipeline.yml` chains them, and `deploy.yml` is the one deploy
+path. Start with [docs/architecture.md](docs/architecture.md) for the full map. Agents and contributors: read [AGENTS.md](AGENTS.md) first, then [GLOSSARY.md](GLOSSARY.md). Past decisions are in [docs/adr/](docs/adr/).
 
 ## Setup
 
-Prerequisites: Python 3.11+, Node 20+, `uv`. GCP/BigQuery/GCS access is needed for data and
+Prerequisites: Python 3.14+ (`uv` installs it), Node 24 (see `web/.nvmrc`), `uv`, and `just`. GCP/BigQuery/GCS access is needed for data and
 production-like runs, not for the test suite.
 
 ```bash
@@ -54,7 +53,7 @@ cd estate-value-index
 
 uv sync --all-extras
 
-cd web && npm install && cd ..
+npm ci --prefix web
 
 cp .env.example .env   # then fill in GCP/BigQuery/GCS values
 ```
@@ -67,14 +66,12 @@ GCP_REGION=europe-north1
 BIGQUERY_PROJECT_ID=your-gcp-project-id
 BIGQUERY_DATASET_RAW=booli_raw
 BIGQUERY_TABLE_LISTINGS=listings
-BIGQUERY_DATASET_FEATURES=booli_features
-BIGQUERY_TABLE_FEATURES=engineered_features
 GCS_BUCKET=your-gcs-bucket
 ```
 
-Config precedence is environment variables -> [config/pipeline_config.yaml](config/pipeline_config.yaml)
--> code defaults. Inspect resolved settings with
-`uv run python -m estate_value_index.utils.settings`.
+Config precedence is environment variables -> `.env` -> the defaults in
+[src/estate_value_index/utils/settings.py](src/estate_value_index/utils/settings.py). An unknown
+key in `.env` is an error.
 
 ## Run locally
 
@@ -112,25 +109,33 @@ fixtures are synthetic and are the only data meant for public redistribution.
 ## Common tasks
 
 ```bash
-# Test (Python coverage gate is 59%)
-uv run pytest
-cd web && npm test && cd ..
+# Lint, format check, types, and tests for Python and web (the CI `check` job)
+just check
+
+# Drive the real CLI and API on synthetic data
+just verify
+
+# Apply safe automatic fixes
+just fix
+
+# Full Python suite with the 59% coverage gate, plus the web route check
+just slow
 
 # Train production models locally
 uv run python -m estate_value_index.cli train-production-models --data-source bigquery
 
-# Run the pipeline (see --help for all flags)
-uv run python -m estate_value_index.pipelines.core.complete_pipeline --quick      # fast local run
-uv run python -m estate_value_index.pipelines.core.complete_pipeline --dry-run    # preview, no cloud work
-uv run python -m estate_value_index.pipelines.core.complete_pipeline --retrain    # retrain existing data
-uv run python -m estate_value_index.pipelines.core.complete_pipeline --retrain --deploy
+# Fetch authorized listings, then merge them into the local production file
+uv run evi backfill --start-date 2026-01-01 --end-date 2026-01-31 --process
+uv run evi vertex-train --dry-run                                    # print the Vertex job spec
+uv run evi check-model --model-dir web/models                        # MdAPE quality gate
 
-# Backfill authorized listings through the signed API
-uv run python -m estate_value_index.cli backfill --start-date 2026-01-01 --end-date 2026-01-31
-
-# Deploy to Cloud Run
-./scripts/deploy_cloud_run.sh
+# Deploy to Cloud Run: run the Deploy Web App workflow
+gh workflow run deploy.yml -f environment=staging -f approved=true
 ```
+
+Any step that spends money or writes to production (BigQuery, Vertex AI, GCS) refuses
+unless the user approves it with the approval flag (see `--help`). `--dry-run` and local
+runs need no approval. `evi backfill --load` is the step that writes BigQuery.
 
 ## Engineering decisions
 
@@ -156,17 +161,16 @@ Why the system is built the way it is, and the failure mode each choice guards a
 
 | Path | Purpose |
 | ---- | ------- |
-| `src/estate_value_index/ingestion/` | Listing ingestion, parsing, BigQuery load |
-| `src/estate_value_index/pipelines/` | Prefect flows and tasks |
+| `src/estate_value_index/ingestion/` | Listing ingestion, parsing, BigQuery load and sync |
+| `src/estate_value_index/cli/` | The `evi` entry points, including Vertex training |
 | `src/estate_value_index/ml/` | Feature engineering, data loading, training |
-| `src/estate_value_index/monitoring/` | Model and data drift checks |
 | `src/estate_value_index/utils/` | Settings, GCP clients, GCS, BigQuery safety |
 | `web/src/app/` | Next.js pages and API routes |
-| `config/`, `schemas/` | Pipeline/feature config and BigQuery schemas |
+| `schemas/` | BigQuery schemas |
 | `scripts/` | Deploy, startup, cloud setup, and research helpers |
 | `tests/` | Python test suite |
 
-Deeper docs: [data-pipeline.md](docs/data-pipeline.md),
+Deeper docs: [AGENTS.md](AGENTS.md), [GLOSSARY.md](GLOSSARY.md), [data-pipeline.md](docs/data-pipeline.md),
 [ml-and-models.md](docs/ml-and-models.md),
 [api-web-deploy.md](docs/api-web-deploy.md).
 

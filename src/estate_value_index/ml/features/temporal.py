@@ -4,22 +4,22 @@ import numpy as np
 import pandas as pd
 
 from estate_value_index.ml.features.classifiers import (
-    _classify_dom_momentum,
-    _classify_market_cycle,
-    _classify_school_period,
-    _classify_swedish_season,
+    classify_dom_momentum,
+    classify_market_cycle,
+    classify_school_period,
+    classify_swedish_season,
 )
-from estate_value_index.ml.features.context import _ensure_timestamp
+from estate_value_index.ml.features.context import ensure_timestamp
 
 """Temporal and seasonality feature builders."""
 
 
-def _create_temporal_features(df: pd.DataFrame, reference_date: pd.Timestamp) -> pd.DataFrame:
+def create_temporal_features(df: pd.DataFrame, reference_date: pd.Timestamp) -> pd.DataFrame:
     """Create time-based features including seasonality and market timing."""
     # Parse dates - use scraped_at and derive listing_date from days_on_market
     fallback_timestamp = reference_date
-    df["sold_date"] = _ensure_timestamp(df.get("sold_date"), df.index, fallback_timestamp)
-    df["scraped_at"] = _ensure_timestamp(df.get("scraped_at"), df.index, fallback_timestamp)
+    df["sold_date"] = ensure_timestamp(df.get("sold_date"), df.index, fallback_timestamp)
+    df["scraped_at"] = ensure_timestamp(df.get("scraped_at"), df.index, fallback_timestamp)
 
     # Calculate listing_date from scraped_at and days_on_market
     if "days_on_market" in df.columns:
@@ -49,9 +49,9 @@ def _create_temporal_features(df: pd.DataFrame, reference_date: pd.Timestamp) ->
     # area statistics (area_sold_price_median_*).
 
     # Market cycle based on listing_date (uses year-based cycle)
-    df["market_cycle"] = _classify_market_cycle(df["listing_date"])
-    df["swedish_season"] = df["listed_month"].apply(_classify_swedish_season)
-    df["school_period"] = df["listed_month"].apply(_classify_school_period)
+    df["market_cycle"] = classify_market_cycle(df["listing_date"])
+    df["swedish_season"] = df["listed_month"].apply(classify_swedish_season)
+    df["school_period"] = df["listed_month"].apply(classify_school_period)
 
     # Specific month indicators
     df["is_tax_month"] = df["listed_month"].isin([3, 4]).astype(int)
@@ -61,7 +61,7 @@ def _create_temporal_features(df: pd.DataFrame, reference_date: pd.Timestamp) ->
     # Days on market momentum
     if "days_on_market" not in df.columns:
         df["days_on_market"] = 0
-    df["dom_momentum"] = df["days_on_market"].apply(_classify_dom_momentum)
+    df["dom_momentum"] = df["days_on_market"].apply(classify_dom_momentum)
 
     # Market timing score (combines multiple temporal factors)
     timing_score = 0

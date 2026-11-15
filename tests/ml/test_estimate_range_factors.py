@@ -9,9 +9,11 @@ import pandas as pd
 
 from estate_value_index.ml.estimate_range_factors import (
     MIN_BUCKET_SAMPLES,
+    EstimateRangeFactors,
     compute_estimate_range_factors,
 )
 from estate_value_index.ml.production_models import _metrics_payload
+from estate_value_index.model_artifacts import installed_package_version
 
 
 def _frame(predicted, ratios, dates):
@@ -107,6 +109,7 @@ def test_factors_rounded_to_four_decimals() -> None:
 
 def test_factors_land_in_metrics_payload() -> None:
     factors = {"buckets": [], "pooled": {"lower": 0.94, "upper": 1.04}, "interval_pct": 30}
+    # Stub exposing only the attributes _metrics_payload reads.
     model = SimpleNamespace(
         model_id="no_list_price_v1",
         model_type="tiered",
@@ -130,7 +133,7 @@ def test_factors_land_in_metrics_payload() -> None:
     }
 
     payload = _metrics_payload(
-        model,
+        model,  # pyright: ignore[reportArgumentType]  # stub model: see the comment above
         heldout_metrics=heldout,
         calibration={"served": "uncalibrated"},
         estimate_range_factors=factors,
@@ -141,10 +144,21 @@ def test_factors_land_in_metrics_payload() -> None:
         test_end="2026-07-01",
         lgbm_params={"num_leaves": 20},
         tuned=True,
+        data_fingerprint={"rows": 15, "max_sold_date": "2026-07-01", "sha256": "ab"},
+        commit_sha="abc123",
     )
 
+    assert payload["commit_sha"] == "abc123"
     assert payload["estimate_range_factors"] is factors
+    assert payload["data_fingerprint"]["rows"] == 15
+    assert payload["package_version"] == installed_package_version()
     assert payload["training_parameters"] == {
         "source": "optuna",
         "lightgbm": {"num_leaves": 20},
     }
+
+
+def test_computed_factors_match_the_typed_model() -> None:
+    n = 200
+    frame, preds = _frame([3_500_000.0] * n, list(np.linspace(0.9, 1.1, n)), ["2026-07-01"] * n)
+    EstimateRangeFactors.model_validate(compute_estimate_range_factors(frame, preds))

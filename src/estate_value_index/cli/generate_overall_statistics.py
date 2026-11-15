@@ -6,19 +6,19 @@ module is a thin argparse shell over `generate_overall_statistics`.
 """
 
 import argparse
-import os
 from pathlib import Path
 
 from estate_value_index.analytics.overall_statistics import generate_overall_statistics
+from estate_value_index.utils.settings import get_settings
 
 
-def main(argv: list[str] | None = None, *, args=None) -> int:
+def main(argv: list[str] | None = None, *, args: argparse.Namespace | None = None) -> int:
     if args is None:
         parser = argparse.ArgumentParser(description="Generate city-wide statistics for the web UI")
         parser.add_argument(
             "--data-source",
             choices=["bigquery", "json"],
-            default=os.getenv("DATA_SOURCE", "bigquery"),
+            default=get_settings().data_source,
             help=(
                 "Primary data source for raw listings (default: bigquery; falls "
                 "back to json when bigquery returns no rows or its client is "
@@ -37,7 +37,7 @@ def main(argv: list[str] | None = None, *, args=None) -> int:
         args = parser.parse_args(argv)
 
     generate_overall_statistics(
-        data_source=args.data_source or os.getenv("DATA_SOURCE", "bigquery"),
+        data_source=args.data_source or get_settings().data_source,
         value_analysis_path=Path(args.value_analysis) if args.value_analysis else None,
         raw_listings_path=Path(args.raw_listings) if args.raw_listings else None,
         output_path=Path(args.output) if args.output else None,

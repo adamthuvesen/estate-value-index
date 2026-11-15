@@ -2,69 +2,14 @@
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 
 import pandas as pd
 
-from estate_value_index.ingestion.booli.normalization import extract_area_token
+from estate_value_index.areas import extract_area_name
 
 from .constants import MIN_VALID_PRICE
 from .features import CATEGORICAL_FEATURE_NAMES, NUMERIC_FEATURE_NAMES
-
-_SWEDISH_CHAR_MAP = {"ö": "o", "ä": "a", "å": "a", "Ö": "o", "Ä": "a", "Å": "a"}
-
-
-def transliterate_swedish(text: object) -> str | None:
-    """Convert Swedish characters to ASCII equivalents and clean for LightGBM compatibility.
-
-    Returns None for missing values to preserve NA semantics in tests/pipelines.
-    """
-    if pd.isna(text):
-        return None
-
-    text = str(text).lower()
-    for swedish_char, ascii_char in _SWEDISH_CHAR_MAP.items():
-        text = text.replace(swedish_char, ascii_char)
-
-    text = re.sub(r"[^a-zA-Z0-9_]", "_", text)
-    text = re.sub(r"_+", "_", text)
-    return text.strip("_")
-
-
-def extract_area_name(area_string: object) -> str | None:
-    """Extract the ASCII area key from a Booli ``Type · Area · Municipality`` string.
-
-    Tokenisation delegates to :func:`extract_area_token` (the single shared
-    implementation between ingestion and ML); this layer transliterates the
-    extracted token to the slug the model expects. Returns None for missing
-    inputs to preserve NA semantics used by tests.
-    """
-    if pd.isna(area_string):
-        return None
-
-    token = extract_area_token(area_string)
-    if not token:
-        return None
-    return transliterate_swedish(token)
-
-
-def normalize_area_for_model(area: object, *, empty_for_unknown: bool = False) -> str:
-    """Return the area key used in training and inference (ASCII slug, Booli-safe).
-
-    Handles Booli-style ``Lägenhet · Södermalm · Stockholm`` via ``extract_area_name``.
-
-    Args:
-        area: Raw area string (any Booli-shaped or pre-cleaned value).
-        empty_for_unknown: When True, map missing/unknown areas to ``""`` instead
-            of ``"unknown"`` — useful for keys that need to be join-safe (e.g. the
-            geocode join in feature materialization, where ``"unknown"`` would
-            produce a sentinel match).
-    """
-    extracted = extract_area_name(area)
-    if extracted is None or extracted == "":
-        return "" if empty_for_unknown else "unknown"
-    return extracted
 
 
 def preprocess_area_field(frame: pd.DataFrame) -> pd.DataFrame:
@@ -119,35 +64,6 @@ def filter_valid_listings(
     return filtered.reset_index(drop=True)
 
 
-def prepare_features(
-    frame: pd.DataFrame,
-    *,
-    feature_spec: FeatureSpec | None = None,
-    target: str = "sold_price",
-) -> tuple[pd.DataFrame, pd.Series, FeatureSpec]:
-    """Split the dataset into features and target along with the feature spec."""
-
-    if feature_spec is None:
-        feature_spec = FeatureSpec(
-            numeric=[col for col in NUMERIC_FEATURE_NAMES if col in frame.columns],
-            categorical=[col for col in CATEGORICAL_FEATURE_NAMES if col in frame.columns],
-            target=target,
-        )
-
-    missing_features = [
-        col for col in feature_spec.numeric + feature_spec.categorical if col not in frame.columns
-    ]
-    if missing_features:
-        raise KeyError(f"Missing expected feature columns: {missing_features}")
-    if target not in frame.columns:
-        raise KeyError(f"Missing target column '{target}'")
-
-    X = frame[feature_spec.numeric + feature_spec.categorical].copy()
-    y = frame[target].copy()
-
-    return X, y, feature_spec
-
-
 def drop_outliers_quantile(
     frame: pd.DataFrame,
     *,
@@ -181,7 +97,7 @@ def drop_outliers_quantile(
             continue
         q_low = series.quantile(lower)
         q_high = series.quantile(upper)
-        bounds[col] = (q_low, q_high)
+        bounds[col] = (float(q_low), float(q_high))
 
     if not bounds:
         return frame.reset_index(drop=True)

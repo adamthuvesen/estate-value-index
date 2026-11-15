@@ -53,7 +53,7 @@ class TestLGBMTrainerCreateModel:
 
         assert model.random_state == 99
         assert model.objective == "regression"
-        assert model.metric == "mae"
+        assert model.get_params()["metric"] == "mae"
         assert model.boosting_type == "gbdt"
 
     @pytest.mark.unit
@@ -149,7 +149,7 @@ class TestLGBMTrainerTrain:
         model = LGBMTrainer().train(
             df,
             sample_training_target,
-            categorical_indices=[df.columns.get_loc("property_type")],
+            categorical_indices=[df.columns.to_list().index("property_type")],
         )
 
         assert isinstance(model, LGBMRegressor)
@@ -229,40 +229,6 @@ class TestLGBMTrainerPredict:
 
         assert isinstance(predictions, np.ndarray)
         assert len(predictions) == len(sample_training_features)
-
-
-class TestLGBMTrainerGetBestParams:
-    @pytest.mark.unit
-    def test_get_best_params_returns_copy(
-        self,
-        sample_training_features: pd.DataFrame,
-        sample_training_target: np.ndarray,
-    ) -> None:
-        trainer = LGBMTrainer()
-        trainer.train(sample_training_features, sample_training_target)
-
-        params = trainer.get_best_params()
-        params["num_leaves"] = 9999
-
-        assert trainer.best_params["num_leaves"] != 9999
-
-    @pytest.mark.unit
-    def test_get_best_params_empty_if_not_trained(self) -> None:
-        assert LGBMTrainer().get_best_params() == {}
-
-    @pytest.mark.unit
-    def test_get_best_params_after_training(
-        self,
-        sample_training_features: pd.DataFrame,
-        sample_training_target: np.ndarray,
-    ) -> None:
-        trainer = LGBMTrainer()
-        trainer.train(sample_training_features, sample_training_target)
-
-        params = trainer.get_best_params()
-        assert "num_leaves" in params
-        assert "learning_rate" in params
-        assert "n_estimators" in params
 
 
 class TestDefaultParams:

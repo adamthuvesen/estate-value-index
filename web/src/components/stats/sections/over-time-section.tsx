@@ -25,8 +25,7 @@ export function OverTimeSection({
   const last = complete[complete.length - 1];
   const changePct =
     first && last
-      ? ((last.median_price_per_sqm - first.median_price_per_sqm) /
-          first.median_price_per_sqm) *
+      ? ((last.median_price_per_sqm - first.median_price_per_sqm) / first.median_price_per_sqm) *
         100
       : null;
 
@@ -49,7 +48,9 @@ export function OverTimeSection({
     note: `${formatNumber(s.median_price_per_sqm)} kr/m²`,
   }));
 
-  const busiest = [...overTime.seasonality].sort((a, b) => b.avg_sales_count - a.avg_sales_count)[0];
+  const busiest = [...overTime.seasonality].sort(
+    (a, b) => b.avg_sales_count - a.avg_sales_count,
+  )[0];
 
   return (
     <section id="over-time" className="scroll-mt-24">
@@ -64,8 +65,8 @@ export function OverTimeSection({
                 {changePct >= 0 ? "up" : "down"} {Math.abs(changePct).toFixed(1)}%.{" "}
               </>
             )}
-            Volume is seasonal — {formatMonthOfYear(busiest.month_of_year)} is the busiest
-            selling month. The current month is incomplete and drawn hollow.
+            Volume is seasonal — {formatMonthOfYear(busiest.month_of_year)} is the busiest selling
+            month. The current month is incomplete and drawn hollow.
           </>
         }
       />

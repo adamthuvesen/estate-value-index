@@ -9,7 +9,12 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import mean_absolute_error
 
-from estate_value_index.ml.residual_calibration import _prepare_matrices, _train_lgbm
+from estate_value_index.ml.residual_calibration import (
+    PreparedModelData,
+    predict_prices,
+    prepare_matrices,
+    train_lgbm,
+)
 
 DEFAULT_BLEND_WEIGHTS = tuple(round(value, 2) for value in np.linspace(0.0, 1.0, 21))
 MARKET_INDEX_COLUMN = "market_ppsqm_index"
@@ -91,7 +96,7 @@ def select_best_market_blend_weight(
     normalized_predictions: np.ndarray,
     *,
     weights: tuple[float, ...] = DEFAULT_BLEND_WEIGHTS,
-) -> dict[str, object]:
+) -> dict[str, Any]:
     """Pick the normalized-target blend weight with lowest OOF MAE."""
     candidates = []
     for weight in weights:
@@ -114,17 +119,17 @@ def select_best_market_blend_weight(
     }
 
 
-def _fit_market_normalized_predictions(
-    prepared,
+def fit_market_normalized_predictions(
+    prepared: PreparedModelData,
     random_state: int,
     *,
     fallback_predictions: np.ndarray,
     lgbm_params: dict[str, Any] | None = None,
 ) -> MarketNormalizedFit:
     """Fit the normalized target for one training/validation split."""
-    X_train, X_test, y_train, _ = _prepare_matrices(prepared)
-    train_index = _market_index(prepared.train_engineered)
-    test_index = _market_index(prepared.test_engineered)
+    X_train, X_test, y_train, _ = prepare_matrices(prepared)
+    train_index = build_market_index(prepared.train_engineered)
+    test_index = build_market_index(prepared.test_engineered)
     reference_index = market_index_reference(train_index)
     y_normalized = normalize_prices_to_market_index(
         y_train,
@@ -141,14 +146,14 @@ def _fit_market_normalized_predictions(
     if valid_train.sum() < 100:
         raise ValueError("Not enough valid market index rows to train a normalized target model")
 
-    model = _train_lgbm(
+    model = train_lgbm(
         X_train.loc[valid_train],
         y_normalized.loc[valid_train],
         prepared.categorical_features,
         random_state,
         lgbm_params=lgbm_params,
     )
-    normalized_predictions = np.expm1(model.predict(X_test))
+    normalized_predictions = predict_prices(model, X_test)
     predictions = denormalize_market_predictions(
         normalized_predictions,
         test_index,
@@ -164,13 +169,15 @@ def _fit_market_normalized_predictions(
     )
 
 
-def _market_index(frame: pd.DataFrame) -> pd.Series:
+def build_market_index(frame: pd.DataFrame) -> pd.Series:
     if MARKET_INDEX_COLUMN not in frame.columns:
         raise ValueError(f"{MARKET_INDEX_COLUMN} is required for market-normalized target training")
     return pd.to_numeric(frame[MARKET_INDEX_COLUMN], errors="coerce")
 
 
-def _as_numeric_series(values: pd.Series | np.ndarray, *, index=None) -> pd.Series:
+def _as_numeric_series(
+    values: pd.Series | np.ndarray, *, index: pd.Index | None = None
+) -> pd.Series:
     if isinstance(values, pd.Series):
         return pd.to_numeric(values, errors="coerce")
     return pd.to_numeric(pd.Series(values, index=index), errors="coerce")

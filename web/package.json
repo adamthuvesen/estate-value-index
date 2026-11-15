@@ -6,37 +6,44 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint src && npm run check:routes",
+    "lint": "oxlint --max-warnings=0 src && npm run check:routes",
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check .",
+    "typecheck": "oxlint --type-aware --type-check --deny-warnings",
     "check:routes": "node scripts/check-route-runtime.mjs",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage"
   },
   "dependencies": {
-    "@google-cloud/storage": "^7.21.0",
+    "@google-cloud/storage": "7.21.0",
     "@tailwindcss/postcss": "4.3.2",
-    "next": "16.2.10",
+    "next": "16.4.6",
     "react": "19.2.7",
     "react-dom": "19.2.7",
-    "recharts": "^3.9.2",
+    "recharts": "3.9.2",
     "tailwindcss": "4.3.2"
   },
   "devDependencies": {
-    "@types/jest": "^30.0.0",
-    "@types/node": "20.17.0",
+    "@types/jest": "30.0.0",
+    "@types/node": "24.19.2",
     "@types/react": "19.2.17",
     "@types/react-dom": "19.2.3",
-    "eslint": "9.39.4",
-    "eslint-config-next": "16.2.10",
-    "jest": "^30.4.2",
-    "jest-environment-node": "^30.4.1",
+    "jest": "30.4.2",
+    "jest-environment-node": "30.4.1",
+    "json-schema-to-typescript": "16.0.0",
+    "oxfmt": "0.77.0",
+    "oxlint": "1.92.0",
+    "oxlint-tsgolint": "7.0.2006",
     "postcss": "8.5.15",
-    "prettier": "3.9.4",
-    "ts-jest": "^29.4.11",
-    "typescript": "6.0.3"
+    "typescript": "7.0.2"
   },
   "overrides": {
     "postcss": "8.5.15",
     "uuid": "11.1.1"
+  },
+  "engines": {
+    "node": "24.22.3",
+    "npm": "11.19.1"
   }
 }

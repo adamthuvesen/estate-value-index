@@ -19,7 +19,7 @@ from pathlib import Path
 from estate_value_index.analytics.value_analysis import generate_value_analysis
 
 
-def main(argv: list[str] | None = None, *, args=None) -> int:
+def main(argv: list[str] | None = None, *, args: argparse.Namespace | None = None) -> int:
     if args is None:
         parser = argparse.ArgumentParser(
             description="Generate value analysis by running predictions on production data"

@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+from typing import Any
+
 import pandas as pd
 
 from estate_value_index.ml.features import build_feature_context, create_optimized_features
 from estate_value_index.ml.features.address_comps import normalize_street_name
+from tests.fakes import value_at
 
 
 def _listing(
@@ -14,7 +17,7 @@ def _listing(
     address: str = "Grev Magnigatan 17A",
     area: str = "Östermalm",
     living_area: float = 100.0,
-) -> dict:
+) -> dict[str, Any]:
     return {
         "listing_id": listing_id,
         "area": area,
@@ -46,12 +49,11 @@ def test_street_area_comp_uses_prior_street_history() -> None:
 
     engineered = create_optimized_features(pd.DataFrame(rows)).set_index("listing_id")
 
-    assert engineered.loc["TARGET", "street_name"] == "grev magnigatan"
-    assert engineered.loc["TARGET", "street_area_scope_used"] == "street_area"
-    assert engineered.loc["TARGET", "street_area_ppsqm_count"] == 5
-    assert (
-        engineered.loc["TARGET", "street_area_ppsqm_p90"]
-        >= engineered.loc["TARGET", "street_area_ppsqm_median"]
+    assert value_at(engineered, "TARGET", "street_name") == "grev magnigatan"
+    assert value_at(engineered, "TARGET", "street_area_scope_used") == "street_area"
+    assert value_at(engineered, "TARGET", "street_area_ppsqm_count") == 5
+    assert value_at(engineered, "TARGET", "street_area_ppsqm_p90") >= value_at(
+        engineered, "TARGET", "street_area_ppsqm_median"
     )
 
 
@@ -72,9 +74,9 @@ def test_address_comp_uses_prior_exact_address_history() -> None:
 
     engineered = create_optimized_features(pd.DataFrame(rows)).set_index("listing_id")
 
-    assert engineered.loc["TARGET", "address_comp_scope_used"] == "address"
-    assert engineered.loc["TARGET", "address_ppsqm_count"] == 3
-    assert engineered.loc["TARGET", "address_ppsqm_median"] > 0
+    assert value_at(engineered, "TARGET", "address_comp_scope_used") == "address"
+    assert value_at(engineered, "TARGET", "address_ppsqm_count") == 3
+    assert value_at(engineered, "TARGET", "address_ppsqm_median") > 0
 
 
 def test_address_comp_features_do_not_use_same_day_labels() -> None:

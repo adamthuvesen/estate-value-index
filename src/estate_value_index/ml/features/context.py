@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -19,7 +20,7 @@ class FeatureEngineeringContext:
 
     reference_date: pd.Timestamp
     area_avg_price: dict[str, float]
-    area_listing_count: dict[str, float]
+    area_listing_count: Mapping[str, float]
     area_price_tier: dict[str, str]
     area_target_mean: dict[str, float]
     global_target_mean: float
@@ -51,7 +52,7 @@ class FeatureEngineeringContext:
     global_ppsqm_median: float | None
 
 
-def _to_naive_timestamp(value: pd.Timestamp | None) -> pd.Timestamp:
+def to_naive_timestamp(value: pd.Timestamp | None) -> pd.Timestamp:
     """Convert timestamp to timezone-naive, defaulting to now if None."""
     if value is None or (isinstance(value, float) and np.isnan(value)):
         return pd.Timestamp.now(tz=None)
@@ -62,7 +63,7 @@ def _to_naive_timestamp(value: pd.Timestamp | None) -> pd.Timestamp:
     return ts
 
 
-def _ensure_timestamp(value: Any, index: Any, fallback: pd.Timestamp) -> pd.Series:
+def ensure_timestamp(value: Any, index: Any, fallback: pd.Timestamp) -> pd.Series:
     """Ensure a value is a valid timestamp Series."""
     series = pd.to_datetime(value, errors="coerce")
     if not isinstance(series, pd.Series):

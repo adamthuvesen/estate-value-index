@@ -11,6 +11,12 @@ from functools import cache
 
 from google.cloud import bigquery, storage
 
+# Lets modules annotate clients without importing the Google SDK themselves.
+BigQueryClient = bigquery.Client
+StorageClient = storage.Client
+StorageBucket = storage.Bucket
+StorageBlob = storage.Blob
+
 
 @cache
 def get_bq_client(project_id: str | None = None) -> bigquery.Client:

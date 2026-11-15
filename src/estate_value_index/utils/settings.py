@@ -1,209 +1,75 @@
-"""Central configuration layer: env vars (with optional .env) and YAML overrides.
+"""Runtime settings: one typed model read from the environment and an optional ``.env``.
 
-This module is the single source for raw environment and YAML-backed settings —
-the ``EnvConfig`` dataclass, ``load_env_config()``, and the ``get_*``/``is_*``
-accessors. Higher-level, pipeline-shaped config objects (``BigQueryConfig``,
-``TrainingFlowConfig``) live in :mod:`estate_value_index.pipelines.utils.config`
-and are built on top of this layer.
+Precedence: environment variables, then ``.env``, then the field defaults below.
+``extra="forbid"`` makes an unknown key in ``.env`` an error instead of a silent no-op.
 """
 
-import os
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Any
+from __future__ import annotations
 
-import yaml
+from typing import Literal
 
+from pydantic import Field, SecretStr
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from estate_value_index.exceptions import ConfigurationError
 from estate_value_index.utils.bigquery_safety import safe_table_ref
 
-try:
-    from dotenv import load_dotenv
 
-    load_dotenv()
-except ImportError:
-    pass
+class Settings(BaseSettings):
+    """Field names match the environment variable names (case-insensitive)."""
 
-
-@dataclass(frozen=True)
-class EnvConfig:
-    """Environment-specific configuration."""
-
-    gcp_project_id: str
-    bigquery_project_id: str
-    bq_dataset_raw: str
-    bq_table_listings: str
-    bq_dataset_features: str
-    bq_table_features: str
-    # Optional at load time: only required when GCS is actually used. Enforced
-    # then by ``utils.gcs.get_gcs_bucket`` rather than failing every non-GCS path.
-    gcs_bucket: str | None
-
-
-def load_env_config() -> EnvConfig:
-    """Load environment configuration."""
-    return EnvConfig(
-        gcp_project_id=os.environ["GCP_PROJECT_ID"],
-        bigquery_project_id=os.getenv("BIGQUERY_PROJECT_ID", os.environ["GCP_PROJECT_ID"]),
-        bq_dataset_raw=os.getenv("BIGQUERY_DATASET_RAW", "booli_raw"),
-        bq_table_listings=os.getenv("BIGQUERY_TABLE_LISTINGS", "listings"),
-        bq_dataset_features=os.getenv("BIGQUERY_DATASET_FEATURES", "booli_features"),
-        bq_table_features=os.getenv("BIGQUERY_TABLE_FEATURES", "engineered_features"),
-        gcs_bucket=os.getenv("GCS_BUCKET"),
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="forbid",
+        frozen=True,
     )
 
+    gcp_project_id: str | None = None
+    gcp_region: str = "europe-north1"
+    bigquery_project_id: str | None = None
+    bigquery_dataset_raw: str = "booli_raw"
+    bigquery_table_listings: str = "listings"
+    gcs_enabled: bool = False
+    gcs_bucket: str | None = None
+    # Where the Vertex trainer uploads artifacts (a gs:// URI or a bucket prefix).
+    model_artifacts_uri: str | None = None
+    model_artifacts_prefix: str | None = None
+    data_source: Literal["bigquery", "json"] = "bigquery"
+    booli_train_data: str | None = None
+    booli_api_caller_id: SecretStr | None = None
+    booli_api_private_key: SecretStr | None = None
+    # Production quality bar as MdAPE (median absolute % error), a fraction.
+    max_median_ape_threshold: float = Field(default=0.08, gt=0, lt=1)
+    ingestion_min_validation_rate: float = Field(default=0.5, ge=0, le=1)
 
-_TRUTHY = ("true", "1", "yes", "on")
+    def require_gcp_project_id(self) -> str:
+        if not self.gcp_project_id:
+            raise ConfigurationError("GCP_PROJECT_ID is not set.")
+        return self.gcp_project_id
 
+    def require_bigquery_project_id(self) -> str:
+        return self.bigquery_project_id or self.require_gcp_project_id()
 
-def load_yaml_config(path: str | None = None) -> dict[str, Any]:
-    """Load YAML config file (returns ``{}`` if missing)."""
-    path = path or os.getenv("EVI_CONFIG_FILE", "config/pipeline_config.yaml")
-    config_path = Path(path)
-    if not config_path.exists():
-        return {}
-    with open(config_path) as f:
-        return yaml.safe_load(f) or {}
+    def require_gcs_bucket(self) -> str:
+        if not self.gcs_bucket:
+            raise ConfigurationError("GCS_BUCKET is not set; required when GCS is enabled.")
+        return self.gcs_bucket
 
-
-def bq_table(project: str, dataset: str, table: str) -> str:
-    """Return a validated, fully-qualified ``project.dataset.table`` reference.
-
-    Delegates to :func:`~estate_value_index.utils.bigquery_safety.safe_table_ref`
-    so every interpolated table reference is allow-list validated at the source.
-    """
-    return safe_table_ref(project, dataset, table)
-
-
-def get_training_config() -> dict[str, Any]:
-    return load_yaml_config().get("training", {})
-
-
-def get_bigquery_config() -> dict[str, Any]:
-    return load_yaml_config().get("bigquery", {})
-
-
-def get_ingestion_config() -> dict[str, Any]:
-    return load_yaml_config().get("ingestion", {})
-
-
-# env → YAML → default. MdAPE (median absolute % error) as a fraction, e.g. 0.08.
-def get_median_ape_threshold() -> float:
-    env_threshold = os.getenv("MAX_MEDIAN_APE_THRESHOLD")
-    if env_threshold:
-        return float(env_threshold)
-    return get_training_config().get("median_ape_threshold", 0.08)
+    def listings_table_ref(self) -> str:
+        """Validated ``project.dataset.table`` for the raw listings table."""
+        return safe_table_ref(
+            self.require_bigquery_project_id(),
+            self.bigquery_dataset_raw,
+            self.bigquery_table_listings,
+        )
 
 
-def get_random_state() -> int:
-    return get_training_config().get("random_state", 42)
-
-
-def get_cv_folds() -> int:
-    return get_training_config().get("cv_folds", 5)
-
-
-def get_test_size() -> float:
-    return get_training_config().get("test_size", 0.2)
-
-
-def get_batch_size() -> int:
-    env_batch = os.getenv("BIGQUERY_BATCH_SIZE")
-    if env_batch:
-        return int(env_batch)
-    return get_bigquery_config().get("batch_size", 1000)
-
-
-def get_min_ingestion_validation_rate() -> float:
-    env_rate = os.getenv("INGESTION_MIN_VALIDATION_RATE")
-    if env_rate:
-        return float(env_rate)
-    return float(get_ingestion_config().get("min_validation_rate", 0.5))
-
-
-def is_debug() -> bool:
-    return os.getenv("DEBUG", "false").lower() in _TRUTHY
-
-
-def is_dry_run() -> bool:
-    return os.getenv("DRY_RUN", "false").lower() in _TRUTHY
-
-
-def is_verbose_logging() -> bool:
-    return os.getenv("VERBOSE_LOGGING", "true").lower() in _TRUTHY
+def get_settings() -> Settings:
+    """Read the settings now. Not cached, so a changed environment takes effect at once."""
+    return Settings()
 
 
 def is_gcs_enabled() -> bool:
-    return os.getenv("GCS_ENABLED", "false").lower() in _TRUTHY
-
-
-def get_data_source() -> str:
-    return os.getenv("DATA_SOURCE", "bigquery")
-
-
-def get_model_prefix() -> str:
-    return os.getenv("MODEL_PREFIX", "price_prediction_model")
-
-
-def get_model_output_dir() -> Path:
-    return Path(os.getenv("MODEL_OUTPUT_DIR", "web/models"))
-
-
-def get_cloud_run_service_name() -> str:
-    return os.getenv("CLOUD_RUN_SERVICE_NAME", "estate-value-index-app")
-
-
-def get_cloud_run_region() -> str:
-    return os.getenv("CLOUD_RUN_REGION", "europe-north1")
-
-
-def print_config_summary():
-    """Print a summary of the current configuration."""
-    print("=" * 80)
-    print("ESTATE VALUE INDEX CONFIGURATION SUMMARY")
-    print("=" * 80)
-
-    try:
-        env_config = load_env_config()
-    except KeyError as e:
-        print(f"Missing required environment variable: {e}")
-        return
-
-    print(f"GCP Project: {env_config.gcp_project_id}")
-    print(f"BigQuery Project: {env_config.bigquery_project_id}")
-    print(f"Raw Dataset: {env_config.bq_dataset_raw}")
-    print(f"Raw Table: {env_config.bq_table_listings}")
-    print(f"Features Dataset: {env_config.bq_dataset_features}")
-    print(f"Features Table: {env_config.bq_table_features}")
-    print(f"GCS Bucket: {env_config.gcs_bucket}")
-
-    print("\n" + "-" * 80)
-    print("PIPELINE CONFIGURATION")
-    print("-" * 80)
-
-    yaml_config = load_yaml_config()
-    if yaml_config:
-        print(f"YAML Config: {len(yaml_config)} sections loaded")
-        for section in yaml_config:
-            print(f"   - {section}")
-    else:
-        print("No YAML configuration found")
-
-    print(f"MdAPE Threshold: {get_median_ape_threshold():.2%}")
-    print(f"Random State: {get_random_state()}")
-    print(f"CV Folds: {get_cv_folds()}")
-    print(f"Test Size: {get_test_size()}")
-    print(f"Batch Size: {get_batch_size()}")
-
-    print("\n" + "-" * 80)
-    print("FLAGS")
-    print("-" * 80)
-    print(f"Debug: {is_debug()}")
-    print(f"Dry Run: {is_dry_run()}")
-    print(f"Verbose Logging: {is_verbose_logging()}")
-    print(f"GCS Enabled: {is_gcs_enabled()}")
-
-    print("=" * 80)
-
-
-if __name__ == "__main__":
-    print_config_summary()
+    return get_settings().gcs_enabled

@@ -128,7 +128,7 @@ echo "Permissions granted"
 # BigQuery — so this account gets object-read on the bucket and nothing else: no
 # project Editor, no BigQuery. Running the public service under it means even a
 # compromise of the request path cannot reach BigQuery, because the attached
-# credentials cannot. deploy_cloud_run.sh attaches it via --service-account.
+# credentials cannot. deploy.yml attaches it via --service-account.
 RUNTIME_SA_NAME="evi-cloud-run-runtime"
 RUNTIME_SA_EMAIL="${RUNTIME_SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
 
@@ -234,8 +234,9 @@ echo ""
 echo "3. Upload training data to GCS:"
 echo "   gsutil cp data/raw/booli/booli_listings_prod.json gs://$BUCKET_NAME/raw/"
 echo ""
-echo "4. Train model with GCS:"
-echo "   GCS_ENABLED=true uv run python -m estate_value_index.cli train-production-models --data-source bigquery --model-dir web/models"
+echo "4. Train model locally:"
+echo "   GCS_ENABLED=false uv run python -m estate_value_index.cli train-production-models --data-source bigquery --model-dir web/models"
+echo "   Uploading model artifacts to GCS needs explicit approval (see train-production-models --help)."
 echo ""
 echo "5. Setup budget alerts at:"
 echo "   https://console.cloud.google.com/billing/budgets?project=$PROJECT_ID"

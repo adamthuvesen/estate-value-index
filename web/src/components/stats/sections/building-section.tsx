@@ -133,7 +133,11 @@ export function BuildingSection({
           footnote="The source only records these flags when the amenity is present, so absence is unknown, not confirmed false. A with-vs-without price comparison isn't possible; only prevalence and the median where present are shown."
         >
           <AmenityRow name="Balcony" effect={building.amenities.balcony} total={totalProperties} />
-          <AmenityRow name="Elevator" effect={building.amenities.elevator} total={totalProperties} />
+          <AmenityRow
+            name="Elevator"
+            effect={building.amenities.elevator}
+            total={totalProperties}
+          />
         </FigureFrame>
       </div>
 

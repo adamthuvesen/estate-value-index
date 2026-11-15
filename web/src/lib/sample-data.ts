@@ -20,7 +20,7 @@ export const SAMPLE_LISTINGS: SampleListing[] = [
       balcony: "",
       latitude: "",
       longitude: "",
-    }
+    },
   },
   {
     name: "Demo Premium",
@@ -40,7 +40,7 @@ export const SAMPLE_LISTINGS: SampleListing[] = [
       balcony: "",
       latitude: "",
       longitude: "",
-    }
+    },
   },
   {
     name: "Demo Family",
@@ -60,7 +60,7 @@ export const SAMPLE_LISTINGS: SampleListing[] = [
       balcony: "",
       latitude: "",
       longitude: "",
-    }
+    },
   },
   {
     name: "Demo Cozy",
@@ -80,7 +80,7 @@ export const SAMPLE_LISTINGS: SampleListing[] = [
       balcony: "true",
       latitude: "",
       longitude: "",
-    }
+    },
   },
   {
     name: "Demo Central",
@@ -100,7 +100,7 @@ export const SAMPLE_LISTINGS: SampleListing[] = [
       balcony: "",
       latitude: "",
       longitude: "",
-    }
+    },
   },
   {
     name: "Demo Modern",
@@ -120,8 +120,8 @@ export const SAMPLE_LISTINGS: SampleListing[] = [
       balcony: "true",
       latitude: "",
       longitude: "",
-    }
-  }
+    },
+  },
 ];
 
 export const MODEL_LABELS: Record<string, string> = {

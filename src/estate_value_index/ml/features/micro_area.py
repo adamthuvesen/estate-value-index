@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 
 from estate_value_index.ml.features.context import FeatureEngineeringContext
-from estate_value_index.ml.features.utils import _safe_divide
+from estate_value_index.ml.features.utils import safe_divide
 
 """H3 micro-area price-per-sqm features."""
 
@@ -69,7 +69,7 @@ def observed_price_per_sqm(df: pd.DataFrame) -> pd.Series:
         source = pd.Series(np.nan, index=df.index, dtype=float)
 
     if "sold_price" in df.columns and "living_area" in df.columns:
-        sold_ppsqm = _safe_divide(df["sold_price"], df["living_area"], df.index)
+        sold_ppsqm = safe_divide(df["sold_price"], df["living_area"], df.index)
         source = source.fillna(sold_ppsqm)
 
     source = source.where(source > 0)
@@ -234,7 +234,7 @@ def _finish_micro_area_stats(df: pd.DataFrame, area: pd.DataFrame) -> None:
         .fillna(df["micro_area_ppsqm_p75"])
         .fillna(df["micro_area_ppsqm_median"])
     )
-    upper_tail = _safe_divide(
+    upper_tail = safe_divide(
         df["micro_area_ppsqm_p90"],
         df["micro_area_ppsqm_median"],
         df.index,
@@ -267,7 +267,7 @@ def _choose_micro_area_stats(
 
     _finish_micro_area_stats(df, area)
     area_denominator = area["median"].fillna(df["micro_area_ppsqm_median"])
-    premium = _safe_divide(df["micro_area_ppsqm_median"], area_denominator, df.index) - 1.0
+    premium = safe_divide(df["micro_area_ppsqm_median"], area_denominator, df.index) - 1.0
     df["micro_area_ppsqm_premium_vs_area"] = premium.fillna(0.0)
     df["micro_area_ppsqm_count"] = df["micro_area_ppsqm_count"].fillna(0.0)
 
@@ -304,7 +304,7 @@ def _add_context_micro_area_features(
 
     _finish_micro_area_stats(df, area)
     area_denominator = area["median"].fillna(df["micro_area_ppsqm_median"])
-    premium = _safe_divide(df["micro_area_ppsqm_median"], area_denominator, df.index) - 1.0
+    premium = safe_divide(df["micro_area_ppsqm_median"], area_denominator, df.index) - 1.0
     df["micro_area_ppsqm_premium_vs_area"] = premium.fillna(0.0)
     return df
 
@@ -346,7 +346,7 @@ def _add_comp_features(
     df: pd.DataFrame,
     context: FeatureEngineeringContext | None,
 ) -> pd.DataFrame:
-    df[SIZE_BAND_COLUMN] = _size_band(df)
+    df[SIZE_BAND_COLUMN] = compute_size_band(df)
     if context is None:
         df = _add_training_neighbor_features(df)
         return _add_training_same_size_features(df)
@@ -355,7 +355,7 @@ def _add_comp_features(
     return _add_context_same_size_features(df, context)
 
 
-def _size_band(df: pd.DataFrame) -> pd.Series:
+def compute_size_band(df: pd.DataFrame) -> pd.Series:
     if "living_area" in df.columns:
         living_area = pd.to_numeric(df["living_area"], errors="coerce")
     else:
@@ -456,9 +456,9 @@ def _finish_neighbor_features(df: pd.DataFrame) -> None:
         .fillna(df["h3_neighbor_ppsqm_p75"])
         .fillna(df["h3_neighbor_ppsqm"])
     )
-    premium = _safe_divide(df["h3_neighbor_ppsqm"], df["micro_area_ppsqm_median"], df.index) - 1.0
+    premium = safe_divide(df["h3_neighbor_ppsqm"], df["micro_area_ppsqm_median"], df.index) - 1.0
     df["h3_neighbor_premium_vs_micro"] = premium.fillna(0.0)
-    upper_tail = _safe_divide(
+    upper_tail = safe_divide(
         df["h3_neighbor_ppsqm_p90"],
         df["h3_neighbor_ppsqm"],
         df.index,
@@ -524,7 +524,7 @@ def _neighbor_cells(cell: object) -> set[str]:
 
     try:
         cells = set(h3.grid_disk(cell, 1))
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return set()
     cells.discard(cell)
     return {str(value) for value in cells}
@@ -684,9 +684,9 @@ def _choose_same_size_stats(
         .fillna(df["same_size_ppsqm_p75"])
         .fillna(df["same_size_ppsqm_median"])
     )
-    premium = _safe_divide(df["same_size_ppsqm_median"], df["micro_area_ppsqm_median"], df.index)
+    premium = safe_divide(df["same_size_ppsqm_median"], df["micro_area_ppsqm_median"], df.index)
     df["same_size_premium_vs_area"] = (premium - 1.0).fillna(0.0)
-    upper_tail = _safe_divide(
+    upper_tail = safe_divide(
         df["same_size_ppsqm_p90"],
         df["same_size_ppsqm_median"],
         df.index,
@@ -754,7 +754,7 @@ def build_same_size_context_stats(
 ) -> dict[str, dict[str, float]]:
     frame = training_frame.copy()
     if SIZE_BAND_COLUMN not in frame.columns:
-        frame[SIZE_BAND_COLUMN] = _size_band(frame)
+        frame[SIZE_BAND_COLUMN] = compute_size_band(frame)
 
     missing = [column for column in group_cols if column not in frame.columns]
     if missing:
@@ -794,7 +794,7 @@ def _stats_dict(stats: pd.DataFrame) -> dict[str, dict[str, float]]:
 
 
 def _float_stat(row: pd.Series, column: str, *, fallback: float = np.nan) -> float:
-    value = row[column] if column in row else fallback
+    value = row.get(column, fallback)
     if pd.isna(value):
         return float(fallback)
     return float(value)

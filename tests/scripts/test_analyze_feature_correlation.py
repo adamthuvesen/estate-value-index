@@ -19,6 +19,8 @@ def correlation_module():
     spec = importlib.util.spec_from_file_location(
         "analyze_feature_correlation_under_test", _SCRIPT_PATH
     )
+    assert spec is not None
+    assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)

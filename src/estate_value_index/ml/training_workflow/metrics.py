@@ -22,7 +22,7 @@ def regression_metrics(y_true: pd.Series, y_pred: np.ndarray) -> dict[str, float
     # A zero (or missing) sold_price divides to inf; drop those rows from the
     # population instead of letting one bad row poison median_ape, which now
     # gates model acceptance and drift. Mirrors residual_calibration.py's
-    # _prediction_metrics so both metrics paths agree on edge cases.
+    # prediction_metrics so both metrics paths agree on edge cases.
     absolute_pct_error = np.where(np.isinf(absolute_pct_error), np.nan, absolute_pct_error)
     valid_pct_errors = absolute_pct_error[np.isfinite(absolute_pct_error)]
     within_10_pct = np.mean(valid_pct_errors <= 0.10) * 100 if len(valid_pct_errors) else np.nan

@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from importlib.metadata import version
+
+PACKAGE_NAME = "estate-value-index"
 
 DEFAULT_MODEL_PREFIX = "price_prediction_model"
 NO_LIST_MODEL_ID = "no_list_price"
@@ -57,3 +60,11 @@ def required_production_artifact_files(model_prefix: str = DEFAULT_MODEL_PREFIX)
         for model_id in PRODUCTION_MODEL_IDS
         for filename in production_artifact_names(model_id, model_prefix).files
     )
+
+
+UNKNOWN_COMMIT = "unknown"
+
+
+def installed_package_version() -> str:
+    """The version training stamps into model metadata and serving checks on load."""
+    return version(PACKAGE_NAME)

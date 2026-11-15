@@ -5,13 +5,15 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from estate_value_index.utils.narrowing import is_missing
+
 """Shared utilities for feature engineering."""
 
 _COERCE_TRUTHY = {"true", "t", "yes", "y", "1", "ja"}
 _COERCE_FALSY = {"false", "f", "no", "n", "0", "nej"}
 
 
-def _coerce_nullable_bool(series: pd.Series) -> pd.Series:
+def coerce_nullable_bool(series: pd.Series) -> pd.Series:
     """Normalize heterogeneous truthy/falsy values to pandas nullable Boolean.
 
     Truth table matches `estate_value_index.ingestion.booli.normalization.to_bool`
@@ -19,8 +21,8 @@ def _coerce_nullable_bool(series: pd.Series) -> pd.Series:
     `'no'` means False (it does) or `'unknown'` is a valid bool (it isn't).
     """
 
-    def _convert(value):
-        if pd.isna(value):
+    def _convert(value: object) -> object:
+        if is_missing(value):
             return pd.NA
         if isinstance(value, bool):
             return value
@@ -39,7 +41,7 @@ def _coerce_nullable_bool(series: pd.Series) -> pd.Series:
     return converted.astype("boolean")
 
 
-def _safe_divide(numerator: Any, denominator: Any, index: Any) -> pd.Series:
+def safe_divide(numerator: Any, denominator: Any, index: Any) -> pd.Series:
     """Safely divide two values, handling None and zero denominators."""
     if index is None:
         if hasattr(numerator, "index"):

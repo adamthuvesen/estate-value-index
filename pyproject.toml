@@ -7,7 +7,7 @@ name = "estate-value-index"
 version = "1.0.0"
 description = "Swedish real estate ML system: authorized listings → BigQuery → LightGBM → Next.js"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.14"
 license = {text = "MIT"}
 authors = [
     {name = "Estate Value Index Team"}
@@ -17,8 +17,7 @@ classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.14",
 ]
 
 # Core dependencies (production runtime)
@@ -38,6 +37,7 @@ dependencies = [
     "fastapi>=0.104.0",
     "uvicorn[standard]>=0.24.0",
     "pydantic>=2.0.0",
+    "pydantic-settings==2.14.1",
 
     # GCP
     "google-cloud-storage>=2.10.0",
@@ -45,9 +45,8 @@ dependencies = [
     "google-cloud-bigquery-storage>=2.0.0",
     "db-dtypes>=1.4.0",
 
-    # Utilities
+    # Utilities (python-dotenv: pydantic-settings reads .env through it)
     "python-dotenv>=1.0.0",
-    "pyyaml>=6.0.0",
 ]
 
 [project.optional-dependencies]
@@ -57,25 +56,17 @@ ml = [
     "optuna>=3.0.0",
 ]
 
-# Prefect pipeline orchestration (ingestion/training/analytics flows). Not
-# needed to serve predictions — api_server.py never imports
-# estate_value_index.pipelines — so keeping it out of the base dependencies
-# keeps prefect and its dependency tree out of the serving Docker image.
-pipeline = [
-    "prefect>=3.0.0",
-]
-
 # Development dependencies
 # `[dev]` pulls in every extra needed to actually run the test suite, so a
 # fresh worktree can `uv pip install -e ".[dev]"` and have pytest collect
-# without chasing ad-hoc deps (evidently, matplotlib, seaborn, geopy, etc.).
+# without chasing ad-hoc deps (matplotlib, seaborn, geopy, etc.).
 dev = [
     "pytest>=7.4.0",
     "pytest-cov>=4.1.0",
     "pytest-mock>=3.11.0",
-    "ruff>=0.1.0",
     "pre-commit>=4.0.0",
-    "estate-value-index[ml,pipeline,viz,geo,monitoring,vertex]",
+    "httpx>=0.28.1",
+    "estate-value-index[ml,viz,geo,analysis]",
 ]
 
 # Visualization dependencies
@@ -85,8 +76,8 @@ viz = [
     "statsmodels>=0.14.0",
 ]
 
-# Vertex AI training dependencies (additional to ml)
-vertex = [
+# Analysis extras: scipy for value analysis; pyarrow for Arrow-backed BigQuery results
+analysis = [
     "pyarrow>=12.0.0",
     "scipy>=1.10.0",
 ]
@@ -97,14 +88,20 @@ geo = [
     "h3>=4.0.0",
 ]
 
-# ML monitoring and drift detection
-monitoring = [
-    "evidently>=0.4.0,<0.5.0",
-]
-
 # All optional dependencies
 all = [
-    "estate-value-index[ml,dev,pipeline,viz,vertex,geo,monitoring]",
+    "estate-value-index[ml,dev,viz,analysis,geo]",
+]
+
+[dependency-groups]
+dev = [
+    "basedpyright==1.40.2",
+    "import-linter==2.11",
+    "pandas-stubs==2.3.3.260113",
+    "ruff==0.17.4",
+    "scipy-stubs==1.18.1.1",
+    "types-requests==2.33.0.20261030",
+    "types-seaborn==0.13.2.20261107",
 ]
 
 [project.scripts]
@@ -123,6 +120,9 @@ Issues = "https://github.com/adamthuvesen/estate-value-index/issues"
 [tool.setuptools]
 package-dir = {"" = "src"}
 
+[tool.setuptools.package-data]
+estate_value_index = ["ml/reference/*/*.csv", "ingestion/config/*.json"]
+
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["estate_value_index*"]
@@ -134,6 +134,8 @@ namespaces = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# The repo root holds api_server.py, which tests import as a module.
+pythonpath = ["."]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
@@ -167,7 +169,7 @@ filterwarnings = [
 
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+target-version = "py314"
 exclude = [
     ".git",
     ".venv",
@@ -185,8 +187,14 @@ select = [
     "F",  # pyflakes
     "I",  # isort
     "B",  # flake8-bugbear
+    "SIM", # flake8-simplify
     "C4", # flake8-comprehensions
+    "PTH", # flake8-use-pathlib
+    "RUF", # ruff-specific rules
+    "PGH003", # blanket type: ignore
+    "PGH004", # blanket noqa
     "UP", # pyupgrade
+    "TID251", # banned-api: process and network calls outside their owners
 ]
 ignore = [
     "E501",  # line too long
@@ -194,14 +202,69 @@ ignore = [
     "C901",  # too complex
 ]
 
+# Size-bucket labels ("40–50") and docs use the en dash and multiplication sign on purpose.
+allowed-confusables = ["–", "×"]
+
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]  # Allow unused imports in __init__ files
-"tests/*" = ["B011", "E402"]  # assert False; sys.path before imports
-"src/estate_value_index/ingestion/booli/settings.py" = ["F403"]  # optional local_settings
+"tests/*" = ["B011", "TID251"]  # assert False; tests may spawn processes
+"src/estate_value_index/ingestion/booli/api.py" = ["TID251"]  # sole owner of urllib.request
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+# Whole modules (subprocess, requests, google, ...) are banned by the import-linter
+# contracts below, which give exact per-module owners. Ruff covers what import-linter
+# cannot see: submodules of the standard library and attribute calls.
+"urllib.request".msg = "Network client: only ingestion/booli/api.py may use it."
+"http.client".msg = "Network client: not allowed."
+"os.system".msg = "Process call: use cli/vertex_train.py."
+"os.popen".msg = "Process call: use cli/vertex_train.py."
+"os.execl".msg = "Process call: use cli/vertex_train.py."
+"os.execle".msg = "Process call: use cli/vertex_train.py."
+"os.execlp".msg = "Process call: use cli/vertex_train.py."
+"os.execlpe".msg = "Process call: use cli/vertex_train.py."
+"os.execv".msg = "Process call: use cli/vertex_train.py."
+"os.execve".msg = "Process call: use cli/vertex_train.py."
+"os.execvp".msg = "Process call: use cli/vertex_train.py."
+"os.execvpe".msg = "Process call: use cli/vertex_train.py."
+"os.spawnl".msg = "Process call: use cli/vertex_train.py."
+"os.spawnle".msg = "Process call: use cli/vertex_train.py."
+"os.spawnlp".msg = "Process call: use cli/vertex_train.py."
+"os.spawnlpe".msg = "Process call: use cli/vertex_train.py."
+"os.spawnv".msg = "Process call: use cli/vertex_train.py."
+"os.spawnve".msg = "Process call: use cli/vertex_train.py."
+"os.spawnvp".msg = "Process call: use cli/vertex_train.py."
+"os.spawnvpe".msg = "Process call: use cli/vertex_train.py."
+"os.posix_spawn".msg = "Process call: use cli/vertex_train.py."
+"os.posix_spawnp".msg = "Process call: use cli/vertex_train.py."
+"asyncio.subprocess".msg = "Process call: use cli/vertex_train.py."
+"asyncio.create_subprocess_exec".msg = "Process call: use cli/vertex_train.py."
+"asyncio.create_subprocess_shell".msg = "Process call: use cli/vertex_train.py."
 
 [tool.ruff.lint.isort]
 known-first-party = ["estate_value_index"]
-known-third-party = ["pandas", "numpy", "sklearn", "lightgbm", "prefect"]
+known-third-party = ["pandas", "numpy", "sklearn", "lightgbm"]
+
+# =============================================================================
+# basedpyright Configuration
+# =============================================================================
+
+[tool.basedpyright]
+include = ["src", "api_server.py", "tests", "scripts"]
+pythonVersion = "3.14"
+typeCheckingMode = "strict"
+enableTypeIgnoreComments = false
+reportUnnecessaryTypeIgnoreComment = "error"
+reportIgnoreCommentWithoutRule = "error"
+reportUnknownMemberType = false
+reportUnknownArgumentType = false
+reportUnknownVariableType = false
+reportUnknownParameterType = false
+reportUnknownLambdaType = false
+reportMissingTypeStubs = false
+executionEnvironments = [
+    { root = "tests", extraPaths = ["."], reportMissingParameterType = false, reportPrivateUsage = false },
+    { root = ".", extraPaths = ["."] },
+]
 
 # =============================================================================
 # Coverage Configuration
@@ -233,3 +296,58 @@ exclude_lines = [
 
 [tool.coverage.html]
 directory = "htmlcov"
+
+# =============================================================================
+# Import Linter Configuration
+# =============================================================================
+
+[tool.importlinter]
+root_packages = ["estate_value_index", "scripts"]
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "Layers"
+type = "layers"
+containers = ["estate_value_index"]
+layers = [
+    "cli",
+    "analytics",
+    "ml | ingestion",
+    "areas",
+    "utils",
+    "exceptions",
+]
+
+[[tool.importlinter.contracts]]
+name = "Process modules"
+type = "forbidden"
+source_modules = ["estate_value_index", "scripts"]
+forbidden_modules = ["subprocess", "pty"]
+allow_indirect_imports = true
+ignore_imports = [
+    "estate_value_index.cli.vertex_train -> subprocess",
+]
+
+[[tool.importlinter.contracts]]
+name = "Network clients"
+type = "forbidden"
+source_modules = ["estate_value_index", "scripts"]
+forbidden_modules = ["requests", "httpx", "socket"]
+allow_indirect_imports = true
+ignore_imports = [
+    "scripts.fetch_economic_data -> requests",
+]
+
+[[tool.importlinter.contracts]]
+name = "Google Cloud SDKs"
+type = "forbidden"
+source_modules = ["estate_value_index", "scripts"]
+forbidden_modules = ["google"]
+allow_indirect_imports = true
+ignore_imports = [
+    "estate_value_index.ingestion.bigquery_upload -> google",
+    "estate_value_index.ingestion.geocoding -> google",
+    "estate_value_index.ml.data_loader -> google",
+    "estate_value_index.utils.bigquery_safety -> google",
+    "estate_value_index.utils.clients -> google",
+]

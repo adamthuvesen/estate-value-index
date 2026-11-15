@@ -12,11 +12,7 @@ import {
 } from "recharts";
 import type { Histogram } from "@/lib/overall-statistics-types";
 import { binIndexForValue, histogramBars } from "@/lib/histogram";
-import {
-  axisDefaults,
-  chartColors,
-  ChartTooltip
-} from "@/components/charts/chart-theme";
+import { axisDefaults, chartColors, ChartTooltip } from "@/components/charts/chart-theme";
 import { formatNumber } from "@/lib/format";
 
 interface HistogramBarChartProps {
@@ -77,11 +73,7 @@ export function HistogramBarChart({
           />
         )}
         {thresholdIndex !== null && (
-          <ReferenceLine
-            x={thresholdIndex}
-            stroke={chartColors.axisLine}
-            strokeWidth={1.5}
-          />
+          <ReferenceLine x={thresholdIndex} stroke={chartColors.axisLine} strokeWidth={1.5} />
         )}
         <Tooltip
           cursor={{ fill: "var(--color-ledger-elevated)", opacity: 0.5 }}

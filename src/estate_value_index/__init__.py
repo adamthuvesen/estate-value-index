@@ -3,6 +3,25 @@
 Architecture: Authorized ingestion → BigQuery → Feature Engineering → Training → Deployment
 """
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from estate_value_index.exceptions import (
+        ConfigurationError,
+        DataValidationError,
+        EstateValueIndexError,
+        ModelValidationError,
+        PipelineError,
+    )
+    from estate_value_index.ml.data_loader import load_listings
+    from estate_value_index.ml.features import (
+        FeatureEngineeringContext,
+        SimplePredictionPipeline,
+        build_feature_context,
+        create_optimized_features,
+    )
+    from estate_value_index.ml.training import LGBMTrainer
+
 __version__ = "1.0.0"
 __author__ = "Estate Value Index Team"
 
@@ -14,19 +33,19 @@ VERSION_INFO = {
 }
 
 __all__ = [
-    "__version__",
     "VERSION_INFO",
-    "load_listings",
-    "create_optimized_features",
-    "build_feature_context",
-    "SimplePredictionPipeline",
+    "ConfigurationError",
+    "DataValidationError",
+    "EstateValueIndexError",
     "FeatureEngineeringContext",
     "LGBMTrainer",
-    "EstateValueIndexError",
-    "DataValidationError",
     "ModelValidationError",
     "PipelineError",
-    "ConfigurationError",
+    "SimplePredictionPipeline",
+    "__version__",
+    "build_feature_context",
+    "create_optimized_features",
+    "load_listings",
 ]
 
 # Lazy submodule imports — each entry maps an exported name to its submodule path.
@@ -45,7 +64,7 @@ _LAZY_ATTRS = {
 }
 
 
-def __getattr__(name):
+def __getattr__(name: str) -> object:
     module_path = _LAZY_ATTRS.get(name)
     if module_path is None:
         raise AttributeError(f"module '{__name__}' has no attribute '{name}'")

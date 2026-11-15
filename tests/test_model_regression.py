@@ -39,7 +39,7 @@ def test_model_performance_regression():
     if not metrics_file.exists():
         pytest.skip(f"Model metrics file not found: {metrics_file}")
 
-    with open(metrics_file) as f:
+    with Path(metrics_file).open() as f:
         current_metrics = json.load(f)
 
     current_median_ape = current_metrics.get("median_ape")
@@ -65,7 +65,7 @@ def test_model_metrics_exist():
 
     assert metrics_file.exists(), f"Model metrics file not found: {metrics_file}"
 
-    with open(metrics_file) as f:
+    with Path(metrics_file).open() as f:
         metrics = json.load(f)
 
     for field in ["median_ape", "within_10_pct", "within_20_pct", "mae", "rmse"]:
@@ -105,7 +105,7 @@ def test_baseline_metrics_file():
     if not baseline_file.exists():
         pytest.skip(f"Baseline metrics file not found: {baseline_file}")
 
-    with open(baseline_file) as f:
+    with Path(baseline_file).open() as f:
         baseline = json.load(f)
 
     assert "median_ape" in baseline, "baseline_metrics.json must contain 'median_ape' field"

@@ -67,9 +67,7 @@ export default function RootLayout({
       <body className="bg-ledger-bg min-h-screen font-sans antialiased">
         <div className="relative flex min-h-screen flex-col">
           <SiteHeader />
-          <main className="flex-1">
-            {children}
-          </main>
+          <main className="flex-1">{children}</main>
           <SiteFooter />
         </div>
       </body>

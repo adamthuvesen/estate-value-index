@@ -7,6 +7,8 @@ contribute labels to each other's features.
 
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -32,7 +34,7 @@ def _minimal_listing(
     rooms: float = 2.0,
     latitude: float | None = None,
     longitude: float | None = None,
-) -> dict:
+) -> dict[str, Any]:
     """One listing dict with the columns downstream feature engineering needs."""
     return {
         "listing_id": listing_id,
@@ -194,7 +196,7 @@ def test_micro_area_features_no_same_day_leak() -> None:
 def _disjoint_distribution_frame(seed: int = 0, n_per_area: int = 30) -> pd.DataFrame:
     """Frame where train (early dates) and test (later dates) come from disjoint price distributions."""
     rng = np.random.default_rng(seed)
-    rows: list[dict] = []
+    rows: list[dict[str, Any]] = []
     for i in range(n_per_area):
         rows.append(
             _minimal_listing(
@@ -238,7 +240,7 @@ def test_train_test_distribution_isolation() -> None:
     """The training-fold context's global stats match a feature run that never saw the test rows."""
     df = _disjoint_distribution_frame()
     df_sorted = sort_by_temporal_order(df, date_column="sold_date")
-    train_df, test_df = create_temporal_holdout_split(
+    train_df, _test_df = create_temporal_holdout_split(
         df_sorted, test_size=0.5, date_column="sold_date"
     )
 
@@ -269,7 +271,7 @@ def test_feature_context_sufficient_for_holdout() -> None:
 
     test_shuffled = test_df.copy()
     rng = np.random.default_rng(42)
-    test_shuffled["sold_price"] = rng.permutation(test_shuffled["sold_price"].values)
+    test_shuffled["sold_price"] = rng.permutation(test_shuffled["sold_price"].to_numpy())
     holdout_b = create_optimized_features(test_shuffled, context=ctx)
 
     leakage_columns = [
@@ -309,8 +311,8 @@ def test_validate_temporal_leakage_rejects_boundary() -> None:
     df = pd.DataFrame(rows)
     df["sold_date"] = pd.to_datetime(df["sold_date"])
     df = df.sort_values("sold_date").reset_index(drop=True)
-    train_indices = [0, 1]
-    test_indices = [2, 3]
+    train_indices = np.array([0, 1])
+    test_indices = np.array([2, 3])
 
     is_valid = validate_temporal_leakage(
         train_indices, test_indices, df, date_column="sold_date", verbose=False
@@ -325,7 +327,7 @@ def test_build_feature_context_uses_train_df() -> None:
     df = df.iloc[rng.permutation(len(df))].reset_index(drop=True)
 
     df_sorted = sort_by_temporal_order(df, date_column="sold_date")
-    train_df, test_df = create_temporal_holdout_split(
+    train_df, _test_df = create_temporal_holdout_split(
         df_sorted, test_size=0.5, date_column="sold_date"
     )
 

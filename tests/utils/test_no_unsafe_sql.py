@@ -28,19 +28,17 @@ from pathlib import Path
 # qualname -> reason. Each entry is dynamic SQL that interpolates something other
 # than a safe_table_ref()/quote_identifier() call, and has been reviewed.
 REVIEWED_DYNAMIC_SQL: dict[str, str] = {
-    "estate_value_index.pipelines.tasks.sync:_bigquery_sync_summary": (
-        "`table_ref` is BigQueryConfig.full_table_id, which is validated via "
-        "safe_table_ref() in the property."
+    "estate_value_index.ingestion.sync:_bigquery_sync_summary": (
+        "`table_ref` comes from Settings.listings_table_ref(), which calls safe_table_ref()."
     ),
-    "estate_value_index.pipelines.tasks.sync:sync_bigquery_to_local_task": (
-        "`table_ref` is BigQueryConfig.full_table_id, which is validated via "
-        "safe_table_ref() in the property."
+    "estate_value_index.ingestion.sync:sync_bigquery_to_local": (
+        "`table_ref` comes from Settings.listings_table_ref(), which calls safe_table_ref()."
     ),
-    "estate_value_index.pipelines.tasks.ingestion:upload_to_bigquery_task": (
-        "TRUNCATE interpolates the validated BigQueryConfig.full_table_id."
+    "estate_value_index.ingestion.bigquery_upload:upload_to_bigquery": (
+        "TRUNCATE interpolates Settings.listings_table_ref(), which calls safe_table_ref()."
     ),
-    "estate_value_index.pipelines.tasks.ingestion:_merge_query": (
-        "MERGE interpolates the validated full_table_id + a safe_table_ref() "
+    "estate_value_index.ingestion.bigquery_upload:_merge_query": (
+        "MERGE interpolates the validated table ref + a safe_table_ref() "
         "temp ref; column lists go through quote_identifier()."
     ),
 }
@@ -88,7 +86,7 @@ def _is_safe_call(node: ast.expr) -> bool:
 
 def _joinedstr_text(node: ast.JoinedStr) -> str:
     """Concatenate the literal (non-interpolated) parts of an f-string."""
-    return "".join(part.value for part in node.values if isinstance(part, ast.Constant))
+    return "".join(str(part.value) for part in node.values if isinstance(part, ast.Constant))
 
 
 def _find_unsafe_sql(tree: ast.AST, module: str) -> list[tuple[str, int]]:
@@ -99,21 +97,29 @@ def _find_unsafe_sql(tree: ast.AST, module: str) -> list[tuple[str, int]]:
         def __init__(self) -> None:
             self._stack: list[str] = []
 
-        def _visit_scope(self, node: ast.AST) -> None:
-            self._stack.append(node.name)  # type: ignore[attr-defined]
+        def _visit_scope(self, node: ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef) -> None:
+            self._stack.append(node.name)
             self.generic_visit(node)
             self._stack.pop()
 
-        visit_FunctionDef = _visit_scope  # type: ignore[assignment]
-        visit_AsyncFunctionDef = _visit_scope  # type: ignore[assignment]
-        visit_ClassDef = _visit_scope  # type: ignore[assignment]
+        def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+            self._visit_scope(node)
+
+        def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+            self._visit_scope(node)
+
+        def visit_ClassDef(self, node: ast.ClassDef) -> None:
+            self._visit_scope(node)
 
         def visit_JoinedStr(self, node: ast.JoinedStr) -> None:
             interpolations = [v for v in node.values if isinstance(v, ast.FormattedValue)]
-            if interpolations and _SQL_STATEMENT.search(_joinedstr_text(node)):
-                if not all(_is_safe_call(fv.value) for fv in interpolations):
-                    qualname = f"{module}:{'.'.join(self._stack) or '<module>'}"
-                    findings.append((qualname, node.lineno))
+            if (
+                interpolations
+                and _SQL_STATEMENT.search(_joinedstr_text(node))
+                and not all(_is_safe_call(fv.value) for fv in interpolations)
+            ):
+                qualname = f"{module}:{'.'.join(self._stack) or '<module>'}"
+                findings.append((qualname, node.lineno))
             self.generic_visit(node)
 
     Visitor().visit(tree)
@@ -153,7 +159,7 @@ def test_no_unreviewed_dynamic_sql() -> None:
 
 def test_safe_helpers_are_importable() -> None:
     """Guard against the helper names drifting out from under this test."""
-    from estate_value_index.utils.bigquery_safety import (  # noqa: F401
-        quote_identifier,
-        safe_table_ref,
-    )
+    from estate_value_index.utils import bigquery_safety
+
+    assert callable(bigquery_safety.quote_identifier)
+    assert callable(bigquery_safety.safe_table_ref)

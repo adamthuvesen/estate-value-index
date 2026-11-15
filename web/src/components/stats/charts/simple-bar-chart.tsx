@@ -10,10 +10,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import {
-  axisDefaults,
-  ChartTooltip
-} from "@/components/charts/chart-theme";
+import { axisDefaults, ChartTooltip } from "@/components/charts/chart-theme";
 
 export interface SimpleBar {
   label: string;
@@ -85,7 +82,10 @@ export function SimpleBarChart({
               <Cell key={i} fill={LOW} fillOpacity={d.muted ? 0.4 : 1} />
             ))}
             {showLabels && (
-              <LabelList dataKey="value" content={(p) => <EndLabel {...p} format={valueFormat} />} />
+              <LabelList
+                dataKey="value"
+                content={(p) => <EndLabel {...p} format={valueFormat} />}
+              />
             )}
           </Bar>
         </BarChart>

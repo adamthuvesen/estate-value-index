@@ -2,16 +2,17 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.estate_value_index.ml.constants import MIN_VALID_PRICE
-from src.estate_value_index.ml.preprocessing import (
+from estate_value_index.areas import (
+    extract_area_name,
+    normalize_area_for_model,
+    transliterate_swedish,
+)
+from estate_value_index.ml.constants import MIN_VALID_PRICE
+from estate_value_index.ml.preprocessing import (
     FeatureSpec,
     drop_outliers_quantile,
-    extract_area_name,
     filter_valid_listings,
-    normalize_area_for_model,
-    prepare_features,
     preprocess_area_field,
-    transliterate_swedish,
 )
 
 
@@ -54,29 +55,6 @@ def test_filter_valid_listings_drops_invalid_rows():
 
     assert len(filtered) == 1
     assert filtered.iloc[0]["listing_id"] == "1"
-
-
-def test_prepare_features_returns_expected_columns():
-    frame = make_sample_frame().iloc[[0]]
-
-    X, y, spec = prepare_features(frame)
-
-    assert spec.target == "sold_price"
-    assert set(spec.numeric).issubset(frame.columns)
-    assert set(spec.categorical).issubset(frame.columns)
-    assert list(X.columns) == spec.numeric + spec.categorical
-    assert y.iloc[0] == frame.iloc[0][spec.target]
-
-
-def test_prepare_features_uses_custom_spec():
-    frame = make_sample_frame().iloc[[0]]
-    custom_spec = FeatureSpec(numeric=["listing_price"], categorical=[], target="sold_price")
-
-    X, y, spec = prepare_features(frame, feature_spec=custom_spec)
-
-    assert list(X.columns) == ["listing_price"]
-    assert spec == custom_spec
-    assert y.equals(frame["sold_price"])
 
 
 class TestSwedishCharacterHandling:
@@ -131,21 +109,6 @@ class TestSwedishCharacterHandling:
     def test_normalize_area_for_model_empty(self):
         assert normalize_area_for_model("") == "unknown"
         assert normalize_area_for_model(None) == "unknown"
-
-    @pytest.mark.unit
-    def test_normalize_area_for_model_empty_for_unknown(self):
-        # `empty_for_unknown=True` is used by feature_materialization for join keys.
-        assert normalize_area_for_model("", empty_for_unknown=True) == ""
-        assert normalize_area_for_model(None, empty_for_unknown=True) == ""
-        assert normalize_area_for_model("Östermalm", empty_for_unknown=True) == "ostermalm"
-
-    @pytest.mark.unit
-    def test_normalize_area_consolidates_with_utils(self):
-        # `ml.area_names.normalize_area_key` must agree with the canonical fn.
-        from estate_value_index.ml.area_names import normalize_area_key
-
-        for raw in ["Östermalm", "Lägenhet · Södermalm · Stockholm", "", "vasastan"]:
-            assert normalize_area_key(raw) == normalize_area_for_model(raw)
 
     @pytest.mark.integration
     def test_preprocess_area_field(self):
@@ -247,52 +210,6 @@ class TestFilterValidListings:
         assert len(filter_valid_listings(df, drop_na_features=True)) == 0
 
 
-class TestPrepareFeatures:
-    @pytest.mark.unit
-    def test_prepare_features_missing_feature_columns(self):
-        df = pd.DataFrame({"listing_price": [1000000], "sold_price": [1100000]})
-        feature_spec = FeatureSpec(
-            numeric=["listing_price", "nonexistent_column"], categorical=[], target="sold_price"
-        )
-
-        with pytest.raises(KeyError, match="Missing expected feature columns"):
-            prepare_features(df, feature_spec=feature_spec)
-
-    @pytest.mark.unit
-    def test_prepare_features_missing_target(self):
-        df = pd.DataFrame({"listing_price": [1000000], "living_area": [65.0]})
-        feature_spec = FeatureSpec(
-            numeric=["listing_price", "living_area"], categorical=[], target="nonexistent_target"
-        )
-
-        with pytest.raises(KeyError, match="Missing target column"):
-            prepare_features(df, feature_spec=feature_spec)
-
-    @pytest.mark.integration
-    def test_prepare_features_auto_spec(self):
-        df = make_sample_frame().iloc[[0]]
-
-        X, y, spec = prepare_features(df)
-
-        assert isinstance(spec, FeatureSpec)
-        assert "listing_price" in spec.numeric
-        assert "living_area" in spec.numeric
-        assert len(spec.numeric) > 0
-        assert len(spec.categorical) > 0
-        assert spec.target == "sold_price"
-
-    @pytest.mark.integration
-    def test_prepare_features_data_integrity(self):
-        df = make_sample_frame().iloc[[0]]
-        original_values = df.iloc[0].to_dict()
-
-        X, y, _ = prepare_features(df)
-
-        assert X["listing_price"].iloc[0] == original_values["listing_price"]
-        assert X["living_area"].iloc[0] == original_values["living_area"]
-        assert y.iloc[0] == original_values["sold_price"]
-
-
 class TestOutlierRemoval:
     @pytest.mark.unit
     def test_drop_outliers_quantile_basic(self):
@@ -366,9 +283,9 @@ class TestFeatureSpec:
         spec = FeatureSpec(numeric=["price", "area"], categorical=["location"], target="sold_price")
 
         with pytest.raises(AttributeError):
-            spec.numeric = ["different_price"]
+            spec.numeric = ["different_price"]  # pyright: ignore[reportAttributeAccessIssue]  # asserts that FeatureSpec is frozen
         with pytest.raises(AttributeError):
-            spec.target = "different_target"
+            spec.target = "different_target"  # pyright: ignore[reportAttributeAccessIssue]  # asserts that FeatureSpec is frozen
 
     @pytest.mark.unit
     def test_feature_spec_equality(self):
@@ -425,22 +342,3 @@ class TestIntegrationPreprocessing:
             filtered, columns=["listing_price", "sold_price"], lower=0.1, upper=0.9
         )
         assert len(no_outliers) < len(filtered)
-
-        X, y, spec = prepare_features(no_outliers)
-        assert len(X) == len(y) > 0
-        assert "listing_price" in X.columns
-        assert "living_area" in X.columns
-        assert spec.target == "sold_price"
-
-    @pytest.mark.integration
-    def test_preprocessing_preserves_data_types(self):
-        df = make_sample_frame()
-
-        filtered = filter_valid_listings(df)
-        X, y, spec = prepare_features(filtered)
-
-        for col in spec.numeric:
-            if col in X.columns:
-                assert pd.api.types.is_numeric_dtype(X[col]) or X[col].dtype == "object"
-
-        assert pd.api.types.is_numeric_dtype(y)

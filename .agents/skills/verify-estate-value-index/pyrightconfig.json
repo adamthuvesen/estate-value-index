@@ -1,0 +1,7 @@
+{
+  "extends": "../../../pyproject.toml",
+  "include": [".", "verify"],
+  "executionEnvironments": [
+    { "root": ".", "extraPaths": [".", "../../../src", "../../.."] }
+  ]
+}

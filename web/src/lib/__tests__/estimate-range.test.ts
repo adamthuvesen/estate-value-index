@@ -90,7 +90,7 @@ describe("estimateRange", () => {
 
   it("formats the displayed range without exposing the point estimate", () => {
     expect(formatEstimateRange(estimateRange(7_000_000))).toBe(
-      `${formatNumber(6_900_000)} – ${formatNumber(7_600_000)} kr`
+      `${formatNumber(6_900_000)} – ${formatNumber(7_600_000)} kr`,
     );
   });
 });
@@ -116,7 +116,9 @@ describe("estimateRangeFactorsFromArtifact", () => {
     expect(estimateRangeFactorsFromArtifact(null)).toBeNull();
     expect(estimateRangeFactorsFromArtifact({ buckets: [] })).toBeNull();
     expect(
-      estimateRangeFactorsFromArtifact({ buckets: [{ lower_edge: 3_000_000, lower: "x", upper: 1 }] })
+      estimateRangeFactorsFromArtifact({
+        buckets: [{ lower_edge: 3_000_000, lower: "x", upper: 1 }],
+      }),
     ).toBeNull();
     // Non-ascending edges are rejected.
     expect(
@@ -125,13 +127,13 @@ describe("estimateRangeFactorsFromArtifact", () => {
           { lower_edge: 4_000_000, lower: 0.9, upper: 1.1 },
           { lower_edge: 3_000_000, lower: 0.9, upper: 1.1 },
         ],
-      })
+      }),
     ).toBeNull();
   });
 
   it("keeps the baked default in sync with the frozen eval edges", () => {
     expect(DEFAULT_ESTIMATE_RANGE_FACTORS.edges).toHaveLength(
-      DEFAULT_ESTIMATE_RANGE_FACTORS.buckets.length
+      DEFAULT_ESTIMATE_RANGE_FACTORS.buckets.length,
     );
   });
 });

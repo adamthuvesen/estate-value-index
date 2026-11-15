@@ -6,8 +6,9 @@ jest.mock("../area-statistics-cache", () => ({
   getAreaStatisticsData: jest.fn(),
 }));
 
-const mockedGetAreaStatisticsData =
-  getAreaStatisticsData as jest.MockedFunction<typeof getAreaStatisticsData>;
+const mockedGetAreaStatisticsData = getAreaStatisticsData as jest.MockedFunction<
+  typeof getAreaStatisticsData
+>;
 
 function areaStatistics(
   partial: Partial<AreaStatistics> & Pick<AreaStatistics, "area_name">,
@@ -24,6 +25,20 @@ function areaStatistics(
       median_price_3m: 4_700_000,
       median_price_6m: 4_650_000,
       median_price_12m: 4_600_000,
+      monthly_prices: {
+        month_1: null,
+        month_2: null,
+        month_3: null,
+        month_4: null,
+        month_5: null,
+        month_6: null,
+        month_7: null,
+        month_8: null,
+        month_9: null,
+        month_10: null,
+        month_11: null,
+        month_12: null,
+      },
     },
     market_dynamics: {
       volatility: 0.12,
@@ -59,6 +74,7 @@ function areaStatistics(
       avg_age: 60,
     },
     recent_properties: [],
+    by_room_count: {},
     has_limited_data: false,
     sample_size: 30,
     ...partial,
@@ -71,7 +87,11 @@ function statisticsData(areas: AreaStatistics[]): AreaStatisticsData {
       generated_at: "2026-06-01T00:00:00Z",
       total_areas: areas.length,
       total_properties: 0,
-      data_sources: { feature_context: "fixture", value_analysis: "fixture", raw_listings: "fixture" },
+      data_sources: {
+        feature_context: "fixture",
+        value_analysis: "fixture",
+        raw_listings: "fixture",
+      },
     },
     areas: Object.fromEntries(areas.map((a) => [a.area_name, a])),
   };
@@ -146,9 +166,18 @@ describe("getAreaOverviewList", () => {
   it("returns all areas sorted by listing count descending", async () => {
     mockedGetAreaStatisticsData.mockResolvedValue(
       statisticsData([
-        areaStatistics({ area_name: "small", overview: { ...areaStatistics({ area_name: "small" }).overview, listing_count: 5 } }),
-        areaStatistics({ area_name: "big", overview: { ...areaStatistics({ area_name: "big" }).overview, listing_count: 50 } }),
-        areaStatistics({ area_name: "mid", overview: { ...areaStatistics({ area_name: "mid" }).overview, listing_count: 20 } }),
+        areaStatistics({
+          area_name: "small",
+          overview: { ...areaStatistics({ area_name: "small" }).overview, listing_count: 5 },
+        }),
+        areaStatistics({
+          area_name: "big",
+          overview: { ...areaStatistics({ area_name: "big" }).overview, listing_count: 50 },
+        }),
+        areaStatistics({
+          area_name: "mid",
+          overview: { ...areaStatistics({ area_name: "mid" }).overview, listing_count: 20 },
+        }),
       ]),
     );
 

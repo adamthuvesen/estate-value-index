@@ -1,1 +1,1 @@
-"""Tests for ML monitoring and drift detection."""
+"""Tests for the startup script and the training image."""

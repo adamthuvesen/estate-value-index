@@ -8,7 +8,7 @@ from estate_value_index.ml.features.context import FeatureEngineeringContext
 """Target encoding using only prior sales (temporal awareness)."""
 
 
-def _create_target_encoding(
+def create_target_encoding(
     df: pd.DataFrame, context: FeatureEngineeringContext | None
 ) -> pd.DataFrame:
     """Create target-encoded features using only sales strictly before each row's date."""
@@ -69,7 +69,7 @@ def _create_target_encoding(
         df = df.merge(area_stats, on="area", how="left")
 
     fallback_avg_price = None
-    if context and context.global_listing_price_mean is not None:
+    if context:
         fallback_avg_price = context.global_listing_price_mean
     elif "listing_price" in df:
         fallback_avg_price = df["listing_price"].median(skipna=True)

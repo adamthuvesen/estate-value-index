@@ -15,11 +15,15 @@ import json
 from datetime import date, datetime, timedelta
 from html.parser import HTMLParser
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 import requests
+from pandas._libs.tslibs.nattype import NaTType
 
-DATA_DIR = Path(__file__).parent.parent / "data" / "reference" / "economy"
+DATA_DIR = (
+    Path(__file__).parent.parent / "src" / "estate_value_index" / "ml" / "reference" / "economy"
+)
 
 RIKSBANK_POLICY_RATE_URL = (
     "https://api.riksbank.se/swea/v1/Observations/SECBREPOEFF/{from_date}/{to_date}"
@@ -77,7 +81,7 @@ class ChartCanvasParser(HTMLParser):
 
 def fetch_riksbank_policy_rate(
     session: requests.Session, from_date: date, to_date: date
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     url = RIKSBANK_POLICY_RATE_URL.format(
         from_date=from_date.isoformat(), to_date=to_date.isoformat()
     )
@@ -86,7 +90,7 @@ def fetch_riksbank_policy_rate(
     return response.json()
 
 
-def process_riksbank_to_monthly(data: list[dict]) -> pd.DataFrame:
+def process_riksbank_to_monthly(data: list[dict[str, Any]]) -> pd.DataFrame:
     if not data:
         return pd.DataFrame(columns=["year_month", "average_rate", "days_in_month"])
 
@@ -105,7 +109,7 @@ def process_riksbank_to_monthly(data: list[dict]) -> pd.DataFrame:
     )
 
 
-def fetch_ki_metadata(session: requests.Session) -> dict:
+def fetch_ki_metadata(session: requests.Session) -> dict[str, Any]:
     response = session.get(KI_INDICATORS_URL, timeout=30)
     response.raise_for_status()
     return response.json()
@@ -142,7 +146,7 @@ def fetch_ki_indicators(session: requests.Session, periods: list[str]) -> pd.Dat
     return _sort_ki_indicators(result)
 
 
-def fetch_scb_metadata(session: requests.Session) -> dict:
+def fetch_scb_metadata(session: requests.Session) -> dict[str, Any]:
     response = session.get(SCB_GDP_URL, timeout=30)
     response.raise_for_status()
     return response.json()
@@ -366,7 +370,7 @@ def _sort_ki_indicators(data: pd.DataFrame) -> pd.DataFrame:
     )
 
 
-def _metadata_values(metadata: dict, code: str) -> list[str]:
+def _metadata_values(metadata: dict[str, Any], code: str) -> list[str]:
     for variable in metadata["variables"]:
         if variable["code"] == code:
             return list(variable["values"])
@@ -450,7 +454,7 @@ def _quarter_key(quarter: str) -> tuple[int, int]:
     return int(quarter[:4]), int(quarter[-1])
 
 
-def _parse_swedish_month(value: object) -> pd.Timestamp | pd.NaT:
+def _parse_swedish_month(value: object) -> pd.Timestamp | NaTType:
     if not isinstance(value, str):
         return pd.NaT
 

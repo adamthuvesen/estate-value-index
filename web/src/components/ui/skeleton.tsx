@@ -4,10 +4,7 @@ import { cn } from "@/lib/cn";
  *  global reduced-motion rule. */
 export function Skeleton({ className }: { className?: string }) {
   return (
-    <div
-      className={cn("animate-pulse rounded-sm bg-ledger-elevated", className)}
-      aria-hidden
-    />
+    <div className={cn("animate-pulse rounded-sm bg-ledger-elevated", className)} aria-hidden />
   );
 }
 

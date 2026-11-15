@@ -19,8 +19,8 @@ export default async function AreaNotFound() {
         <p className="eyebrow text-ledger-dimmed">Area report</p>
         <h1 className="mt-3 font-display text-title text-ledger-text">Area not found</h1>
         <p className="mt-3 text-[14px] text-ledger-muted">
-          No statistics are recorded under this name. It may be spelled differently in the
-          register, or the area has too few sales to report on.
+          No statistics are recorded under this name. It may be spelled differently in the register,
+          or the area has too few sales to report on.
         </p>
 
         {suggestions.length > 0 && (

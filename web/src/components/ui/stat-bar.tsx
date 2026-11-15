@@ -8,9 +8,7 @@ interface StatBarProps {
 
 /** Row of hairline-divided figures — the shared page/area hero stat strip. */
 export function StatBar({ children, className }: StatBarProps) {
-  return (
-    <dl className={cn("flex flex-wrap gap-x-8 gap-y-5", className)}>{children}</dl>
-  );
+  return <dl className={cn("flex flex-wrap gap-x-8 gap-y-5", className)}>{children}</dl>;
 }
 
 interface StatProps {

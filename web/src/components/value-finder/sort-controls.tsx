@@ -43,64 +43,69 @@ export function SortControls({
 }: SortControlsProps) {
   return (
     <div className="flex flex-wrap items-center gap-2">
-        <div className="flex items-center gap-1.5">
-          <label htmlFor="sort-field" className="text-[13px] text-ledger-muted">
-            Sort
-          </label>
-          <select
-            id="sort-field"
-            value={sortField}
-            onChange={(e) => onSortChange(e.target.value as SortField, sortOrder)}
-            disabled={isLoading}
-            className={selectClass}
-            style={{ backgroundImage: chevron }}
-          >
-            {sortOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <button
-          onClick={() => onSortChange(sortField, sortOrder === "asc" ? "desc" : "asc")}
+      <div className="flex items-center gap-1.5">
+        <label htmlFor="sort-field" className="text-[13px] text-ledger-muted">
+          Sort
+        </label>
+        <select
+          id="sort-field"
+          value={sortField}
+          onChange={(e) => onSortChange(e.target.value as SortField, sortOrder)}
           disabled={isLoading}
-          className={buttonClasses("secondary", "sm", "px-2.5 py-1.5")}
-          title={sortOrder === "asc" ? "Ascending" : "Descending"}
-          aria-label={`Sort ${sortOrder === "asc" ? "ascending" : "descending"}`}
+          className={selectClass}
+          style={{ backgroundImage: chevron }}
         >
-          <svg
-            className={`h-4 w-4 text-ledger-muted transition-transform duration-ledger ${sortOrder === "asc" ? "rotate-180" : ""}`}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v14m0 0l6-6m-6 6l-6-6" />
-          </svg>
-        </button>
+          {sortOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </div>
 
-        <span className="mx-1 hidden h-5 w-px bg-ledger-border sm:block" aria-hidden />
+      <button
+        onClick={() => onSortChange(sortField, sortOrder === "asc" ? "desc" : "asc")}
+        disabled={isLoading}
+        className={buttonClasses("secondary", "sm", "px-2.5 py-1.5")}
+        title={sortOrder === "asc" ? "Ascending" : "Descending"}
+        aria-label={`Sort ${sortOrder === "asc" ? "ascending" : "descending"}`}
+      >
+        <svg
+          className={`h-4 w-4 text-ledger-muted transition-transform duration-ledger ${sortOrder === "asc" ? "rotate-180" : ""}`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M12 5v14m0 0l6-6m-6 6l-6-6"
+          />
+        </svg>
+      </button>
 
-        <div className="flex items-center gap-1.5">
-          <label htmlFor="page-size" className="text-[13px] text-ledger-muted">
-            Show
-          </label>
-          <select
-            id="page-size"
-            value={pageSize}
-            onChange={(e) => onPageSizeChange(Number(e.target.value))}
-            disabled={isLoading}
-            className={selectClass}
-            style={{ backgroundImage: chevron }}
-          >
-            {pageSizeOptions.map((size) => (
-              <option key={size} value={size}>
-                {size}
-              </option>
-            ))}
-          </select>
-        </div>
+      <span className="mx-1 hidden h-5 w-px bg-ledger-border sm:block" aria-hidden />
+
+      <div className="flex items-center gap-1.5">
+        <label htmlFor="page-size" className="text-[13px] text-ledger-muted">
+          Show
+        </label>
+        <select
+          id="page-size"
+          value={pageSize}
+          onChange={(e) => onPageSizeChange(Number(e.target.value))}
+          disabled={isLoading}
+          className={selectClass}
+          style={{ backgroundImage: chevron }}
+        >
+          {pageSizeOptions.map((size) => (
+            <option key={size} value={size}>
+              {size}
+            </option>
+          ))}
+        </select>
+      </div>
     </div>
   );
 }

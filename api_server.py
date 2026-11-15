@@ -14,20 +14,23 @@ import time
 import warnings
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 from uuid import uuid4
 
 import joblib
 import pandas as pd
 import uvicorn
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
-from estate_value_index.ml.preprocessing import normalize_area_for_model
+from estate_value_index.areas import normalize_area_for_model
+from estate_value_index.ml.data_fingerprint import DataFingerprint
+from estate_value_index.ml.estimate_range_factors import EstimateRangeFactors
 from estate_value_index.model_artifacts import (
     DEFAULT_MODEL_PREFIX,
     LISTING_MODEL_ID,
     NO_LIST_MODEL_ID,
+    installed_package_version,
     production_artifact_names,
     production_model_files,
 )
@@ -49,7 +52,7 @@ LISTING_MODEL = LISTING_MODEL_ID
 PRODUCTION_MODEL_FILES = production_model_files(DEFAULT_MODEL_PREFIX)
 REQUIRED_MODEL_IDS = frozenset(PRODUCTION_MODEL_FILES)
 
-MODEL_CACHE: dict[str, dict] = {}
+MODEL_CACHE: dict[str, dict[str, Any]] = {}
 
 
 def _raise_internal_error(context: str, exc: BaseException) -> None:
@@ -65,9 +68,9 @@ def _raise_internal_error(context: str, exc: BaseException) -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Load models on startup, cleanup on shutdown."""
-    global MODEL_CACHE
     logger.info("Loading models from %s", MODELS_DIR.absolute())
-    MODEL_CACHE = load_all_models(MODELS_DIR)
+    MODEL_CACHE.clear()
+    MODEL_CACHE.update(load_all_models(MODELS_DIR))
 
     missing_models = _missing_required_models(MODEL_CACHE)
     if missing_models:
@@ -145,9 +148,21 @@ class PredictionResponse(BaseModel):
     model_id: str
     requires_listing_price: bool
     status: str = "success"
+    # The request after validation and defaults, so callers see what the model scored.
+    input: PredictionRequest
     # Per-bucket q35/q65 factors driving the displayed value window; null when
-    # the model artifact predates the estimate_range_factors block.
-    estimate_range_factors: dict | None = None
+    # the metrics artifact has no valid estimate_range_factors block.
+    estimate_range_factors: EstimateRangeFactors | None = None
+
+
+class LoadedModelInfo(BaseModel):
+    """What a loaded model artifact is: its code version, its bytes, and its training data."""
+
+    package_version: str
+    # The commit training ran from; null for artifacts trained before the stamp.
+    commit_sha: str | None
+    sha256: str
+    data_fingerprint: DataFingerprint | None
 
 
 class HealthResponse(BaseModel):
@@ -156,6 +171,7 @@ class HealthResponse(BaseModel):
     status: str
     models_loaded: list[str]
     models_count: int
+    models: dict[str, LoadedModelInfo]
 
 
 def _available_models(models_dir: Path) -> dict[str, Path]:
@@ -168,7 +184,7 @@ def _available_models(models_dir: Path) -> dict[str, Path]:
     return mapping
 
 
-def _missing_required_models(cache: dict[str, dict]) -> list[str]:
+def _missing_required_models(cache: dict[str, dict[str, Any]]) -> list[str]:
     return sorted(REQUIRED_MODEL_IDS.difference(cache))
 
 
@@ -208,32 +224,57 @@ def _verify_model_integrity(model_path: Path) -> str:
     return observed
 
 
-def _load_estimate_range_factors(models_dir: Path, model_id: str) -> dict | None:
-    """Read the estimate_range_factors block from a model's metrics sidecar.
-
-    Returns None when the metrics file is absent or predates the block, so the
-    web app falls back to its baked factors.
-    """
+def _read_metrics(models_dir: Path, model_id: str) -> dict[str, Any]:
+    """Read a model's metrics artifact, the metadata written next to the joblib file."""
     metrics_path = models_dir / production_artifact_names(model_id, DEFAULT_MODEL_PREFIX).metrics
     if not metrics_path.exists():
-        return None
+        raise RuntimeError(f"missing metrics artifact: {metrics_path.name}")
     try:
         metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError) as exc:
-        logger.warning("Could not read metrics for %s: %s", model_id, exc)
+        raise RuntimeError(f"unreadable metrics artifact {metrics_path.name}: {exc}") from exc
+    if not isinstance(metrics, dict):
+        raise RuntimeError(f"metrics artifact {metrics_path.name} is not a JSON object")
+    return metrics
+
+
+def _check_package_version(metrics: dict[str, Any]) -> str:
+    """Refuse an artifact trained by a different package version than the one installed."""
+    trained = metrics.get("package_version")
+    installed = installed_package_version()
+    if trained != installed:
+        raise RuntimeError(
+            f"trained with estate-value-index {trained or '(no version stamp)'}, "
+            f"but {installed} is installed; retrain the model with this version"
+        )
+    return installed
+
+
+def _estimate_range_factors(metrics: dict[str, Any], model_id: str) -> EstimateRangeFactors | None:
+    """Return the typed factors, or None so the web app falls back to its baked factors."""
+    raw = metrics.get("estimate_range_factors")
+    if raw is None:
         return None
-    factors = metrics.get("estimate_range_factors")
-    return factors if isinstance(factors, dict) else None
+    try:
+        return EstimateRangeFactors.model_validate(raw)
+    except ValidationError as exc:
+        logger.error("Ignoring invalid estimate_range_factors for %s: %s", model_id, exc)
+        return None
 
 
-def load_all_models(models_dir: Path) -> dict[str, dict]:
+def _data_fingerprint(metrics: dict[str, Any]) -> DataFingerprint | None:
+    raw = metrics.get("data_fingerprint")
+    return None if raw is None else DataFingerprint.model_validate(raw)
+
+
+def load_all_models(models_dir: Path) -> dict[str, dict[str, Any]]:
     """Load all available models into memory on startup.
 
-    Each artefact must be accompanied by a ``<artefact>.sha256`` sidecar.
-    Artefacts that fail integrity verification (or whose sidecar is missing)
-    are logged and skipped — they are not added to the cache.
+    Each artefact needs a ``<artefact>.sha256`` sidecar and a metrics artifact whose
+    ``package_version`` matches the installed package. Artefacts that fail either
+    check are logged and skipped; they are not added to the cache.
     """
-    cache: dict[str, dict] = {}
+    cache: dict[str, dict[str, Any]] = {}
 
     available = _available_models(models_dir)
     if not available:
@@ -246,7 +287,10 @@ def load_all_models(models_dir: Path) -> dict[str, dict]:
     for model_type, model_path in available.items():
         try:
             digest = _verify_model_integrity(model_path)
-        except RuntimeError as exc:
+            metrics = _read_metrics(models_dir, model_type)
+            package_version = _check_package_version(metrics)
+            data_fingerprint = _data_fingerprint(metrics)
+        except (RuntimeError, ValidationError) as exc:
             logger.error("Refusing to load %s (%s): %s", model_type, model_path.name, exc)
             continue
 
@@ -273,13 +317,20 @@ def load_all_models(models_dir: Path) -> dict[str, dict]:
             "sha256": digest,
             "requires_listing_price": requires_listing_price,
             "model_type": loaded_model_type,
-            "estimate_range_factors": _load_estimate_range_factors(models_dir, model_type),
+            "estimate_range_factors": _estimate_range_factors(metrics, model_type),
+            "info": LoadedModelInfo(
+                package_version=package_version,
+                commit_sha=metrics.get("commit_sha"),
+                sha256=digest,
+                data_fingerprint=data_fingerprint,
+            ),
         }
         logger.info(
-            "Loaded %s model: %s (sha256=%s..., %.1fs)",
+            "Loaded %s model: %s (sha256=%s..., data=%s, %.1fs)",
             model_type,
             model_path.name,
             digest[:16],
+            data_fingerprint.model_dump(mode="json") if data_fingerprint else "no fingerprint",
             model_load_duration,
         )
 
@@ -297,7 +348,10 @@ async def health_check():
         )
 
     return HealthResponse(
-        status="healthy", models_loaded=list(MODEL_CACHE.keys()), models_count=len(MODEL_CACHE)
+        status="healthy",
+        models_loaded=list(MODEL_CACHE.keys()),
+        models_count=len(MODEL_CACHE),
+        models={model_id: cached["info"] for model_id, cached in MODEL_CACHE.items()},
     )
 
 
@@ -335,6 +389,7 @@ async def predict(request: PredictionRequest):
             model_id=model_type,
             requires_listing_price=bool(cached.get("requires_listing_price", False)),
             status="success",
+            input=request,
             estimate_range_factors=cached.get("estimate_range_factors"),
         )
 

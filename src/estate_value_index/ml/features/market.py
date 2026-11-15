@@ -4,16 +4,15 @@ from functools import lru_cache
 from pathlib import Path
 
 import pandas as pd
+from pandas._libs.tslibs.nattype import NaTType
 
-from estate_value_index.ml.features.context import FeatureEngineeringContext, _ensure_timestamp
+from estate_value_index.ml.features.context import FeatureEngineeringContext, ensure_timestamp
 
 """Market-level economic features from local reference data."""
 
 
-# Resolved against the working directory (project root locally, /app in the
-# training and serving containers), matching poi.py's GEO_DATA_DIR. A __file__
-# relative path breaks once the package is installed to site-packages.
-ECONOMY_DIR = Path("data/reference/economy")
+# Package data (see [tool.setuptools.package-data]), so it does not depend on the cwd.
+ECONOMY_DIR = Path(__file__).resolve().parents[1] / "reference" / "economy"
 
 MARKET_FEATURE_DEFAULTS: dict[str, float] = {
     "market_interest_rate": 0.0,
@@ -90,10 +89,10 @@ def _as_of_date(
     dates = pd.Series(pd.NaT, index=df.index, dtype="datetime64[ns]")
 
     if "sold_date" in df.columns:
-        sold_date = _ensure_timestamp(df["sold_date"], df.index, fallback)
+        sold_date = ensure_timestamp(df["sold_date"], df.index, fallback)
         dates = dates.fillna(sold_date)
     if "scraped_at" in df.columns:
-        scraped_at = _ensure_timestamp(df["scraped_at"], df.index, fallback)
+        scraped_at = ensure_timestamp(df["scraped_at"], df.index, fallback)
         dates = dates.fillna(scraped_at)
 
     return dates.fillna(fallback)
@@ -228,7 +227,7 @@ def _load_sales_index() -> pd.DataFrame:
     if sales.empty or not {"Månad", "kr/kvm", "antal försäljningar"}.issubset(sales.columns):
         return pd.DataFrame()
 
-    sales["market_month"] = sales["Månad"].apply(_parse_swedish_month)
+    sales["market_month"] = sales["Månad"].map(_parse_swedish_month)
     sales["market_ppsqm_index"] = pd.to_numeric(sales["kr/kvm"], errors="coerce")
     sales["market_sales_volume"] = pd.to_numeric(sales["antal försäljningar"], errors="coerce")
     sales = sales.sort_values("market_month")
@@ -245,7 +244,7 @@ def _load_sales_index() -> pd.DataFrame:
     ].dropna(subset=["market_month"])
 
 
-def _parse_swedish_month(value: object) -> pd.Timestamp | pd.NaT:
+def _parse_swedish_month(value: object) -> pd.Timestamp | NaTType:
     if not isinstance(value, str):
         return pd.NaT
 

@@ -64,7 +64,7 @@ docs/
 data/raw/
 data/metrics/
 *.csv
-!data/reference/**/*.csv
+!src/estate_value_index/ml/reference/**/*.csv
 *.parquet
 
 # Enrichment data (loaded from GCS at runtime)

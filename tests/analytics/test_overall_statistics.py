@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from typing import Any
 
 from estate_value_index.analytics.overall_statistics import (
     _amenity_effect,
@@ -16,7 +17,7 @@ from estate_value_index.analytics.overall_statistics import (
 def test_build_histogram_clips_to_percentile_window_but_percentiles_are_unclipped():
     # 0..100 plus two extreme outliers. p1..p99 come from the full set; the
     # outliers are trimmed before binning so they don't stretch the axis.
-    values = list(range(0, 101)) + [10_000, -10_000]
+    values = [*list(range(0, 101)), 10000, -10000]
 
     hist = build_histogram(values, bins=10, clip_lo_pct=1, clip_hi_pct=99, as_int=True)
 
@@ -140,7 +141,7 @@ def test_records_fastest_sale_requires_days_on_market_at_least_one():
 
 
 def test_records_biggest_bid_up_skips_implausible_premiums():
-    def row(address: str, listing: int, sold: int) -> dict:
+    def row(address: str, listing: int, sold: int) -> dict[str, Any]:
         return {
             "address": address,
             "area": "sodermalm",
@@ -313,3 +314,65 @@ def test_generate_overall_statistics_end_to_end(tmp_path):
     assert best is not None
     assert best["value_score"] == 90.0
     assert best["area_name"] == "sodermalm"
+
+
+def test_amenity_effect_without_present_rows_fits_the_web_contract():
+    from estate_value_index.analytics.web_json import AmenityEffect
+
+    rows = [{"balcony": False, "sold_price": 5_000_000, "living_area": 50}]
+
+    effect = _amenity_effect(rows, "balcony")
+
+    assert effect["median_ppsqm_with"] is None
+    AmenityEffect.model_validate(effect)
+
+
+def test_recent_sales_without_rooms_or_area_fit_the_web_contract():
+    from estate_value_index.analytics.area_statistics import get_recent_properties
+    from estate_value_index.analytics.web_json import RecentProperty
+
+    recent = get_recent_properties(
+        [
+            {
+                "listing_id": "1",
+                "url": None,
+                "address": "Street 1",
+                "sold_price": 5_000_000,
+                "sold_date": "2026-11-01",
+                "living_area": None,
+                "rooms": None,
+            }
+        ]
+    )
+
+    assert [RecentProperty.model_validate(item).rooms for item in recent] == [None]
+
+
+def test_records_keep_an_undated_sale_valid_for_the_web_contract():
+    from estate_value_index.analytics.web_json import OverallRecords
+
+    rows = [
+        {
+            "address": "A 1",
+            "area": "sodermalm",
+            "sold_price": 9_000_000,
+            "living_area": 50,
+            "sold_date": None,  # sold price but no recorded date
+            "days_on_market": 5,
+            "listing_price": 8_000_000,
+        },
+        {
+            "address": "B 2",
+            "area": "sodermalm",
+            "sold_price": 6_000_000,
+            "living_area": 60,
+            "sold_date": "2026-02-01",
+            "days_on_market": 3,
+            "listing_price": 5_500_000,
+        },
+    ]
+
+    records = build_records(rows, value_properties=[])
+
+    assert records["most_expensive"]["sold_date"] is None
+    OverallRecords.model_validate(records)

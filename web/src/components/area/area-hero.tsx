@@ -34,10 +34,7 @@ export function AreaHero({ area, updatedAt, stale }: AreaHeroProps) {
       </h1>
 
       <StatBar className="mt-7">
-        <Stat
-          value={perSqm ? formatNumber(perSqm) : "—"}
-          label="Avg price / m²"
-        />
+        <Stat value={perSqm ? formatNumber(perSqm) : "—"} label="Avg price / m²" />
         <Stat
           value={
             change === null ? (
@@ -65,12 +62,7 @@ export function AreaHero({ area, updatedAt, stale }: AreaHeroProps) {
         />
       </StatBar>
 
-      <p
-        className={cn(
-          "mt-6 text-body-sm",
-          stale ? "text-val-over" : "text-ledger-muted",
-        )}
-      >
+      <p className={cn("mt-6 text-body-sm", stale ? "text-val-over" : "text-ledger-muted")}>
         Based on <span className="num">{formatNumber(area.overview.listing_count)}</span> sold
         listings · Updated {formatDateSv(updatedAt)}
         {stale ? " — data may be out of date" : ""}
@@ -78,8 +70,7 @@ export function AreaHero({ area, updatedAt, stale }: AreaHeroProps) {
 
       {area.has_limited_data && (
         <p className="mt-3 inline-flex items-center gap-1.5 rounded-pill border border-val-over-line bg-val-over-tint px-3 py-1 text-caption text-val-over">
-          Small sample (n=<span className="num">{area.sample_size}</span>) — figures are
-          indicative
+          Small sample (n=<span className="num">{area.sample_size}</span>) — figures are indicative
         </p>
       )}
     </header>

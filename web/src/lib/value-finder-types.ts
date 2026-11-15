@@ -1,44 +1,13 @@
-export interface ValueProperty {
-  listing_id: string;
-  url: string | null;
-  address: string;
-  area: string;
-  municipality: string;
-  living_area: number;
-  rooms: number;
-  property_type: string;
-  construction_year: number | null;
-  monthly_fee: number;
-  floor: number | null;
-  elevator: boolean | null;
-  balcony: boolean | null;
-  sold_price: number;
-  predicted_price: number;
-  prediction_delta_absolute: number;
-  prediction_delta_percentage: number;
-  is_undervalued: boolean;
-  // Suppressed rows (missing core fields, is_rankable === false) carry a null
-  // score and tier: they are kept and searchable but held out of the ranking.
-  value_score: number | null;
-  value_tier: ValueTier | null;
-  is_rankable: boolean;
-  rank_suppressed_reason: string | null;
-  missing_core_fields: string[];
-  sold_date: string;
-  days_on_market: number | null;
-  listing_price: number | null;
-  price_per_sqm: number | null;
-  latitude?: number | null;
-  longitude?: number | null;
-}
+import type { ValueTier } from "./generated/api-types";
 
-export type ValueTier =
-  | "Excellent Value"
-  | "Great Value"
-  | "Good Value"
-  | "Fair Value"
-  | "Overvalued"
-  | "Highly Overvalued";
+export type {
+  ValueAnalysisData,
+  ValueAnalysisMetadata,
+  ValueProperty,
+  ValueStatistics,
+  ValueTier,
+} from "./generated/api-types";
+import type { ValueAnalysisMetadata, ValueProperty, ValueStatistics } from "./generated/api-types";
 
 /**
  * Canonical ordering for `ValueTier` (best to worst). Single source of truth
@@ -53,65 +22,6 @@ export const VALUE_TIERS: readonly ValueTier[] = [
   "Overvalued",
   "Highly Overvalued",
 ] as const;
-
-export interface ValueAnalysisMetadata {
-  generated_at: string;
-  model_type: string;
-  model_path: string;
-  data_source: string;
-  filters: {
-    only_undervalued: boolean;
-    min_value_score: number | null;
-  };
-  thresholds?: {
-    undervalue_threshold_pct: number;
-    undervalue_threshold_abs: number;
-  };
-}
-
-export interface ValueStatistics {
-  total_properties: number;
-  undervalued_count: number;
-  overvalued_count: number;
-  undervalued_percentage: number;
-  value_score: {
-    mean: number;
-    median: number;
-    min: number;
-    max: number;
-    std: number;
-  };
-  prediction_delta_absolute: {
-    mean: number;
-    median: number;
-    min: number;
-    max: number;
-  };
-  prediction_delta_percentage: {
-    mean: number;
-    median: number;
-    min: number;
-    max: number;
-  };
-  value_tier_distribution: Record<ValueTier, number>;
-  area_statistics: {
-    total_areas: number;
-    top_undervalued_areas: Record<string, number>;
-  };
-  model_performance: {
-    mae: number | null;
-    rmse: number | null;
-    mape: number | null;
-    n_train: number | null;
-    n_test: number | null;
-  };
-}
-
-export interface ValueAnalysisData {
-  metadata: ValueAnalysisMetadata;
-  statistics: ValueStatistics;
-  properties: ValueProperty[];
-}
 
 export type SortField =
   | "value_score"

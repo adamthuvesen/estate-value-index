@@ -36,11 +36,13 @@ export function PropertyCard({ property }: PropertyCardProps) {
   const half = (Math.abs(clamped) / BAND) * 50; // width from center, in %
   const fillLeft = belowPrediction ? 50 - half : 50;
 
-  const soldDate = new Date(property.sold_date).toLocaleDateString("en-GB", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
+  const soldDate = property.sold_date
+    ? new Date(property.sold_date).toLocaleDateString("en-GB", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      })
+    : "—";
 
   return (
     <article className="ledger-card ledger-card-hover group flex flex-col p-4">
@@ -49,9 +51,9 @@ export function PropertyCard({ property }: PropertyCardProps) {
         <div className="min-w-0">
           <h3
             className="truncate font-display text-[15px] font-semibold leading-tight text-ledger-text"
-            title={property.address}
+            title={property.address ?? undefined}
           >
-            {property.address}
+            {property.address ?? "Address unknown"}
           </h3>
           <p className="mt-1 flex items-center gap-1.5 truncate text-[12px]">
             <span className="truncate text-ledger-muted">
@@ -61,9 +63,11 @@ export function PropertyCard({ property }: PropertyCardProps) {
               >
                 {titleCaseArea(property.area)}
               </Link>{" "}
-              · {titleCaseArea(property.municipality)}
+              · {property.municipality ? titleCaseArea(property.municipality) : "–"}
             </span>
-            <span aria-hidden className="text-ledger-border-emphasis">·</span>
+            <span aria-hidden className="text-ledger-border-emphasis">
+              ·
+            </span>
             <span className={`inline-flex shrink-0 items-center gap-1 font-medium ${tier.text}`}>
               <span className={`h-1.5 w-1.5 rounded-full ${tier.dot}`} aria-hidden />
               {tier.label}
@@ -115,7 +119,8 @@ export function PropertyCard({ property }: PropertyCardProps) {
               {formatSek(Math.abs(displayDelta))}
             </span>
             <span className={`text-[12px] font-medium ${tier.text}`}>
-              {Math.abs(displayPercentage).toFixed(1)}% {belowPrediction ? "under estimate" : "over estimate"}
+              {Math.abs(displayPercentage).toFixed(1)}%{" "}
+              {belowPrediction ? "under estimate" : "over estimate"}
             </span>
           </div>
         </div>
@@ -124,8 +129,11 @@ export function PropertyCard({ property }: PropertyCardProps) {
       {/* Facts */}
       <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 sm:grid-cols-4">
         <Fact label="Size" value={`${property.living_area} m²`} />
-        <Fact label="Rooms" value={`${property.rooms}`} />
-        <Fact label="Built" value={property.construction_year ? `${property.construction_year}` : "—"} />
+        <Fact label="Rooms" value={property.rooms === null ? "–" : `${property.rooms}`} />
+        <Fact
+          label="Built"
+          value={property.construction_year ? `${property.construction_year}` : "—"}
+        />
         <Fact label="Fee" value={`${formatSek(property.monthly_fee)}/mo`} />
       </dl>
 
@@ -171,11 +179,13 @@ function InsufficientDataCard({ property }: PropertyCardProps) {
   const reason = missing ? `Missing ${missing}` : "Insufficient data";
   const sizeLabel = property.living_area ? `${property.living_area} m²` : "—";
 
-  const soldDate = new Date(property.sold_date).toLocaleDateString("en-GB", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
+  const soldDate = property.sold_date
+    ? new Date(property.sold_date).toLocaleDateString("en-GB", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      })
+    : "—";
 
   return (
     <article className="flex flex-col rounded-ledger border border-dashed border-ledger-border-emphasis bg-ledger-elevated/50 p-4">
@@ -183,9 +193,9 @@ function InsufficientDataCard({ property }: PropertyCardProps) {
         <div className="min-w-0">
           <h3
             className="truncate font-display text-[15px] font-semibold leading-tight text-ledger-text"
-            title={property.address}
+            title={property.address ?? undefined}
           >
-            {property.address}
+            {property.address ?? "Address unknown"}
           </h3>
           <p className="mt-1 truncate text-[12px] text-ledger-muted">
             <Link
@@ -194,7 +204,7 @@ function InsufficientDataCard({ property }: PropertyCardProps) {
             >
               {titleCaseArea(property.area)}
             </Link>{" "}
-            · {titleCaseArea(property.municipality)}
+            · {property.municipality ? titleCaseArea(property.municipality) : "–"}
           </p>
         </div>
         <Badge variant="neutral" className="shrink-0">
@@ -204,17 +214,20 @@ function InsufficientDataCard({ property }: PropertyCardProps) {
 
       <p className="mt-3 rounded-lg border border-ledger-border bg-ledger-surface px-3 py-2.5 text-[12px] text-ledger-muted">
         {reason} — not ranked. Sold for{" "}
-        <span className="num font-medium text-ledger-text">
-          {formatSek(property.sold_price)}
-        </span>
-        .
+        <span className="num font-medium text-ledger-text">{formatSek(property.sold_price)}</span>.
       </p>
 
       <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 sm:grid-cols-4">
         <Fact label="Size" value={sizeLabel} />
         <Fact label="Rooms" value={property.rooms ? `${property.rooms}` : "—"} />
-        <Fact label="Built" value={property.construction_year ? `${property.construction_year}` : "—"} />
-        <Fact label="Fee" value={property.monthly_fee ? `${formatSek(property.monthly_fee)}/mo` : "—"} />
+        <Fact
+          label="Built"
+          value={property.construction_year ? `${property.construction_year}` : "—"}
+        />
+        <Fact
+          label="Fee"
+          value={property.monthly_fee ? `${formatSek(property.monthly_fee)}/mo` : "—"}
+        />
       </dl>
 
       <div className="mt-3 flex items-center justify-between gap-2 border-t border-ledger-border pt-2.5">
@@ -246,7 +259,9 @@ function Fact({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-col">
       <dt className="text-[10px] uppercase tracking-eyebrow text-ledger-dimmed">{label}</dt>
-      <dd className="num mt-0.5 whitespace-nowrap text-[13px] font-medium text-ledger-text">{value}</dd>
+      <dd className="num mt-0.5 whitespace-nowrap text-[13px] font-medium text-ledger-text">
+        {value}
+      </dd>
     </div>
   );
 }
@@ -255,7 +270,12 @@ function Chip({ children, icon = false }: { children: React.ReactNode; icon?: bo
   return (
     <span className="inline-flex items-center gap-1 rounded-pill border border-ledger-border bg-ledger-surface px-2 py-0.5 text-[11px] font-medium text-ledger-muted">
       {icon && (
-        <svg className="h-2.5 w-2.5 text-val-exc" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg
+          className="h-2.5 w-2.5 text-val-exc"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
         </svg>
       )}

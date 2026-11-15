@@ -1,23 +1,22 @@
 """Shared test fixtures and utilities for the Swedish real estate prediction system."""
 
-import sys
-from pathlib import Path
-
-# Add project root to Python path
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
-
 import json
+import os
 import shutil
 import tempfile
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import pytest
 
-from src.estate_value_index.ml.features import FeatureEngineeringContext
-from src.estate_value_index.ml.preprocessing import FeatureSpec
+from estate_value_index.ml.features import FeatureEngineeringContext
+from estate_value_index.ml.preprocessing import FeatureSpec
+
+# Fake project IDs so tests that build BigQuery queries run in a fresh clone.
+os.environ.setdefault("GCP_PROJECT_ID", "test-project")
+os.environ.setdefault("BIGQUERY_PROJECT_ID", "test-project")
 
 
 @pytest.fixture
@@ -320,12 +319,12 @@ def temp_data_dir_with_files():
 
     # Single JSON file
     json_file = temp_path / "test_listings.json"
-    with open(json_file, "w") as f:
+    with Path(json_file).open("w") as f:
         json.dump(sample_data, f)
 
     # JSONL file (one JSON per line)
     jsonl_file = temp_path / "test_listings.jsonl"
-    with open(jsonl_file, "w") as f:
+    with Path(jsonl_file).open("w") as f:
         for record in sample_data:
             f.write(json.dumps(record) + "\n")
 

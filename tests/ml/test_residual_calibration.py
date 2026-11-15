@@ -4,7 +4,6 @@ import numpy as np
 import pandas as pd
 
 from estate_value_index.ml.residual_calibration import (
-    apply_residual_calibration,
     build_calibration_features,
 )
 
@@ -31,12 +30,3 @@ def test_build_calibration_features_marks_central_area_and_ppsqm() -> None:
     assert features.loc[1, "is_central_area"] == 0.0
     assert features.loc[0, "market_ppsqm_index_change_3m"] == 0.04
     assert features.loc[1, "area"] == "rasunda"
-
-
-def test_apply_residual_calibration_clips_negative_predictions() -> None:
-    calibrated = apply_residual_calibration(
-        np.array([1_000_000, 500_000]),
-        np.array([250_000, -900_000]),
-    )
-
-    assert calibrated.tolist() == [1_250_000, 0]

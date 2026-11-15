@@ -1,30 +1,27 @@
 """Tests for feature engineering functionality."""
 
-from pathlib import Path
-
 import numpy as np
 import pandas as pd
 import pytest
-import yaml
 
-from src.estate_value_index.ml.features import (
+from estate_value_index.ml.features import (
     CATEGORICAL_FEATURE_NAMES,
     NUMERIC_FEATURE_NAMES,
     FeatureEngineeringContext,
     SimplePredictionPipeline,
-    _coerce_nullable_bool,
-    _safe_divide,
     build_feature_context,
+    coerce_nullable_bool,
     create_optimized_features,
     get_feature_lists,
     handle_missing_values,
+    safe_divide,
 )
-from src.estate_value_index.ml.features.heuristics import (
-    _estimate_energy_efficiency,
-    _estimate_energy_efficiency_series,
+from estate_value_index.ml.features.heuristics import (
+    estimate_energy_efficiency_series,
 )
-from src.estate_value_index.ml.training_workflow.data import load_feature_subset
+from estate_value_index.ml.features.registry import FEATURE_SUBSETS, load_feature_subset
 from tests.conftest import assert_valid_dataframe
+from tests.fakes import value_at
 
 
 def test_unknown_feature_subset_fails() -> None:
@@ -32,25 +29,13 @@ def test_unknown_feature_subset_fails() -> None:
         load_feature_subset("missing_feature_set")
 
 
-def test_missing_feature_subset_config_fails(monkeypatch, tmp_path) -> None:
-    monkeypatch.chdir(tmp_path)
-
-    with pytest.raises(FileNotFoundError, match="Feature subset config not found"):
-        load_feature_subset("no_list_price_v1")
-
-
-def test_full_feature_set_is_explicit_and_config_free(monkeypatch, tmp_path) -> None:
-    monkeypatch.chdir(tmp_path)
-
-    assert load_feature_subset("full") == (None, None)
-
-
-def test_all_registered_feature_sets_match_the_feature_registry() -> None:
-    config = yaml.safe_load(Path("config/feature_subsets.yaml").read_text(encoding="utf-8"))
-
-    for feature_set in config:
-        if feature_set != "default":
-            load_feature_subset(feature_set)
+def test_production_feature_sets_use_registered_unique_features() -> None:
+    assert set(FEATURE_SUBSETS) == {"no_list_price_v1", "with_list_price_v1"}
+    for numeric, categorical in FEATURE_SUBSETS.values():
+        assert set(numeric) <= set(NUMERIC_FEATURE_NAMES)
+        assert set(categorical) <= set(CATEGORICAL_FEATURE_NAMES)
+        assert len(numeric) == len(set(numeric))
+        assert len(categorical) == len(set(categorical))
 
 
 class TestFeatureEngineering:
@@ -152,7 +137,7 @@ class TestFeatureEngineering:
         assert result.loc[0, "has_modern_bathroom"] == 1
         assert result.loc[0, "has_view"] == 1
         assert result.loc[0, "is_quiet_location"] == 1
-        assert result.loc[0, "condition_score"] > result.loc[1, "condition_score"]
+        assert value_at(result, 0, "condition_score") > value_at(result, 1, "condition_score")
         assert result.loc[1, "needs_renovation"] == 1
         assert result["distance_to_city_center"].notna().all()
         assert "transit_accessibility_score" in result.columns
@@ -170,21 +155,21 @@ class TestFeatureEngineering:
     def test_safe_divide_function(self):
         index = pd.RangeIndex(3)
 
-        result = _safe_divide([10, 20, 30], [2, 4, 5], index)
+        result = safe_divide([10, 20, 30], [2, 4, 5], index)
         expected = pd.Series([5.0, 5.0, 6.0], index=index)
         pd.testing.assert_series_equal(result, expected)
 
-        result = _safe_divide([10, 20], [0, 4], index[:2])
+        result = safe_divide([10, 20], [0, 4], index[:2])
         assert np.isnan(result.iloc[0])
         assert result.iloc[1] == 5.0
 
-        result = _safe_divide(None, [1, 2], index[:2])
+        result = safe_divide(None, [1, 2], index[:2])
         assert result.isna().all()
 
     @pytest.mark.unit
     def test_coerce_nullable_bool(self):
         test_series = pd.Series(["true", "false", "1", "0", "yes", "no", "invalid", None])
-        result = _coerce_nullable_bool(test_series)
+        result = coerce_nullable_bool(test_series)
 
         expected = [True, False, True, False, True, False, pd.NA, pd.NA]
         for i, exp in enumerate(expected):
@@ -273,41 +258,8 @@ class TestFeatureConfiguration:
         assert no_list_categorical == listing_categorical
 
     @pytest.mark.unit
-    def test_comparison_feature_subsets_isolate_h3(self):
-        listing_numeric, listing_categorical = load_feature_subset("with_list_price_v1")
-        comps_numeric, comps_categorical = load_feature_subset("no_list_price_h3_comps")
-        street_numeric, street_categorical = load_feature_subset("no_list_price_h3_market_street")
-
-        assert "listing_price" in listing_numeric
-        assert "h3_neighbor_ppsqm" in listing_numeric
-        assert "h3_res10" in listing_categorical
-
-        assert "listing_price" not in comps_numeric
-        assert "h3_neighbor_ppsqm" in comps_numeric
-        assert "same_size_ppsqm_median" in comps_numeric
-        assert "market_interest_rate" not in comps_numeric
-        assert "same_size_scope_used" in comps_categorical
-
-        market_numeric, market_categorical = load_feature_subset("no_list_price_h3_market")
-        assert "listing_price" not in market_numeric
-        assert "h3_neighbor_ppsqm" in market_numeric
-        assert "same_size_ppsqm_median" in market_numeric
-        assert "market_interest_rate" in market_numeric
-        assert "same_size_scope_used" in market_categorical
-        assert "listing_price" not in street_numeric
-        assert "street_area_ppsqm_p90" in street_numeric
-        assert "street_size_ppsqm_median" in street_numeric
-        assert "address_ppsqm_median" in street_numeric
-        assert "street_name" in street_categorical
-        assert "address_comp_scope_used" in street_categorical
-        assert "micro_area_ppsqm_p90" not in street_numeric
-
-    @pytest.mark.unit
-    def test_rfe_compact_feature_subsets_are_registered(self):
+    def test_no_list_feature_set_hides_asking_price(self):
         no_list_numeric, no_list_categorical = load_feature_subset("no_list_price_v1")
-        listing_numeric, listing_categorical = load_feature_subset(
-            "listing_price_h3_market_street_rfe15"
-        )
 
         no_list_blocked = {
             "listing_price",
@@ -324,39 +276,22 @@ class TestFeatureConfiguration:
         assert {"h3_res10", "h3_res9", "street_name", "area"}.issubset(no_list_categorical)
         assert "same_size_premium_vs_area" in no_list_numeric
         assert "street_size_upper_tail_ratio" in no_list_numeric
-        assert set(no_list_numeric).issubset(NUMERIC_FEATURE_NAMES)
-        assert set(no_list_categorical).issubset(CATEGORICAL_FEATURE_NAMES)
-
-        assert len(listing_numeric) + len(listing_categorical) == 15
-        assert "listing_price" in listing_numeric
-        assert "relative_area_price" in listing_numeric
-        assert "street_name" in listing_categorical
-        assert set(listing_numeric).issubset(NUMERIC_FEATURE_NAMES)
-        assert set(listing_categorical).issubset(CATEGORICAL_FEATURE_NAMES)
 
     @pytest.mark.unit
-    def test_aligned_listing_feature_sets_extend_no_list_backbone(self):
+    def test_listing_feature_set_extends_the_no_list_backbone(self):
         no_list_numeric, no_list_categorical = load_feature_subset("no_list_price_v1")
-        aligned26_numeric, aligned26_categorical = load_feature_subset(
-            "listing_price_h3_market_street_aligned26"
-        )
-        aligned30_numeric, aligned30_categorical = load_feature_subset("with_list_price_v1")
+        listing_numeric, listing_categorical = load_feature_subset("with_list_price_v1")
 
-        assert set(no_list_numeric).issubset(aligned26_numeric)
-        assert set(no_list_numeric).issubset(aligned30_numeric)
-        assert aligned26_categorical == no_list_categorical
-        assert aligned30_categorical == no_list_categorical
-
-        assert set(aligned26_numeric) - set(no_list_numeric) == {"listing_price"}
-        assert set(aligned30_numeric) - set(no_list_numeric) == {
+        assert listing_numeric[: len(no_list_numeric)] == no_list_numeric
+        assert listing_categorical == no_list_categorical
+        assert set(listing_numeric) - set(no_list_numeric) == {
             "listing_price",
             "relative_area_price",
             "total_cost_per_sqm",
             "monthly_fee_per_sqm",
             "efficiency_premium",
         }
-        assert len(aligned26_numeric) + len(aligned26_categorical) == 26
-        assert len(aligned30_numeric) + len(aligned30_categorical) == 30
+        assert len(listing_numeric) + len(listing_categorical) == 30
 
 
 class TestMissingValueHandling:
@@ -484,24 +419,6 @@ class TestFeatureContext:
         assert result.loc[0, "market_ppsqm_index"] == pytest.approx(112912)
 
     @pytest.mark.unit
-    def test_energy_efficiency_vectorised_matches_scalar(self):
-        # Permutation of every (year-bin, area-bin) bucket the function reasons about,
-        # plus NaNs on each axis. The vectorised version must match the scalar
-        # version row-by-row — this is the safety net for the `df.apply(axis=1)`
-        # → `np.select` rewrite.
-        years = [2020, 2005, 1995, 1985, 1975, 1960, np.nan, 2020]
-        areas = [30.0, 50.0, 70.0, 90.0, 30.0, 70.0, 50.0, np.nan]
-        s_year = pd.Series(years)
-        s_area = pd.Series(areas)
-
-        scalar = pd.Series(
-            [_estimate_energy_efficiency(y, a) for y, a in zip(years, areas, strict=True)]
-        )
-        vector = _estimate_energy_efficiency_series(s_year, s_area)
-
-        pd.testing.assert_series_equal(scalar, vector, check_names=False, check_dtype=False)
-
-    @pytest.mark.unit
     def test_energy_efficiency_handles_nullable_extension_dtypes(self):
         # BigQuery's to_dataframe() returns integer columns as pandas nullable
         # Int64. Comparisons on nullable dtypes return a `boolean` extension
@@ -511,15 +428,15 @@ class TestFeatureContext:
         s_year = pd.Series([2020, 2005, pd.NA, 1985, 1960], dtype="Int64")
         s_area = pd.Series([30.0, 50.0, 70.0, pd.NA, 90.0], dtype="Float64")
 
-        result = _estimate_energy_efficiency_series(s_year, s_area)
+        result = estimate_energy_efficiency_series(s_year, s_area)
 
         expected = pd.Series(
             [
-                _estimate_energy_efficiency(2020, 30.0),
-                _estimate_energy_efficiency(2005, 50.0),
+                10.0,  # 2010+ bin (9.0) plus small-unit bonus (+1.0)
+                8.0,  # 2000s bin (7.5) plus mid-size bonus (+0.5)
                 5.0,  # NaN year → default
                 5.0,  # NaN area → default
-                _estimate_energy_efficiency(1960, 90.0),
+                5.5,  # pre-1970 bin (6.0) minus large-unit penalty (-0.5)
             ]
         )
         pd.testing.assert_series_equal(result, expected, check_names=False, check_dtype=False)

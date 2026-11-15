@@ -7,7 +7,6 @@ variables. They must not fall back to a real project name when config is missing
 
 ```bash
 ./scripts/setup_bigquery.sh --project your-gcp-project-id
-./scripts/create_predictions_table.sh --project your-gcp-project-id
 ./scripts/cloud_run_disable.sh --project your-gcp-project-id
 ./vertex_ai/build_and_push.sh --project your-gcp-project-id --dry-run
 ```

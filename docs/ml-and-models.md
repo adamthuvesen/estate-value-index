@@ -2,7 +2,7 @@
 
 Training uses engineered listing features and LightGBM-based tiered ensembles.
 Keep training, feature context, and inference aligned; that contract matters
-more than any one helper name.
+more than any one helper name. Term definitions are in [GLOSSARY.md](../GLOSSARY.md).
 
 Private model scoreboards, exact holdout slices, local backfill notes, and
 feature-selection research belong under `docs/internal/`. That directory is
@@ -15,7 +15,7 @@ intentionally git-ignored.
 - Feature engineering: `src/estate_value_index/ml/features/`
 - Data loading and preprocessing: `src/estate_value_index/ml/data_loader.py`, `src/estate_value_index/ml/preprocessing.py`
 - Model serving: `api_server.py`
-- Feature subsets: `config/feature_subsets.yaml`
+- Feature sets: `NO_LIST_PRICE_V1_NUMERIC`, `WITH_LIST_PRICE_V1_NUMERIC`, and `PRODUCTION_CATEGORICAL` in `src/estate_value_index/ml/features/registry.py`
 
 ## Training contract
 
@@ -32,7 +32,7 @@ intentionally git-ignored.
 - H3 comp features add prior adjacent-cell PPSQM and same-size PPSQM fallbacks.
   They must exclude same-day rows during training and use train-fold context for
   holdout/inference.
-- Market/economy features come from local CSVs in `data/reference/economy/` and
+- Market/economy features come from local CSVs in `src/estate_value_index/ml/reference/economy/` and
   use the latest previous month to avoid same-month lookahead. Refresh them with
   `uv run python scripts/fetch_economic_data.py --replace`.
 - Feature sets that hide asking price must also exclude same-row
@@ -67,13 +67,15 @@ intentionally git-ignored.
   hand-edited.
 - Runtime model sync can come from GCS through `scripts/startup.sh`.
 - Model integrity uses `.sha256` sidecars; do not bypass those checks casually.
+- Training writes `package_version`, `commit_sha`, and `data_fingerprint` into each `*_metrics.json`. The API refuses a model with a missing or different `package_version`, so retrain after a version bump and before the next deploy. See [ADR 0003](adr/0003-stamp-and-fingerprint-model-artifacts.md).
+- Features have one code path, `ml/features/`, for training and serving. Materialized features and drift monitoring were deleted: [ADR 0002](adr/0002-no-materialized-features-or-drift-monitoring.md).
 
 ## Checks to run
 
 - General ML changes: `uv run pytest tests/ml tests/test_training.py tests/test_features.py`
 - Leakage-sensitive changes: `uv run pytest tests/ml/test_temporal_leakage.py`
 - Model serving/integrity: `uv run pytest tests/api/test_model_integrity.py tests/test_api_server.py`
-- Feature materialization: `uv run pytest tests/ml/test_feature_materialization.py tests/test_data_loader.py`
+- Real train and serve on synthetic data: `just verify train serve`
 
 ## Useful commands
 

@@ -37,40 +37,26 @@ export function FigureFrame({
   className,
   children,
 }: FigureFrameProps) {
-  const label =
-    kind !== "panel" && index !== undefined ? `${KIND_LABEL[kind]} ${index}` : null;
+  const label = kind !== "panel" && index !== undefined ? `${KIND_LABEL[kind]} ${index}` : null;
 
   return (
     <section id={id} className={cn("scroll-mt-24 border-t border-ledger-border pt-4", className)}>
       <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
         <div className="min-w-0">
-          {label && (
-            <span className="eyebrow block text-ledger-accent">{label}</span>
-          )}
+          {label && <span className="eyebrow block text-ledger-accent">{label}</span>}
           <h2 className="mt-1 font-display text-title text-ledger-text">{title}</h2>
           {meta && (
-            <p
-              className={cn(
-                "mt-1 text-caption",
-                stale ? "text-val-over" : "text-ledger-dimmed",
-              )}
-            >
+            <p className={cn("mt-1 text-caption", stale ? "text-val-over" : "text-ledger-dimmed")}>
               {meta}
             </p>
           )}
         </div>
-        {actions && (
-          <div className="flex shrink-0 items-center gap-2">{actions}</div>
-        )}
+        {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
       </div>
 
-      <div className="ledger-card mt-4 p-4 shadow-none sm:p-5">
-        {children}
-      </div>
+      <div className="ledger-card mt-4 p-4 shadow-none sm:p-5">{children}</div>
 
-      {footnote && (
-        <p className="mt-2.5 text-caption text-ledger-dimmed">{footnote}</p>
-      )}
+      {footnote && <p className="mt-2.5 text-caption text-ledger-dimmed">{footnote}</p>}
     </section>
   );
 }

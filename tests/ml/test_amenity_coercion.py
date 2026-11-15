@@ -11,7 +11,7 @@ import pandas as pd
 import pytest
 
 from estate_value_index.ingestion.booli.normalization import to_bool
-from estate_value_index.ml.features import _coerce_nullable_bool
+from estate_value_index.ml.features import coerce_nullable_bool
 
 _CANONICAL_TRUTH_TABLE = [
     (True, True, True),
@@ -45,7 +45,7 @@ def test_canonical_truth_table_pipeline(raw, expected_pipeline, expected_feature
 @pytest.mark.parametrize("raw,expected_pipeline,expected_feature", _CANONICAL_TRUTH_TABLE)
 def test_canonical_truth_table_feature(raw, expected_pipeline, expected_feature):
     series = pd.Series([raw])
-    coerced = _coerce_nullable_bool(series).iloc[0]
+    coerced = coerce_nullable_bool(series).iloc[0]
     assert bool(coerced) is expected_feature
 
 
@@ -61,13 +61,13 @@ def test_unrecognised_token_returns_none_at_pipeline(raw):
 @pytest.mark.parametrize("raw", _UNRECOGNISED)
 def test_unrecognised_token_returns_na_at_feature(raw):
     series = pd.Series([raw])
-    coerced = _coerce_nullable_bool(series)
+    coerced = coerce_nullable_bool(series)
     assert coerced.isna().iloc[0]
 
 
 def test_amenity_feature_block_handles_string_no():
     """A scraped 'no' for elevator/balcony must not become has_*='yes'."""
-    from estate_value_index.ml.features.basic import _create_amenity_features
+    from estate_value_index.ml.features.basic import create_amenity_features
 
     df = pd.DataFrame(
         {
@@ -76,6 +76,6 @@ def test_amenity_feature_block_handles_string_no():
             "floor": [3, 4, 1, 2, 5, 0],
         }
     )
-    out = _create_amenity_features(df.copy())
+    out = create_amenity_features(df.copy())
     assert list(out["has_elevator"]) == ["no", "yes", "no", "yes", "no", "no"]
     assert list(out["has_balcony"]) == ["no", "yes", "no", "yes", "no", "no"]

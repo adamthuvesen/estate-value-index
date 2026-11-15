@@ -31,7 +31,7 @@ export function errorResponse({
       remediation,
       ...extra,
     },
-    { status }
+    { status },
   );
 }
 

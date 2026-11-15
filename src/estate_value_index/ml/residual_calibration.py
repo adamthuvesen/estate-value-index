@@ -11,7 +11,6 @@ from lightgbm import LGBMRegressor
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import HistGradientBoostingRegressor
 from sklearn.impute import SimpleImputer
-from sklearn.model_selection import TimeSeriesSplit
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder
 
@@ -19,12 +18,11 @@ from estate_value_index.ml import (
     build_feature_context,
     create_optimized_features,
     get_categorical_indices,
-    get_feature_lists,
     handle_missing_values,
 )
 from estate_value_index.ml.ask_price import mask_ask_price_signals
+from estate_value_index.ml.features.registry import load_feature_subset
 from estate_value_index.ml.training import LGBMTrainer
-from estate_value_index.ml.training_workflow.data import load_feature_subset
 from estate_value_index.ml.training_workflow.metrics import regression_metrics
 
 CENTRAL_AREAS = frozenset({"ostermalm", "vasastan", "sodermalm", "kungsholmen"})
@@ -72,7 +70,7 @@ def build_calibration_features(
     """Create residual-calibrator inputs from engineered rows and base predictions."""
     features = pd.DataFrame(index=frame.index)
     predictions = pd.Series(np.asarray(base_predictions, dtype=float), index=frame.index)
-    living_area = pd.to_numeric(frame.get("living_area"), errors="coerce").replace(0, np.nan)
+    living_area = pd.to_numeric(frame["living_area"], errors="coerce").replace(0, np.nan)
 
     features["base_prediction"] = predictions
     features["base_prediction_ppsqm"] = predictions / living_area
@@ -98,18 +96,6 @@ def build_calibration_features(
             features[column] = "unknown"
 
     return features[CALIBRATION_NUMERIC_FEATURES + CALIBRATION_CATEGORICAL_FEATURES]
-
-
-def apply_residual_calibration(
-    base_predictions: np.ndarray,
-    residual_adjustment: np.ndarray,
-) -> np.ndarray:
-    """Apply residual SEK adjustments and keep predictions non-negative."""
-    return np.clip(
-        np.asarray(base_predictions, dtype=float) + np.asarray(residual_adjustment, dtype=float),
-        0,
-        None,
-    )
 
 
 def apply_calibration_correction(
@@ -138,14 +124,12 @@ def apply_calibration_correction(
     return np.clip(base + clipped, 0, None)
 
 
-def _feature_set_requires_listing_price(feature_set: str | None) -> bool:
+def feature_set_requires_listing_price(feature_set: str) -> bool:
     subset_numeric, _ = load_feature_subset(feature_set)
-    if subset_numeric is None:
-        return True
     return "listing_price" in subset_numeric
 
 
-def _prepare_model_data(
+def prepare_model_data(
     train_raw: pd.DataFrame,
     test_raw: pd.DataFrame,
     feature_set: str,
@@ -153,14 +137,14 @@ def _prepare_model_data(
     # Mask ask-price signals before feature engineering, exactly as production
     # training does — otherwise engineered features leak listing-price signal into
     # the no-list experiment metrics.
-    if not _feature_set_requires_listing_price(feature_set):
+    if not feature_set_requires_listing_price(feature_set):
         train_raw = mask_ask_price_signals(train_raw)
         test_raw = mask_ask_price_signals(test_raw)
     train_engineered = create_optimized_features(train_raw)
     feature_context = build_feature_context(train_engineered)
     test_engineered = create_optimized_features(test_raw, context=feature_context)
     combined = pd.concat([train_engineered, test_engineered], ignore_index=True)
-    numeric_features, categorical_features = _resolve_features(combined, feature_set)
+    numeric_features, categorical_features = resolve_features(combined, feature_set)
     return PreparedModelData(
         train_engineered=train_engineered,
         test_engineered=test_engineered,
@@ -170,36 +154,32 @@ def _prepare_model_data(
     )
 
 
-def _resolve_features(
+def resolve_features(
     df_engineered: pd.DataFrame,
     feature_set: str,
 ) -> tuple[list[str], list[str]]:
-    numeric_features, categorical_features, _ = get_feature_lists()
     subset_numeric, subset_categorical = load_feature_subset(feature_set)
-    if subset_numeric is not None:
-        numeric_features = [
-            feature for feature in subset_numeric if feature in df_engineered.columns
-        ]
-        categorical_features = [
-            feature for feature in (subset_categorical or []) if feature in df_engineered.columns
-        ]
+    numeric_features = [feature for feature in subset_numeric if feature in df_engineered.columns]
+    categorical_features = [
+        feature for feature in subset_categorical if feature in df_engineered.columns
+    ]
     return numeric_features, categorical_features
 
 
-def _fit_base_model(
+def fit_base_model(
     prepared: PreparedModelData,
     random_state: int,
     lgbm_params: dict[str, Any] | None = None,
 ) -> BaseFitResult:
-    X_train, X_test, y_train, _ = _prepare_matrices(prepared)
-    model = _train_lgbm(
+    X_train, X_test, y_train, _ = prepare_matrices(prepared)
+    model = train_lgbm(
         X_train,
         y_train,
         prepared.categorical_features,
         random_state,
         lgbm_params=lgbm_params,
     )
-    predictions = np.expm1(model.predict(X_test))
+    predictions = predict_prices(model, X_test)
     return BaseFitResult(
         model=model,
         predictions=predictions,
@@ -207,7 +187,7 @@ def _fit_base_model(
     )
 
 
-def _prepare_matrices(
+def prepare_matrices(
     prepared: PreparedModelData,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]:
     X_train_raw = prepared.train_engineered[prepared.all_features].copy()
@@ -225,7 +205,12 @@ def _prepare_matrices(
     return X_train, X_test, y_train, y_test
 
 
-def _train_lgbm(
+def predict_prices(model: LGBMRegressor, X: pd.DataFrame) -> np.ndarray:
+    """Predict prices from a model trained on log prices."""
+    return np.expm1(np.asarray(model.predict(X), dtype=float))
+
+
+def train_lgbm(
     X_train: pd.DataFrame,
     y_train: pd.Series,
     categorical_features: list[str],
@@ -244,40 +229,7 @@ def _train_lgbm(
     )
 
 
-def _build_oof_residual_training_data(
-    train_raw: pd.DataFrame,
-    *,
-    feature_set: str,
-    n_splits: int,
-    random_state: int,
-) -> pd.DataFrame:
-    sorted_train = train_raw.sort_values("sold_date").reset_index(drop=True)
-    splitter = TimeSeriesSplit(n_splits=n_splits)
-    rows = []
-
-    for fold, (fold_train_idx, fold_valid_idx) in enumerate(splitter.split(sorted_train), start=1):
-        fold_train_raw = sorted_train.iloc[fold_train_idx].reset_index(drop=True)
-        fold_valid_raw = sorted_train.iloc[fold_valid_idx].reset_index(drop=True)
-        prepared = _prepare_model_data(fold_train_raw, fold_valid_raw, feature_set)
-        fit = _fit_base_model(prepared, random_state)
-        fold_features = build_calibration_features(
-            fit.test_frame,
-            fit.predictions,
-        )
-        fold_features["residual"] = (
-            prepared.test_engineered["sold_price"].reset_index(drop=True).to_numpy()
-            - fit.predictions
-        )
-        fold_features["actual_price"] = prepared.test_engineered["sold_price"].reset_index(
-            drop=True
-        )
-        fold_features["fold"] = fold
-        rows.append(fold_features)
-
-    return pd.concat(rows, ignore_index=True)
-
-
-def _fit_residual_calibrator(oof: pd.DataFrame, *, random_state: int) -> Pipeline:
+def fit_residual_calibrator(oof: pd.DataFrame, *, random_state: int) -> Pipeline:
     X = oof[CALIBRATION_NUMERIC_FEATURES + CALIBRATION_CATEGORICAL_FEATURES].copy()
     y = oof["residual"].copy()
     pipeline = Pipeline(
@@ -329,7 +281,7 @@ def _one_hot_encoder() -> OneHotEncoder:
     return OneHotEncoder(handle_unknown="ignore", sparse_output=False)
 
 
-def _prediction_metrics(y_true: pd.Series, y_pred: np.ndarray) -> dict[str, float]:
+def prediction_metrics(y_true: pd.Series, y_pred: np.ndarray) -> dict[str, float]:
     """regression_metrics's mae/rmse/mape/median_ape/within_X_pct, plus the
     signed-bias fields the calibration gate needs (mean/median bias,
     underprediction rate). Delegates the core computation instead of

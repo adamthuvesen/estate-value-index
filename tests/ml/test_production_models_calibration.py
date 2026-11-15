@@ -31,7 +31,7 @@ def _model(*, model_id: str, calibrator: object | None) -> TieredProductionModel
         requires_listing_price=(model_id == LISTING_MODEL_ID),
         numeric_features=[],
         categorical_features=[],
-        context=None,
+        context=None,  # pyright: ignore[reportArgumentType]  # predict() never reads the context in these tests
         base_model=None,
         normalized_model=None,
         tier_models={},
@@ -101,7 +101,7 @@ def test_select_blend_uses_custom_gate_thresholds(monkeypatch) -> None:
     )
 
     monkeypatch.setattr(
-        "estate_value_index.ml.production_models._build_oof_training_data",
+        "estate_value_index.ml.production_models.build_oof_training_data",
         lambda *args, **kwargs: oof,
     )
     monkeypatch.setattr(

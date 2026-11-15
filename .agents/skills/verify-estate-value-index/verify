@@ -1,0 +1,172 @@
+#!/usr/bin/env python3
+"""Drive the real estate-value-index CLIs and ASGI app on a temp copy of the checkout."""
+
+import datetime as dt
+import fnmatch
+import hashlib
+import json
+import subprocess
+import sys
+import time
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from drives import CONTROL_FAILURE, DRIVES, Shared
+from harness import ROOT, DriveFailure, Run
+
+ALL_BUDGET_SECONDS = 60
+DRIVE_TIMEOUT_SECONDS = 55
+SHARED_PATHS = ["pyproject.toml", "uv.lock", ".agents/skills/verify-estate-value-index/*"]
+SMOKE = "spend-refusal"
+FINGERPRINT_FILE = "src/estate_value_index/ml/data_fingerprint.py"
+
+
+def git(*args: str) -> str:
+    return subprocess.run(
+        ["git", *args], cwd=ROOT, capture_output=True, text=True, check=True
+    ).stdout.strip()
+
+
+def digest(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else "absent"
+
+
+def checkout_state() -> dict[str, str]:
+    """HEAD, the index, and every changed or untracked path in the real checkout."""
+    state = {"HEAD": git("rev-parse", "HEAD"), "index": git("ls-files", "--stage")}
+    listing = git("status", "--porcelain", "-z", "--untracked-files=all")
+    for entry in filter(None, listing.split("\0")):
+        path = entry[3:]
+        if not path.startswith(".verify/") and "__pycache__" not in path.split("/"):
+            state[path] = f"{entry[:2]}:{digest(ROOT / path)}"
+    return state
+
+
+def changed_state(before: dict[str, str]) -> list[str]:
+    after = checkout_state()
+    return sorted(key for key in before.keys() | after.keys() if before.get(key) != after.get(key))
+
+
+def plant_fingerprint_defect(run: Run) -> None:
+    """Control defect: the fingerprint counts one row too many."""
+    target = run.copy / FINGERPRINT_FILE
+    source = target.read_text()
+    if source.count("rows=len(frame),") != 1:
+        raise DriveFailure(
+            f"control cannot plant its defect: pattern not found in {FINGERPRINT_FILE}"
+        )
+    target.write_text(source.replace("rows=len(frame),", "rows=len(frame) + 1,"))
+
+
+def run_drive(name: str, evidence: Path, shared: Shared) -> tuple[str, str, float]:
+    started = time.monotonic()
+    run = Run(evidence, name)
+    try:
+        detail = DRIVES[name].run(run, shared)
+        result = "PASS"
+    except DriveFailure as error:
+        result, detail = "FAIL", str(error)
+    except (subprocess.TimeoutExpired, KeyError, TypeError, ValueError, OSError) as error:
+        result, detail = "FAIL", f"{type(error).__name__}: {error}"
+    except SystemExit as error:
+        result, detail = "FAIL", f"drive exited the run early: SystemExit({error.code!r})"
+    finally:
+        hits = run.tripwire_hits()
+        run.cleanup()
+    if hits:
+        result, detail = "FAIL", f"tripwire hit: {'; '.join(hits)[:200]}"
+    return result, detail, round(time.monotonic() - started, 1)
+
+
+def execute(names: list[str], *, control: bool = False) -> int:
+    sha = git("rev-parse", "--short=7", "HEAD")
+    dirty = bool(git("status", "--porcelain"))
+    stamp = dt.datetime.now(dt.UTC).strftime("%Y%m%dT%H%M%S%fZ")
+    evidence = ROOT / ".verify" / "runs" / f"{stamp}-{sha}{'-dirty' if dirty else ''}"
+    evidence.mkdir(parents=True)
+    shared = Shared(evidence, plant_fingerprint_defect if control else None)
+    before = checkout_state()
+    started = time.monotonic()
+    results = []
+    with ThreadPoolExecutor(max_workers=len(names)) as pool:
+        futures = {name: pool.submit(run_drive, name, evidence, shared) for name in names}
+        for name, future in futures.items():
+            try:
+                result, detail, seconds = future.result(timeout=DRIVE_TIMEOUT_SECONDS)
+            except TimeoutError:
+                result, detail, seconds = "FAIL", f"timed out after {DRIVE_TIMEOUT_SECONDS}s", 0.0
+            print(f"{result} {name} {seconds}s {detail}")
+            results.append({"drive": name, "result": result, "seconds": seconds, "detail": detail})
+    shared.cleanup()
+    elapsed = round(time.monotonic() - started, 1)
+    changed = changed_state(before)
+    if changed:
+        detail = f"the run changed the checkout: {', '.join(changed[:10])}"
+        print(f"FAIL checkout {detail}")
+        results.append({"drive": "checkout", "result": "FAIL", "seconds": 0.0, "detail": detail})
+    if names == list(DRIVES) and elapsed > ALL_BUDGET_SECONDS:
+        detail = f"verify all took {elapsed}s, budget {ALL_BUDGET_SECONDS}s"
+        print(f"FAIL budget {detail}")
+        results.append({"drive": "budget", "result": "FAIL", "seconds": elapsed, "detail": detail})
+    failures = [str(r["detail"]) for r in results if r["result"] == "FAIL"]
+    if control:
+        passed = failures == [CONTROL_FAILURE]
+        if passed:
+            print("control: FAIL observed")
+        elif failures:
+            print(f"control: failed for another reason; expected {CONTROL_FAILURE!r}")
+        else:
+            print("control: passed unexpectedly; the drive cannot fail")
+    else:
+        passed = not failures
+    summary = {
+        "sha": git("rev-parse", "HEAD"),
+        "dirty": dirty,
+        "control": control,
+        "result": "PASS" if passed else "FAIL",
+        "seconds": elapsed,
+        "checkout_changed": changed,
+        "drives": results,
+    }
+    (evidence / "summary.json").write_text(json.dumps(summary, indent=2))
+    print(f"{len(results)} drive(s) in {elapsed}s; evidence: {evidence}")
+    return 0 if passed else 1
+
+
+def changed_files() -> set[str]:
+    branches = git("branch", "--list", "--all", "main", "origin/main").split()
+    base = git("merge-base", "HEAD", "main" if "main" in branches else "origin/main")
+    files = set(git("diff", "--name-only", base).splitlines())
+    return files | set(git("ls-files", "--others", "--exclude-standard").splitlines())
+
+
+def select_changed() -> list[str]:
+    files = changed_files()
+    if any(fnmatch.fnmatch(f, p) for f in files for p in SHARED_PATHS):
+        return list(DRIVES)
+    picked = [
+        n for n, d in DRIVES.items() if any(fnmatch.fnmatch(f, p) for f in files for p in d.paths)
+    ]
+    return picked or [SMOKE]
+
+
+def main(argv: list[str]) -> int:
+    if argv == ["list"]:
+        for name, drive in DRIVES.items():
+            print(f"{name}\t{drive.proves}\t{', '.join(drive.paths)}")
+        return 0
+    if argv == ["control"]:
+        return execute(["train"], control=True)
+    if argv == ["all"]:
+        return execute(list(DRIVES))
+    unknown = [a for a in argv if a not in DRIVES]
+    if unknown:
+        print(f"unknown drive(s): {', '.join(unknown)}; run `verify list`", file=sys.stderr)
+        return 2
+    return execute(argv or select_changed())
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

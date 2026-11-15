@@ -8,6 +8,7 @@ if area-based signals are redundant with the dominant listing_price feature.
 
 import sys
 from pathlib import Path
+from typing import Any
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -18,13 +19,13 @@ from statsmodels.stats.outliers_influence import variance_inflation_factor
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from estate_value_index.ml.data_loader import load_features_from_bigquery
 from estate_value_index.ml.features import create_optimized_features, get_feature_lists
+from estate_value_index.ml.training_workflow.data import load_training_dataframe
 
 _OUTPUT_DIR = Path("reports/correlation_analysis")
 
 
-def calculate_vif(df: pd.DataFrame, numeric_features: list) -> pd.DataFrame:
+def calculate_vif(df: pd.DataFrame, numeric_features: list[Any]) -> pd.DataFrame:
     """Calculate Variance Inflation Factor for numeric features."""
     vif_data = []
 
@@ -51,20 +52,11 @@ def calculate_vif(df: pd.DataFrame, numeric_features: list) -> pd.DataFrame:
 
 
 def _load_engineered_features() -> pd.DataFrame:
-    print("\nLoading pre-engineered features from BigQuery...")
-    try:
-        df_eng = load_features_from_bigquery()
-        print(f"Loaded {len(df_eng)} samples with engineered features")
-        return df_eng
-    except Exception as e:
-        print(f"Error loading from BigQuery: {e}")
-        print("Attempting to load from JSON files instead...")
-        from estate_value_index.ml.data_loader import load_from_bigquery
-
-        df = load_from_bigquery()
-        print(f"Loaded {len(df)} raw samples")
-        print("Engineering features...")
-        return create_optimized_features(df)
+    print("\nLoading raw listings...")
+    df = load_training_dataframe(data_source="bigquery", data_file=None)
+    print(f"Loaded {len(df)} raw samples")
+    print("Engineering features...")
+    return create_optimized_features(df)
 
 
 def _feature_sets(df_eng: pd.DataFrame) -> tuple[list[str], list[str], list[str]]:
@@ -172,7 +164,7 @@ def _vif_report(df_eng: pd.DataFrame, area_features: list[str]) -> pd.DataFrame:
     print("VARIANCE INFLATION FACTOR (Multicollinearity Detection)")
     print("-" * 80)
 
-    vif_features = ["listing_price"] + area_features[:15]
+    vif_features = ["listing_price", *area_features[:15]]
     vif_df = calculate_vif(df_eng, vif_features)
     if vif_df.empty:
         return vif_df
@@ -259,7 +251,7 @@ def _plot_mi_scores(mi_df: pd.DataFrame, area_features: list[str], output_dir: P
     ]
 
     plt.barh(range(len(top_features)), top_features["MI_score"], color=colors)
-    plt.yticks(range(len(top_features)), top_features["feature"])
+    plt.yticks(range(len(top_features)), top_features["feature"].tolist())
     plt.xlabel("Mutual Information Score", fontsize=12)
     plt.title(
         "Feature Importance by Mutual Information\n(Red=listing_price, Blue=area features)",
@@ -359,7 +351,7 @@ def _save_results(
     }
 
     results_path = output_dir / "correlation_analysis_results.json"
-    with open(results_path, "w") as f:
+    with Path(results_path).open("w") as f:
         json.dump(results, f, indent=2)
     print(f"Results saved to: {results_path}")
 

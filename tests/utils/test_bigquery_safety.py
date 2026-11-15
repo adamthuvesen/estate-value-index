@@ -9,11 +9,11 @@ import pytest
 from estate_value_index.utils.bigquery_safety import (
     Filter,
     _validate_bq_dataset_id,
-    _validate_bq_project_id,
     _validate_bq_table_id,
     build_filter_clause,
     quote_identifier,
     safe_table_ref,
+    validate_bq_project_id,
 )
 
 
@@ -31,7 +31,7 @@ from estate_value_index.utils.bigquery_safety import (
 )
 def test_validate_bq_project_id_rejects(invalid: str) -> None:
     with pytest.raises(ValueError, match="invalid GCP project_id"):
-        _validate_bq_project_id(invalid)
+        validate_bq_project_id(invalid)
 
 
 @pytest.mark.parametrize(
@@ -43,7 +43,7 @@ def test_validate_bq_project_id_rejects(invalid: str) -> None:
     ],
 )
 def test_validate_bq_project_id_accepts(valid: str) -> None:
-    assert _validate_bq_project_id(valid) == valid
+    assert validate_bq_project_id(valid) == valid
 
 
 @pytest.mark.parametrize(

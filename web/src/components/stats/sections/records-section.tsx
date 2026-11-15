@@ -4,12 +4,7 @@ import Link from "next/link";
 import { FigureFrame } from "@/components/ui/figure-frame";
 import { SectionIntro } from "@/components/stats/section-intro";
 import type { OverallRecords, RecordSale } from "@/lib/overall-statistics-types";
-import {
-  formatDateSv,
-  formatNumber,
-  formatSek,
-  formatSignedPct,
-} from "@/lib/format";
+import { formatDateSv, formatNumber, formatSek, formatSignedPct } from "@/lib/format";
 
 interface CardConfig {
   label: string;
@@ -51,8 +46,12 @@ function RecordCard({ label, record, headline, caption, footnote }: CardConfig) 
           >
             {record.display_name}
           </Link>
-          {" · "}
-          <span className="num">{formatDateSv(record.sold_date)}</span>
+          {record.sold_date ? (
+            <>
+              {" · "}
+              <span className="num">{formatDateSv(record.sold_date)}</span>
+            </>
+          ) : null}
           {record.living_area ? (
             <span className="num"> · {formatNumber(record.living_area)} m²</span>
           ) : null}

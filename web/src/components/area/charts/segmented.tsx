@@ -36,9 +36,7 @@ export function Segmented<T extends string>({
             onClick={() => onChange(option.value)}
             className={cn(
               "focus-ring rounded-pill px-2.5 py-1 text-[12px] font-medium transition-colors",
-              active
-                ? "bg-ledger-text text-white"
-                : "text-ledger-muted hover:text-ledger-text",
+              active ? "bg-ledger-text text-white" : "text-ledger-muted hover:text-ledger-text",
             )}
           >
             {option.label}

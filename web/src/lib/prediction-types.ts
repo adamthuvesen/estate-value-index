@@ -1,4 +1,5 @@
 import type { EstimateRangeFactors } from "./estimate-range";
+import type { PredictionRequest } from "./generated/api-types";
 
 export interface PredictionInput {
   listing_id: string;
@@ -18,23 +19,8 @@ export interface PredictionInput {
   longitude: string;
 }
 
-export interface PredictionPayload {
-  listing_price: number | null;
-  living_area: number;
-  rooms: number;
-  monthly_fee: number;
-  days_on_market: number;
-  construction_year: number;
-  municipality: string;
-  property_type: string;
-  area: string;
-  model: string;
-  floor: number | null;
-  elevator: boolean | null;
-  balcony: boolean | null;
-  latitude: number | null;
-  longitude: number | null;
-}
+/** The request FastAPI scored, after its validation and defaults. */
+export type PredictionPayload = PredictionRequest;
 
 export interface PredictionResult {
   listing_id: string;

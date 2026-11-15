@@ -8,7 +8,7 @@ interface RoomFilterContextValue {
   setFilter: (filter: RoomFilter) => void;
   /** Stats for the active filter, or null when the bucket doesn't exist. */
   stats: RoomFilteredStatistics | null;
-  roomData: Record<RoomFilter, RoomFilteredStatistics> | undefined;
+  roomData: Partial<Record<RoomFilter, RoomFilteredStatistics>> | undefined;
 }
 
 const RoomFilterContext = createContext<RoomFilterContextValue | null>(null);
@@ -25,7 +25,7 @@ export function RoomFilterProvider({
   children,
 }: {
   initialFilter: RoomFilter;
-  roomData: Record<RoomFilter, RoomFilteredStatistics> | undefined;
+  roomData: Partial<Record<RoomFilter, RoomFilteredStatistics>> | undefined;
   children: ReactNode;
 }) {
   const [filter, setFilterState] = useState<RoomFilter>(initialFilter);

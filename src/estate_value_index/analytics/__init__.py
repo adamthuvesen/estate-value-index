@@ -1,8 +1,7 @@
-"""Framework-agnostic analytics generation library.
+"""Analytics generation: the derived web JSON files and their contract (``web_json``).
 
-Holds the area-statistics and value-analysis computation logic shared by the
-CLI entrypoints (`estate_value_index.cli`) and the Prefect tasks
-(`estate_value_index.pipelines.tasks.analytics`). No argparse or Prefect here.
+The ``evi`` CLI entrypoints (``estate_value_index.cli.generate_*``) are thin shells
+over these functions. No argparse here.
 """
 
 from estate_value_index.analytics.area_statistics import generate_area_statistics

@@ -1,6 +1,6 @@
 import pytest
 
-from src.estate_value_index.ingestion.booli.normalization import (
+from estate_value_index.ingestion.booli.normalization import (
     clean_text,
     ensure_list,
     to_bool,

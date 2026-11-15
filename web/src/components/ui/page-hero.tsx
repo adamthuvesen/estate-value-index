@@ -20,12 +20,8 @@ export function PageHero({ chapter, eyebrow, title, lead, children }: PageHeroPr
         </span>
         <span>{eyebrow}</span>
       </p>
-      <h1 className="mt-3 font-display text-display text-ledger-text text-balance">
-        {title}
-      </h1>
-      {lead && (
-        <p className="mt-4 max-w-2xl text-body text-ledger-muted text-balance">{lead}</p>
-      )}
+      <h1 className="mt-3 font-display text-display text-ledger-text text-balance">{title}</h1>
+      {lead && <p className="mt-4 max-w-2xl text-body text-ledger-muted text-balance">{lead}</p>}
       {children && <div className="mt-6">{children}</div>}
     </header>
   );

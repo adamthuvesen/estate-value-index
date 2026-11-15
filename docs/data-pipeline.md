@@ -1,25 +1,29 @@
 # Data pipeline
 
 The data path starts with authorized listing ingestion output, lands raw listings in BigQuery,
-materializes engineered features, then feeds model training or serving artifacts. The public
+then feeds model training or serving artifacts. The public
 repo contains code and synthetic fixtures only. Redistributable listing data is not included.
 
 ## Main flow
 
 ```text
-Permissioned listing source -> JSONL + upload path -> process_listings -> booli_raw.listings
-  -> materialize_features -> booli_features.engineered_features
-  -> train-production-models -> web/models/* -> Next /api/* -> FastAPI /predict
+evi backfill --load: fetch -> process -> booli_raw.listings -> geocode -> sync back
+  -> evi train-production-models | evi vertex-train -> evi check-model -> evi promote-model
+  -> evi value-analysis / areas / overall-stats -> evi upload-enrichment
 ```
 
 ## Where to work
 
 - Signed Booli API adapter: `src/estate_value_index/ingestion/booli/api.py`
 - Ingestion utilities and loaders: `src/estate_value_index/ingestion/`
-- Pipeline orchestration: `src/estate_value_index/pipelines/core/complete_pipeline.py`
-- Pipeline tasks: `src/estate_value_index/pipelines/tasks/`
-- BigQuery schemas: `schemas/bq_raw_listings.json`, `schemas/bq_features_engineered.json`
-- Pipeline config: `config/pipeline_config.yaml`
+- The one ingestion path: `src/estate_value_index/ingestion/ingest.py` (`ingest_listings`),
+  called by `evi backfill` and the workflow
+- BigQuery load and its row contract: `ingestion/bigquery_upload.py`, `ingestion/listing_row.py`
+  (one bad row stops the load, with a count)
+- Sync and geocoding: `ingestion/sync.py`, `ingestion/geocoding.py`
+- Orchestration: `.github/workflows/ml-pipeline.yml`
+- BigQuery schemas: `schemas/bq_raw_listings.json`
+- Settings: `src/estate_value_index/utils/settings.py`
 - Web enrichment JSON (`data/derived/`, synced to GCS): `area_statistics.json`,
   `value_analysis.json`, and `overall_statistics.json` (city-wide stats for `/stats`;
   regenerate with `uv run python -m estate_value_index.cli overall-stats`)
@@ -34,12 +38,10 @@ GCP_REGION=europe-north1
 BIGQUERY_PROJECT_ID=your-gcp-project-id
 BIGQUERY_DATASET_RAW=booli_raw
 BIGQUERY_TABLE_LISTINGS=listings
-BIGQUERY_DATASET_FEATURES=booli_features
-BIGQUERY_TABLE_FEATURES=engineered_features
 GCS_BUCKET=your-gcs-bucket
 ```
 
-Optional knobs (examples): `GCS_ENABLED`, `MAX_MEDIAN_APE_THRESHOLD`, `DATA_SOURCE`, `MODEL_PREFIX`, `MODEL_OUTPUT_DIR`, `DEBUG`.
+Optional knobs: `GCS_ENABLED`, `MAX_MEDIAN_APE_THRESHOLD`, `INGESTION_MIN_VALIDATION_RATE`, `DATA_SOURCE`, `BOOLI_TRAIN_DATA`. The `Settings` model lists every key; an unknown key in `.env` is an error.
 
 Signed Booli API credentials for ingestion runs:
 
@@ -51,17 +53,15 @@ BOOLI_API_PRIVATE_KEY=your-booli-private-key
 The signed API path writes the raw-listing JSONL schema consumed by processing and
 BigQuery upload. Authorized exports may provide the same schema directly.
 
-Precedence: environment -> `config/pipeline_config.yaml` -> code defaults.
+Precedence: environment -> `.env` -> the `Settings` defaults.
 
 BigQuery datasets:
 
 - **booli_raw:** raw listings (e.g. `listings`, partitioned)
-- **booli_features:** engineered features (e.g. `engineered_features`, partitioned)
 
 ## BigQuery rules
 
 - Typical raw table: `booli_raw.listings`.
-- Typical feature table: `booli_features.engineered_features`.
 - Project, dataset, and table names come from environment variables first.
 - Use helpers such as `src/estate_value_index/utils/bigquery_safety.py` for validation and parameterized/operator-only SQL.
 - Treat dynamic SQL fragments like `where_clause` as trusted operator fragments only, never direct user input.
@@ -76,7 +76,7 @@ BigQuery datasets:
 
 ## Checks to run
 
-- General pipeline/data changes: `uv run pytest`
+- General pipeline/data changes: `just check`; drive the real CLI with `just verify`
 - BigQuery safety: `uv run pytest tests/utils/test_bigquery_safety.py tests/utils/test_no_unsafe_sql.py tests/ml/test_filter_api_contract.py`
 - Temporal behavior: `uv run pytest tests/ml/test_temporal_leakage.py tests/test_time_series_utils.py`
 - Ingestion behavior: `uv run pytest tests/ingestion tests/test_ingestion_utils.py`
