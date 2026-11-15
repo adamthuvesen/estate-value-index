@@ -275,7 +275,7 @@ export interface AreaStatisticsDataSources {
  * via the `definition` "BestValueSale".
  */
 export interface BestValueSale {
-  address: string;
+  address: string | null;
   area_name: string;
   display_name: string;
   living_area: number | null;
@@ -291,7 +291,7 @@ export interface BestValueSale {
  * via the `definition` "BiggestBidUpSale".
  */
 export interface BiggestBidUpSale {
-  address: string;
+  address: string | null;
   area_name: string;
   display_name: string;
   listing_price: number;
@@ -373,7 +373,7 @@ export interface PooledEstimateRange {
  * via the `definition` "FastestSale".
  */
 export interface FastestSale {
-  address: string;
+  address: string | null;
   area_name: string;
   days_on_market: number;
   display_name: string;
@@ -419,7 +419,7 @@ export interface GeographyArea {
  * via the `definition` "HighestPricePerSqmSale".
  */
 export interface HighestPricePerSqmSale {
-  address: string;
+  address: string | null;
   area_name: string;
   display_name: string;
   living_area: number | null;
@@ -595,7 +595,7 @@ export interface OverallRecords {
  * via the `definition` "RecordSale".
  */
 export interface RecordSale {
-  address: string;
+  address: string | null;
   area_name: string;
   display_name: string;
   living_area: number | null;
@@ -800,7 +800,7 @@ export interface ValueAnalysisThresholds {
  * via the `definition` "ValueProperty".
  */
 export interface ValueProperty {
-  address: string;
+  address: string | null;
   area: string;
   balcony: boolean | null;
   construction_year: number | null;
@@ -816,12 +816,12 @@ export interface ValueProperty {
   longitude?: number | null;
   missing_core_fields: string[];
   monthly_fee: number | null;
-  municipality: string;
+  municipality: string | null;
   predicted_price: number;
   prediction_delta_absolute: number;
   prediction_delta_percentage: number;
   price_per_sqm: number | null;
-  property_type: string;
+  property_type: string | null;
   rank_suppressed_reason: string | null;
   rooms: number | null;
   sold_date: string;

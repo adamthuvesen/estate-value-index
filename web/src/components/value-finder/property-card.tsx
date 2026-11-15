@@ -49,9 +49,9 @@ export function PropertyCard({ property }: PropertyCardProps) {
         <div className="min-w-0">
           <h3
             className="truncate font-display text-[15px] font-semibold leading-tight text-ledger-text"
-            title={property.address}
+            title={property.address ?? undefined}
           >
-            {property.address}
+            {property.address ?? "Address unknown"}
           </h3>
           <p className="mt-1 flex items-center gap-1.5 truncate text-[12px]">
             <span className="truncate text-ledger-muted">
@@ -61,7 +61,7 @@ export function PropertyCard({ property }: PropertyCardProps) {
               >
                 {titleCaseArea(property.area)}
               </Link>{" "}
-              · {titleCaseArea(property.municipality)}
+              · {property.municipality ? titleCaseArea(property.municipality) : "–"}
             </span>
             <span aria-hidden className="text-ledger-border-emphasis">
               ·
@@ -189,9 +189,9 @@ function InsufficientDataCard({ property }: PropertyCardProps) {
         <div className="min-w-0">
           <h3
             className="truncate font-display text-[15px] font-semibold leading-tight text-ledger-text"
-            title={property.address}
+            title={property.address ?? undefined}
           >
-            {property.address}
+            {property.address ?? "Address unknown"}
           </h3>
           <p className="mt-1 truncate text-[12px] text-ledger-muted">
             <Link
@@ -200,7 +200,7 @@ function InsufficientDataCard({ property }: PropertyCardProps) {
             >
               {titleCaseArea(property.area)}
             </Link>{" "}
-            · {titleCaseArea(property.municipality)}
+            · {property.municipality ? titleCaseArea(property.municipality) : "–"}
           </p>
         </div>
         <Badge variant="neutral" className="shrink-0">

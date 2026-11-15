@@ -33,14 +33,14 @@ type ValueTier = Literal[
 class ValueProperty(_Strict):
     listing_id: str
     url: str | None
-    address: str
+    address: str | None
     area: str
-    municipality: str
+    municipality: str | None
     # Null on suppressed rows (rank_suppressed_reason "missing_living_area").
     living_area: float | None
     # Nullable in the listing row; the export keeps listings without them.
     rooms: float | None
-    property_type: str
+    property_type: str | None
     construction_year: float | None
     monthly_fee: float | None
     floor: float | None
@@ -314,7 +314,7 @@ class Histogram(_Strict):
 
 
 class RecordSale(_Strict):
-    address: str
+    address: str | None
     area_name: str
     display_name: str
     sold_date: str

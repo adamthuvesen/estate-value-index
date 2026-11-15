@@ -160,7 +160,7 @@ function buildPredicates(filters: ValueFinderFilters): Predicate[] {
     const types = new Set(
       Array.isArray(filters.property_type) ? filters.property_type : [filters.property_type],
     );
-    predicates.push((p) => types.has(p.property_type));
+    predicates.push((p) => p.property_type !== null && types.has(p.property_type));
   }
 
   if (filters.min_living_area !== undefined) {
@@ -208,9 +208,9 @@ function buildPredicates(filters: ValueFinderFilters): Predicate[] {
     const needle = filters.search.toLowerCase();
     predicates.push(
       (p) =>
-        p.address.toLowerCase().includes(needle) ||
+        (p.address ?? "").toLowerCase().includes(needle) ||
         p.area.toLowerCase().includes(needle) ||
-        p.municipality.toLowerCase().includes(needle),
+        (p.municipality ?? "").toLowerCase().includes(needle),
     );
   }
 

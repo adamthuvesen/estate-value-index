@@ -49,8 +49,8 @@ function buildMetadataResponse(data: ValueAnalysisData): ValueFinderFacetsRespon
   // limit on large datasets) plus four `data.properties.map(...)` allocations.
   for (const property of data.properties) {
     areas.add(property.area);
-    municipalities.add(property.municipality);
-    propertyTypes.add(property.property_type);
+    if (property.municipality) municipalities.add(property.municipality);
+    if (property.property_type) propertyTypes.add(property.property_type);
     updateRange(priceRange, property.sold_price);
     updateRange(livingAreaRange, property.living_area);
     updateRange(roomsRange, property.rooms);
